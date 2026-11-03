@@ -196,19 +196,27 @@ git push
 - 在浏览器中验证首页、开课、多轮对话、呼叫老师、报告评分、手写板、题目图片、结束讲课、刷新恢复；
 - 在 390 px 手机宽度和 1440 px 桌面宽度下检查，无横向溢出，控制台无错误；
 - 运行 `node --check` 与密钥/隐私扫描，未发现真实密钥；
-- 执行 `git init -b main`、`git add .`，并创建本地提交 `6085f45`（16 个文件）；
-- 由于环境没有配置 Git 身份，该提交暂时使用中性作者 `Feynman Classroom <feynman-classroom@users.noreply.github.com>`。
+- 执行 `git init -b main`、`git add .`，并创建本地提交 `6df8b1c`；
+- 使用中性作者 `Feynman Classroom <feynman-classroom@users.noreply.github.com>`（本机未配置 Git 身份）；
+- 通过 Git Credential Manager 以 GitHub 账号 `yanqing11` 完成设备码授权；
+- 执行 `git push -u origin main`，远端 `refs/heads/main` 指向 `6df8b1c`；
+- 通过 GitHub Pages API 启用发布：分支 `main`、目录 `/`，构建状态 `built`；
+- 验证线上首页与全部资源均返回 HTTP 200，控制台无错误。
 
-如需把提交作者改成你自己的姓名与邮箱，在推送前执行：
+线上地址：
+
+| 项目 | URL |
+| --- | --- |
+| 仓库 | <https://github.com/yanqing11/feynman-classroom> |
+| GitHub Pages | <https://yanqing11.github.io/feynman-classroom/> |
+
+如需把提交作者改成你自己的姓名与邮箱：
 
 ```bash
 git config user.name "Your Name"
 git config user.email "you@example.com"
 git commit --amend --reset-author --no-edit
+git push --force-with-lease
 ```
 
-尚未执行：
-
-- `git remote add`、`git push`、Pages API：仓库地址仍是占位符，且没有可用的 GitHub 认证。
-
-拿到真实仓库地址并配置提交身份后，把 `<owner>/<repo>` 替换成实际值，按第 2–4 节执行即可。
+注意：`--force-with-lease` 会改写公开历史，仅在确认没有其他人基于该提交工作时使用。
