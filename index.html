@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=20261103b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -144,6 +144,16 @@
             </div>
 
             <div class="chat-body" id="chatBody">
+              <section class="topic-card" id="topicCard" aria-label="本次题目" hidden>
+                <div class="topic-card-inner">
+                  <div class="topic-card-head">
+                    <span class="topic-card-label">本次题目</span>
+                    <span class="topic-card-hint">小问会围绕这道题追问</span>
+                  </div>
+                  <p class="topic-card-text" id="topicCardText"></p>
+                  <img class="topic-card-image" id="topicCardImage" alt="题目图片" data-zoom="true" hidden>
+                </div>
+              </section>
               <div class="message-list" id="messageList" role="log" aria-live="polite" aria-label="对话记录"></div>
               <div class="typing-row" id="typingIndicator" hidden>
                 <div class="message-avatar student-avatar" aria-hidden="true">问</div>
@@ -449,6 +459,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=20261103b"></script>
 </body>
 </html>

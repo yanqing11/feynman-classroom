@@ -140,6 +140,9 @@ const refs = {
   callTeacherMobile: $('#callTeacherMobile'),
   callTeacherMobileLabel: $('#callTeacherMobileLabel'),
   chatBody: $('#chatBody'),
+  topicCard: $('#topicCard'),
+  topicCardText: $('#topicCardText'),
+  topicCardImage: $('#topicCardImage'),
   messageList: $('#messageList'),
   typingIndicator: $('#typingIndicator'),
   composer: $('#composer'),
@@ -342,6 +345,7 @@ function syncChrome() {
 
   refs.topbarTopic.textContent = session?.topic || '';
   refs.chatTopic.textContent = session?.topic || '—';
+  renderTopicCard(session);
   const turns = session ? humanTurnCount(session) : 0;
   const questions = session
     ? session.messages.filter((message) => !message.hidden && message.role === 'assistant').length
@@ -382,6 +386,30 @@ function syncChrome() {
 
   renderConnection();
   updateSettingsButtonState();
+}
+
+function renderTopicCard(session) {
+  const topic = (session?.topic || '').trim();
+  const image = session?.messages?.[0]?.images?.[0] || '';
+
+  refs.topicCard.hidden = !topic;
+  refs.chatTopic.title = topic;
+  refs.topbarTopic.title = topic;
+
+  if (refs.topicCardText.textContent !== topic) {
+    refs.topicCardText.textContent = topic;
+  }
+
+  if (refs.topicCardImage.dataset.src !== image) {
+    refs.topicCardImage.dataset.src = image;
+    if (image) {
+      refs.topicCardImage.src = image;
+      refs.topicCardImage.hidden = false;
+    } else {
+      refs.topicCardImage.removeAttribute('src');
+      refs.topicCardImage.hidden = true;
+    }
+  }
 }
 
 function renderConnection() {

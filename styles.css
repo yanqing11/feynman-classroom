@@ -945,6 +945,64 @@ body.is-chat .footer {
   padding: 28px clamp(16px, 3vw, 32px) 16px;
 }
 
+.topic-card {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px clamp(16px, 3vw, 32px) 0;
+}
+
+.topic-card-inner {
+  padding: 15px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.topic-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topic-card-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.topic-card-hint {
+  font-size: 11px;
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+
+.topic-card-text {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.topic-card-image {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-deep);
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
 .message-row {
   display: flex;
   align-items: flex-start;
@@ -2721,6 +2779,19 @@ input[type="range"] {
 
   .message-list {
     padding-top: 20px;
+  }
+
+  .topic-card {
+    padding-top: 14px;
+  }
+
+  .topic-card-text {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  .topic-card-image {
+    max-height: 260px;
   }
 }
 
