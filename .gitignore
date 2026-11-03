@@ -1,0 +1,27 @@
+# 本地密钥与个人配置
+.env
+.env.*
+!.env.example
+config.local.js
+js/config.local.js
+secrets.*
+*.pem
+*.key
+
+# 依赖与构建产物（本项目为零构建静态站点）
+node_modules/
+dist/
+.vite/
+.cache/
+
+# 操作系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# 日志与临时文件
+*.log
+*.tmp
+*.bak

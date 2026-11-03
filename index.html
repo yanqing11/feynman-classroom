@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="费曼小课堂：把数学讲给一个会追问的 AI 学生听，再用 AI 老师的量化报告找到自己的理解缺口。">
+  <meta name="theme-color" content="#f6f2e9">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
+  <title>费曼小课堂 · 讲给一个会追问的学生听</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="brand" id="brandHome" type="button" aria-label="回到首页">
+        <span class="brand-mark" aria-hidden="true">∫</span>
+        <span class="brand-text">
+          <strong>费曼小课堂</strong>
+          <small>FEYNMAN CLASSROOM</small>
+        </span>
+      </button>
+
+      <div class="topbar-session" id="topbarSession" hidden>
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="topbar-topic" id="topbarTopic"></span>
+      </div>
+
+      <div class="topbar-actions">
+        <span class="connection-pill" id="connectionPill" title="AI 连接状态">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="connectionLabel">未连接</span>
+        </span>
+        <button class="btn btn-ghost btn-sm" id="settingsBtn" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.54h.01A1.7 1.7 0 0 0 10.04 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+          设置
+        </button>
+        <button class="btn btn-ghost btn-sm btn-danger-ghost" id="endSessionBtn" type="button" hidden>结束讲课</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ============ HOME ============ -->
+      <section class="screen home-screen" id="homeScreen">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span>费曼学习法 × 苏格拉底式提问</p>
+            <h1>把你会的东西，<br>讲给一个<span class="marker">听不懂</span>的学生。</h1>
+            <p class="lede">数学学困生缺的往往不是知识点，而是一个把思路说出来的机会。现在，你是老师——AI 学生「小问」会不断追问，直到你把每一步都讲清楚。</p>
+
+            <div class="hero-dialogue" aria-hidden="true">
+              <div class="mini-bubble mini-student">
+                <span class="mini-avatar">问</span>
+                <p>老师，为什么这一步要两边同时加 9 啊？</p>
+              </div>
+              <div class="mini-bubble mini-teacher">
+                <p>因为我想把左边凑成一个完全平方……</p>
+                <span class="mini-avatar">我</span>
+              </div>
+            </div>
+
+            <div class="how-steps">
+              <div class="how-step">
+                <span class="step-num">01</span>
+                <div><strong>输出倒逼输入</strong><p>讲不清的地方，就是你还没真正懂的地方。</p></div>
+              </div>
+              <div class="how-step">
+                <span class="step-num">02</span>
+                <div><strong>只提问，不代答</strong><p>AI 学生装傻、追问、要例子，但绝不替你写出答案。</p></div>
+              </div>
+              <div class="how-step">
+                <span class="step-num">03</span>
+                <div><strong>量化诊断</strong><p>随时呼叫 AI 老师，拿到三维评分和下一次的讲法。</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="topic-wrap">
+            <div class="topic-card paper-card">
+              <div class="tape" aria-hidden="true"></div>
+              <div class="card-heading">
+                <span class="card-kicker">START A LESSON</span>
+                <h2>今天想讲什么？</h2>
+                <p>选一个你“好像会、但讲不清”的数学主题。越具体越好。</p>
+              </div>
+
+              <label class="sr-only" for="topicInput">讲课主题或题目</label>
+              <textarea id="topicInput" class="topic-input" rows="4" maxlength="1200"
+                placeholder="例如：用配方法解 x² − 6x + 5 = 0，并讲清楚每一步为什么这样做……"></textarea>
+
+              <div class="example-row" id="exampleChips" aria-label="示例主题"></div>
+
+              <div class="topic-image-row">
+                <input type="file" id="topicImageInput" accept="image/*" hidden>
+                <button class="btn btn-outline btn-sm" id="topicImageBtn" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                  导入题目图片
+                </button>
+                <span class="image-hint" id="topicImageHint">支持 JPG / PNG，可手写拍照</span>
+              </div>
+              <div class="topic-image-preview" id="topicImagePreview" hidden>
+                <img id="topicImageThumb" alt="题目图片预览">
+                <button class="icon-btn remove-image" id="removeTopicImage" type="button" aria-label="移除题目图片">×</button>
+              </div>
+
+              <button class="btn btn-primary btn-start" id="startBtn" type="button">
+                开始讲课
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+              </button>
+
+              <p class="privacy-note">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                API Key 只保存在你的浏览器里，不经过本站服务器。
+              </p>
+            </div>
+
+            <div class="side-note">
+              <span class="side-note-mark">“</span>
+              <p>如果你能把一个概念讲到十二岁的孩子都听懂，你才是真的懂了。</p>
+              <span class="side-note-by">— 理查德·费曼</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CHAT ============ -->
+      <section class="screen chat-screen" id="chatScreen" hidden>
+        <div class="chat-layout">
+          <section class="chat-panel paper-card" aria-label="讲课对话">
+            <div class="chat-head">
+              <div class="chat-topic">
+                <span class="chat-kicker">正在讲课</span>
+                <h2 id="chatTopic">—</h2>
+              </div>
+              <div class="chat-head-right">
+                <span class="round-badge" id="roundBadge">第 0 轮</span>
+                <button class="btn btn-primary btn-sm mobile-teacher-btn" id="callTeacherMobile" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
+                  <span id="callTeacherMobileLabel">呼叫老师</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="chat-body" id="chatBody">
+              <div class="message-list" id="messageList" role="log" aria-live="polite" aria-label="对话记录"></div>
+              <div class="typing-row" id="typingIndicator" hidden>
+                <div class="message-avatar student-avatar" aria-hidden="true">问</div>
+                <div class="typing-bubble">
+                  <span class="typing-label">小问正在想</span>
+                  <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                </div>
+              </div>
+            </div>
+
+            <form class="composer" id="composer">
+              <div class="pending-images" id="pendingImages" hidden></div>
+              <div class="composer-box">
+                <label class="sr-only" for="messageInput">你的讲解</label>
+                <textarea id="messageInput" rows="1" maxlength="4000"
+                  placeholder="把你的思路讲出来…… 不用完美，边想边说也可以。"></textarea>
+                <div class="composer-toolbar">
+                  <div class="composer-tools">
+                    <input type="file" id="chatImageInput" accept="image/*" hidden>
+                    <button class="tool-btn" id="attachBtn" type="button" title="添加图片">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                      <span>图片</span>
+                    </button>
+                    <button class="tool-btn" id="handwritingBtn" type="button" title="打开手写板">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3Z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5Z"/><path d="m2 2 7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
+                      <span>手写</span>
+                    </button>
+                    <button class="tool-btn" id="micBtn" type="button" title="语音输入">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/><path d="M8 22h8"/></svg>
+                      <span id="micLabel">语音</span>
+                    </button>
+                  </div>
+                  <div class="composer-submit">
+                    <span class="send-hint">Enter 发送 · Shift+Enter 换行</span>
+                    <button class="btn btn-primary btn-send" id="sendBtn" type="submit" aria-label="发送讲解">
+                      <span>发送</span>
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <aside class="side-panel">
+            <div class="side-card progress-card">
+              <div class="side-card-head">
+                <span class="side-kicker">TEACHING CHECKLIST</span>
+                <h3>讲清楚这三件事</h3>
+              </div>
+              <ul class="check-list">
+                <li><span class="check-index">1</span><div><strong>题目在问什么</strong><p>用自己的话复述条件与目标。</p></div></li>
+                <li><span class="check-index">2</span><div><strong>每一步为什么</strong><p>不是“怎么做”，而是“凭什么能做”。</p></div></li>
+                <li><span class="check-index">3</span><div><strong>换个例子验证</strong><p>代一个数回去，看看结论站不站得住。</p></div></li>
+              </ul>
+              <div class="session-stats">
+                <div><span id="statTurns">0</span><small>你的讲解</small></div>
+                <div><span id="statQuestions">0</span><small>小问的追问</small></div>
+              </div>
+            </div>
+
+            <div class="side-card teacher-call-card">
+              <div class="teacher-seal" aria-hidden="true">评</div>
+              <div class="side-card-head">
+                <span class="side-kicker">AI TEACHER · 旁听中</span>
+                <h3>卡住了？呼叫老师。</h3>
+              </div>
+              <p>AI 老师会看完整个对话，指出逻辑漏洞和表达盲区，再给你下一次的具体讲法。</p>
+              <button class="btn btn-primary btn-block" id="callTeacherBtn" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
+                <span id="callTeacherLabel">呼叫 AI 老师点评</span>
+              </button>
+              <button class="text-link" id="viewLastReportBtn" type="button" hidden>查看上一次诊断报告 →</button>
+              <p class="tiny-note">建议先讲 2–3 轮，老师的诊断会更准确。</p>
+            </div>
+
+            <div class="side-card model-card">
+              <div class="model-row">
+                <span class="status-dot" id="sideStatusDot" aria-hidden="true"></span>
+                <div>
+                  <strong id="sideModelName">未连接 AI</strong>
+                  <p id="sideModelHint">在设置中填入 API Key 后开始</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" id="footer">
+      <span>费曼小课堂 · 输出，是最好的输入。</span>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <span>零后端 · BYOK · 不收集个人信息</span>
+    </footer>
+  </div>
+
+  <!-- ============ REPORT MODAL ============ -->
+  <div class="modal-layer" id="reportModal" hidden>
+    <div class="modal-backdrop" data-close="reportModal"></div>
+    <div class="modal report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="report-topbar">
+        <span class="report-stamp">AI TEACHER REVIEW</span>
+        <button class="icon-btn modal-close" data-close="reportModal" type="button" aria-label="关闭报告">×</button>
+      </div>
+
+      <div class="report-loading" id="reportLoading" hidden>
+        <div class="loader-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h2>陈老师正在看你的课……</h2>
+        <p>正在对照你的讲解，检查概念、步骤和表达。通常需要 10–20 秒。</p>
+        <div class="skeleton-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="report-error" id="reportError" hidden>
+        <div class="error-mark" aria-hidden="true">!</div>
+        <h2>老师暂时没看完</h2>
+        <p id="reportErrorText">发生了未知错误。</p>
+        <div class="report-error-actions">
+          <button class="btn btn-primary" id="retryReportBtn" type="button">再试一次</button>
+          <button class="btn btn-ghost" data-close="reportModal" type="button">回到对话</button>
+        </div>
+      </div>
+
+      <div class="report-content" id="reportContent" hidden>
+        <header class="report-head">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line"></span>学习诊断报告</p>
+            <h2 id="reportTitle">你把这道题，讲清楚了吗？</h2>
+            <p class="report-topic" id="reportTopic"></p>
+          </div>
+          <div class="overall-score">
+            <div class="score-ring" id="overallRing" style="--score:0">
+              <div class="score-ring-inner">
+                <strong id="overallScore">0</strong><span>%</span>
+                <small>综合</small>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="report-verdict">
+          <span class="verdict-label">老师总评</span>
+          <p id="reportVerdict"></p>
+        </div>
+
+        <section class="report-section">
+          <div class="section-heading"><span>01</span><h3>三维评分</h3></div>
+          <div class="metric-grid" id="metricGrid"></div>
+        </section>
+
+        <section class="report-section">
+          <div class="section-heading"><span>02</span><h3>关键理解缺口</h3><p>不是挑错，是帮你看见下一次可以补哪里。</p></div>
+          <div class="misconception-list" id="misconceptionList"></div>
+        </section>
+
+        <section class="report-section">
+          <div class="section-heading"><span>03</span><h3>下一次可以这样讲</h3><p>把建议变成一句能直接说出口的话。</p></div>
+          <div class="next-step-list" id="nextStepList"></div>
+        </section>
+
+        <section class="report-section strengths-section" id="strengthsSection" hidden>
+          <div class="section-heading"><span>04</span><h3>你做得好的地方</h3></div>
+          <ul class="strength-list" id="strengthList"></ul>
+        </section>
+
+        <div class="encouragement-card">
+          <span class="teacher-sign" aria-hidden="true">陈</span>
+          <div>
+            <span class="verdict-label">陈老师想说</span>
+            <p id="reportEncouragement"></p>
+          </div>
+        </div>
+
+        <footer class="report-actions">
+          <button class="btn btn-outline" id="copyReportBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制报告
+          </button>
+          <button class="btn btn-ghost" data-close="reportModal" type="button">继续讲一会儿</button>
+          <button class="btn btn-primary" id="restartFromReportBtn" type="button">换个主题，重新开始</button>
+        </footer>
+        <p class="report-disclaimer">本报告由 AI 根据对话内容生成，仅用于学习诊断，不替代老师的人工判断。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS MODAL ============ -->
+  <div class="modal-layer" id="settingsModal" hidden>
+    <div class="modal-backdrop" data-close="settingsModal"></div>
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>BRING YOUR OWN KEY</p>
+          <h2 id="settingsTitle">连接你的 AI</h2>
+          <p>小课堂没有后端。你的 Key 只保存在本机浏览器，并直接发往你选择的模型服务商。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="settingsModal" type="button" aria-label="关闭设置">×</button>
+      </div>
+
+      <form id="settingsForm" class="settings-form" novalidate>
+        <div class="field">
+          <label for="apiKeyInput">API Key</label>
+          <div class="key-input-wrap">
+            <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-v1-…">
+            <button class="key-toggle" id="toggleKeyBtn" type="button" aria-label="显示或隐藏 API Key">显示</button>
+          </div>
+          <p class="field-hint">推荐 OpenRouter，可同时使用 GPT-4o mini 与 Claude Haiku。也可以在 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a> 创建。</p>
+        </div>
+
+        <div class="field">
+          <label for="modelInput">模型</label>
+          <input id="modelInput" type="text" list="modelPresets" autocomplete="off" spellcheck="false" placeholder="openai/gpt-4o-mini">
+          <datalist id="modelPresets"></datalist>
+          <p class="field-hint">默认 <code>openai/gpt-4o-mini</code>，便宜、够快，也支持图片。也可以换成 <code>anthropic/claude-3-haiku</code>。</p>
+        </div>
+
+        <div class="field">
+          <label for="temperatureInput">表达活跃度 <span class="range-value" id="temperatureValue">0.75</span></label>
+          <input id="temperatureInput" type="range" min="0" max="1.2" step="0.05" value="0.75">
+          <div class="range-labels"><span>更严谨</span><span>更活泼</span></div>
+        </div>
+
+        <details class="advanced">
+          <summary>高级设置</summary>
+          <div class="field">
+            <label for="baseUrlInput">API Base URL</label>
+            <input id="baseUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1">
+            <p class="field-hint">任何兼容 OpenAI Chat Completions 的服务都可以。浏览器直连需要服务商支持 CORS。</p>
+          </div>
+        </details>
+
+        <div class="settings-status" id="settingsStatus" hidden role="status"></div>
+
+        <div class="settings-actions">
+          <button class="btn btn-outline" id="testKeyBtn" type="button">测试连接</button>
+          <div class="settings-actions-right">
+            <button class="btn btn-ghost" id="clearKeyBtn" type="button">清除 Key</button>
+            <button class="btn btn-primary" id="saveSettingsBtn" type="submit">保存并开始</button>
+          </div>
+        </div>
+
+        <p class="settings-note">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+          本站不上传、不收集、不记录你的 Key。清除浏览器数据会同时清除 Key。
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ HANDWRITING MODAL ============ -->
+  <div class="modal-layer" id="handwritingModal" hidden>
+    <div class="modal-backdrop" data-close="handwritingModal"></div>
+    <div class="modal handwriting-modal" role="dialog" aria-modal="true" aria-labelledby="handwritingTitle" tabindex="-1">
+      <div class="handwriting-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>HANDWRITING PAD</p>
+          <h2 id="handwritingTitle">手写你的推导</h2>
+          <p>适合画图、列竖式、写公式。支持鼠标、触控和 Apple Pencil。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="handwritingModal" type="button" aria-label="关闭手写板">×</button>
+      </div>
+
+      <div class="pad-toolbar">
+        <div class="pen-colors" role="group" aria-label="笔迹颜色">
+          <button class="color-swatch is-active" type="button" data-color="#1f2a2a" style="--swatch:#1f2a2a" aria-label="墨黑" aria-pressed="true"></button>
+          <button class="color-swatch" type="button" data-color="#1f6f5c" style="--swatch:#1f6f5c" aria-label="深绿" aria-pressed="false"></button>
+          <button class="color-swatch" type="button" data-color="#c15b3f" style="--swatch:#c15b3f" aria-label="砖红" aria-pressed="false"></button>
+          <button class="color-swatch" type="button" data-color="#2f5d9e" style="--swatch:#2f5d9e" aria-label="靛蓝" aria-pressed="false"></button>
+        </div>
+        <div class="pad-tools">
+          <button class="tool-btn" id="eraserBtn" type="button" aria-pressed="false">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4-4L14 6l6 6-9 9H7Z"/><path d="m11 10 6 6"/><path d="M5 21h16"/></svg>
+            橡皮
+          </button>
+          <button class="tool-btn" id="undoBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+            撤销
+          </button>
+          <button class="tool-btn" id="clearPadBtn" type="button">清空</button>
+        </div>
+      </div>
+
+      <div class="pad-wrap">
+        <canvas id="handwritingCanvas" aria-label="手写画布"></canvas>
+        <div class="pad-placeholder" id="padPlaceholder">在这里写或画……</div>
+      </div>
+
+      <div class="handwriting-actions">
+        <span class="pad-hint">提示：写完点“插入消息”，会作为图片发给小问。</span>
+        <div>
+          <button class="btn btn-ghost" data-close="handwritingModal" type="button">取消</button>
+          <button class="btn btn-primary" id="insertHandwritingBtn" type="button">插入消息</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ IMAGE LIGHTBOX ============ -->
+  <div class="lightbox" id="imageLightbox" hidden>
+    <button class="lightbox-close" id="closeLightbox" type="button" aria-label="关闭图片">×</button>
+    <img id="lightboxImage" alt="放大查看的图片">
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
