@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="费曼小课堂：把数学讲给一个会追问的 AI 学生听，再用 AI 老师的量化报告找到自己的理解缺口。">
-  <meta name="theme-color" content="#f6f2e9">
+  <meta name="theme-color" content="#fdfdfb">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261104a">
+  <link rel="stylesheet" href="./styles.css?v=20261104b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -22,6 +22,8 @@
           <small>FEYNMAN CLASSROOM</small>
         </span>
       </button>
+
+      <p class="topbar-tagline" id="topbarTagline">费曼学习法 × 苏格拉底提问</p>
 
       <div class="topbar-session" id="topbarSession" hidden>
         <span class="live-dot" aria-hidden="true"></span>
@@ -48,93 +50,46 @@
     <main id="main">
       <!-- ============ HOME ============ -->
       <section class="screen home-screen" id="homeScreen">
-        <div class="hero-grid">
-          <div class="hero-copy">
-            <p class="eyebrow"><span class="eyebrow-line"></span>费曼学习法 × 苏格拉底式提问</p>
-            <h1>把你会的东西，<br>讲给一个<span class="marker">听不懂</span>的学生。</h1>
-            <p class="lede">数学学困生缺的往往不是知识点，而是一个把思路说出来的机会。现在，你是老师——AI 学生「小问」会不断追问，直到你把每一步都讲清楚。</p>
+        <div class="home-hero">
+          <p class="eyebrow home-eyebrow">
+            <span class="eyebrow-line" aria-hidden="true"></span>
+            费曼学习法 × 苏格拉底提问
+            <span class="eyebrow-line" aria-hidden="true"></span>
+          </p>
+          <h1 class="home-title">讲一遍，你就真的懂了。</h1>
+          <p class="home-subtitle">你来讲，AI 持续追问，找到知识盲区。</p>
+        </div>
 
-            <div class="hero-dialogue" aria-hidden="true">
-              <div class="mini-bubble mini-student">
-                <span class="mini-avatar">问</span>
-                <p>老师，为什么这一步要两边同时加 9 啊？</p>
-              </div>
-              <div class="mini-bubble mini-teacher">
-                <p>因为我想把左边凑成一个完全平方……</p>
-                <span class="mini-avatar">我</span>
-              </div>
+        <div class="home-card">
+          <div class="home-input">
+            <label class="sr-only" for="topicInput">讲课主题或题目</label>
+            <textarea id="topicInput" class="topic-input" rows="3" maxlength="1200"
+              placeholder="输入你想讲解的内容，也可以上传题目图片。"></textarea>
+
+            <div class="topic-image-preview" id="topicImagePreview" hidden>
+              <img id="topicImageThumb" alt="题目图片预览">
+              <button class="icon-btn remove-image" id="removeTopicImage" type="button" aria-label="移除题目图片">×</button>
             </div>
 
-            <div class="how-steps">
-              <div class="how-step">
-                <span class="step-num">01</span>
-                <div><strong>输出倒逼输入</strong><p>讲不清的地方，就是你还没真正懂的地方。</p></div>
-              </div>
-              <div class="how-step">
-                <span class="step-num">02</span>
-                <div><strong>只提问，不代答</strong><p>AI 学生装傻、追问、要例子，但绝不替你写出答案。</p></div>
-              </div>
-              <div class="how-step">
-                <span class="step-num">03</span>
-                <div><strong>量化诊断</strong><p>随时呼叫 AI 老师，拿到三维评分和下一次的讲法。</p></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="topic-wrap">
-            <div class="topic-card paper-card">
-              <div class="tape" aria-hidden="true"></div>
-              <div class="card-heading">
-                <span class="card-kicker">START A LESSON</span>
-                <h2>今天想讲什么？</h2>
-                <p>选一个你“好像会、但讲不清”的数学主题。越具体越好。</p>
-              </div>
-
-              <label class="sr-only" for="topicInput">讲课主题或题目</label>
-              <textarea id="topicInput" class="topic-input" rows="4" maxlength="1200"
-                placeholder="例如：用配方法解 x² − 6x + 5 = 0，并讲清楚每一步为什么这样做……"></textarea>
-
-              <div class="example-row" id="exampleChips" aria-label="示例主题"></div>
-
+            <div class="home-input-foot">
               <div class="topic-image-row">
                 <input type="file" id="topicImageInput" accept="image/*" hidden>
                 <button class="btn btn-outline btn-sm" id="topicImageBtn" type="button">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                  导入题目图片
+                  上传题目图片
                 </button>
-                <span class="image-hint" id="topicImageHint">支持 JPG / PNG · 只传图片也能自动识别题目</span>
+                <span class="image-hint" id="topicImageHint">支持 JPG / PNG</span>
               </div>
-              <div class="topic-image-preview" id="topicImagePreview" hidden>
-                <img id="topicImageThumb" alt="题目图片预览">
-                <button class="icon-btn remove-image" id="removeTopicImage" type="button" aria-label="移除题目图片">×</button>
-              </div>
-
-              <button class="btn btn-primary btn-start" id="startBtn" type="button">
-                开始讲课
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-              </button>
-
-              <p class="privacy-note">
-                <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                API Key 只保存在你的浏览器里，不经过本站服务器。
-              </p>
+              <button class="btn btn-primary btn-start" id="startBtn" type="button">开始讲课</button>
             </div>
-
-            <div class="side-note">
-              <span class="side-note-mark">“</span>
-              <p>如果你能把一个概念讲到十二岁的孩子都听懂，你才是真的懂了。</p>
-              <span class="side-note-by">— 理查德·费曼</span>
-            </div>
-
-            <button class="history-entry" id="homeHistoryBtn" type="button" hidden>
-              <span class="history-entry-mark" aria-hidden="true">档</span>
-              <span class="history-entry-text">
-                <strong>学习档案</strong>
-                <small id="homeHistoryMeta">还没有记录</small>
-              </span>
-              <span class="history-entry-arrow" aria-hidden="true">→</span>
-            </button>
           </div>
+
+          <div class="example-row" id="exampleChips" aria-label="示例主题"></div>
+
+          <p class="privacy-note">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            API Key 仅保存在本地。
+          </p>
         </div>
       </section>
 
@@ -535,6 +490,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261104a"></script>
+  <script type="module" src="./app.js?v=20261104b"></script>
 </body>
 </html>
