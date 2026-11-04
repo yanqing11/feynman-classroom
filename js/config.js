@@ -16,7 +16,9 @@ export const APP = {
     model: 'qwen/qwen3-vl-30b-a3b-instruct',
     temperature: 0.75,
     proxyUrl: 'https://feynman-classroom-proxy.netlify.app/v1',
-    accessCode: 'feynman-2026-k7m3'
+    accessCode: 'feynman-2026-k7m3',
+    // 旧的默认代理已被 DNS 污染，学生本地设置里如果还存着它，加载时自动换成上面的新地址。
+    retiredProxyUrls: ['https://feynman-proxy.yangqingliu64.workers.dev']
   },
   limits: {
     maxImages: 4,

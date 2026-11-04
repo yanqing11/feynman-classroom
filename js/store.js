@@ -30,6 +30,8 @@ function safeParse(value) {
 export function loadSettings() {
   const stored = safeParse(localStorage.getItem(APP.storage.settings)) || {};
   const storedProxy = typeof stored.proxyUrl === 'string' ? stored.proxyUrl.trim() : '';
+  const retired = (APP.defaults.retiredProxyUrls || []).map((url) => url.replace(/\/+$/, ''));
+  const proxyIsRetired = retired.includes(storedProxy.replace(/\/+$/, ''));
   return {
     apiKey: typeof stored.apiKey === 'string' ? stored.apiKey : '',
     baseUrl:
@@ -44,7 +46,7 @@ export function loadSettings() {
       Number.isFinite(Number(stored.temperature)) && Number(stored.temperature) >= 0
         ? Math.min(1.2, Number(stored.temperature))
         : APP.defaults.temperature,
-    proxyUrl: storedProxy || APP.defaults.proxyUrl || '',
+    proxyUrl: storedProxy && !proxyIsRetired ? storedProxy : (APP.defaults.proxyUrl || ''),
     accessCode:
       typeof stored.accessCode === 'string' && stored.accessCode.trim()
         ? stored.accessCode.trim()
