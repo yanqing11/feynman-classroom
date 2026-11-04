@@ -24,6 +24,19 @@ function el(tag, className, text) {
   return node;
 }
 
+const TEXT_ONLY_MODELS = new Set([
+  'deepseek/deepseek-chat-v3-0324',
+  'qwen/qwen3.7-flash'
+]);
+
+function isTextOnlyModel(model) {
+  return TEXT_ONLY_MODELS.has(String(model || '').trim().toLowerCase());
+}
+
+function warnTextOnlyModel() {
+  toast('当前模型只支持文字，看不了图片。请到设置把模型换成 qwen/qwen3-vl-30b-a3b-instruct。', 'warm', 8000);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -582,6 +595,14 @@ async function handleStart() {
     return;
   }
 
+  if (image && isTextOnlyModel(store.settings.model)) {
+    warnTextOnlyModel();
+    startAfterSettings = true;
+    fillSettingsForm();
+    openModal('settingsModal');
+    return;
+  }
+
   if (!topic && image) {
     topic = await recognizeTopicFromImage(image);
     if (!topic) return;
@@ -630,6 +651,10 @@ function handleSend(event) {
   if (!content && !images.length) {
     toast('写点什么再发给小问吧。', 'warm');
     refs.messageInput.focus();
+    return;
+  }
+  if (images.length && isTextOnlyModel(store.settings.model)) {
+    warnTextOnlyModel();
     return;
   }
   if (!ensureKey()) return;
@@ -1121,7 +1146,11 @@ async function handleTopicImage(file) {
     refs.topicImageThumb.src = dataUrl;
     refs.topicImagePreview.hidden = false;
     refs.topicImageHint.textContent = '已添加题目图片，可移除后重选';
-    toast('题目图片已添加。', 'success');
+    if (isTextOnlyModel(store.settings.model)) {
+      warnTextOnlyModel();
+    } else {
+      toast('题目图片已添加。', 'success');
+    }
   } catch (error) {
     toast(error.message, 'error');
   }
@@ -1156,7 +1185,11 @@ async function handleChatImages(fileList) {
   }
   if (added) {
     renderPendingImages();
-    toast(`已添加 ${added} 张图片。`, 'success', 2200);
+    if (isTextOnlyModel(store.settings.model)) {
+      warnTextOnlyModel();
+    } else {
+      toast(`已添加 ${added} 张图片。`, 'success', 2200);
+    }
   }
 }
 

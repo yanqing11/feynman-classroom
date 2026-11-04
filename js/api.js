@@ -75,7 +75,7 @@ function providerHint(text) {
   if (/not available in your region|not supported in your (country|region)|region.*restricted/.test(value)) {
     return '当前地区不支持这个模型。请换用 DeepSeek / Gemini 等模型，或改用课堂共享代理。';
   }
-  if (/does not support image|image.*not supported|invalid.*image_url|vision.*not supported/.test(value)) {
+  if (/does not support image|image.*not supported|invalid.*image_url|vision.*not supported|no endpoints found.*(image|vision)/.test(value)) {
     return '这个模型不支持图片输入。请换用支持视觉的模型（如 Qwen3-VL、Mistral Small 3.2），或直接输入题目文字。';
   }
   if (/insufficient (quota|credit)|exceeded your current quota|credit balance/.test(value)) {
