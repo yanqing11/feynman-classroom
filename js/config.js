@@ -15,7 +15,7 @@ export const APP = {
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'qwen/qwen3-vl-30b-a3b-instruct',
     temperature: 0.75,
-    proxyUrl: 'https://feynman-proxy.yangqingliu64.workers.dev',
+    proxyUrl: 'https://feynman-classroom-proxy.netlify.app/v1',
     accessCode: 'feynman-2026-k7m3'
   },
   limits: {

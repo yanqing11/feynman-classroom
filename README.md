@@ -56,15 +56,23 @@ npx serve .
 - 默认：课堂共享代理（不用 Key）；
 - 自定义：填入自己的 API Key，请求直接发往你选择的模型服务商。
 
-> 仓库里没有任何 API Key。共享代理的真正 Key 存放在 Cloudflare Worker 的 Secret 中；自己的 Key 只存在于当前浏览器的 `localStorage`。
+> 仓库里没有任何 API Key。共享代理的真正 Key 存放在 Netlify 环境变量中；自己的 Key 只存在于当前浏览器的 `localStorage`。
 
 ## 课堂共享代理
 
-`worker/` 目录是一个 Cloudflare Worker，用来藏住真正的模型 Key，并做来源校验、访问码、限流、模型白名单和 token 上限。
+默认代理是 **Netlify Edge Function**：
 
-- 部署与接线步骤见 [`worker/README.md`](worker/README.md)；
+```text
+https://feynman-classroom-proxy.netlify.app/v1
+```
+
+选择 Netlify 是因为 `*.netlify.app` 在中国大陆通常可以直连，而 `*.workers.dev` 经常被 DNS 污染。
+
+- 代码在 [`netlify/`](netlify/README.md)，部署与接线步骤见 [`netlify/README.md`](netlify/README.md)；
 - 默认地址写在 `js/config.js` 的 `defaults.proxyUrl` 与 `defaults.accessCode`；
 - 学生打开页面即可开课，不需要填写任何密钥。
+
+`worker/` 目录保留了一个功能等价的 Cloudflare Worker 版本，作为备用部署方案，见 [`worker/README.md`](worker/README.md)。
 
 ## 功能
 
@@ -90,7 +98,13 @@ npx serve .
 ├── index.html              # 唯一的页面入口（必须位于仓库根目录）
 ├── styles.css              # 纸张 / 墨水风格的设计系统
 ├── app.js                  # UI 状态机、事件、渲染
-├── worker/                 # Cloudflare Worker 共享代理（隐藏真正的 API Key）
+├── netlify.toml            # Netlify 站点配置（默认共享代理）
+├── netlify/
+│   ├── edge-functions/
+│   │   └── chat.js         # /v1/chat/completions 代理
+│   ├── public/index.html   # 代理状态页
+│   └── README.md
+├── worker/                 # Cloudflare Worker 备用代理
 │   ├── index.js
 │   ├── wrangler.toml
 │   └── README.md
@@ -118,7 +132,7 @@ npx serve .
 | 项 | 默认值 |
 | --- | --- |
 | API Base URL | `https://openrouter.ai/api/v1` |
-| 课堂共享代理 | `https://feynman-proxy.yangqingliu64.workers.dev` |
+| 课堂共享代理 | `https://feynman-classroom-proxy.netlify.app/v1` |
 | 模型 | `qwen/qwen3-vl-30b-a3b-instruct` |
 | 温度 | `0.75` |
 | 每轮学生回复上限 | `420` tokens |

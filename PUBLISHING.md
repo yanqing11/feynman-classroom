@@ -209,17 +209,55 @@ git push
 | --- | --- |
 | 仓库 | <https://github.com/yanqing11/feynman-classroom> |
 | GitHub Pages | <https://yanqing11.github.io/feynman-classroom/> |
-| 课堂共享代理 | <https://feynman-proxy.yangqingliu64.workers.dev> |
-| 代理健康检查 | <https://feynman-proxy.yangqingliu64.workers.dev/health> |
+| 课堂共享代理（默认） | <https://feynman-classroom-proxy.netlify.app/v1> |
+| 代理健康检查 | <https://feynman-classroom-proxy.netlify.app/v1/chat/completions> |
+| 备用代理（Worker） | <https://feynman-proxy.yangqingliu64.workers.dev> |
 
-## 10. 课堂共享代理（Cloudflare Worker）
+## 10. 课堂共享代理
 
-学生默认不需要 API Key：网页把请求发给 Worker，Worker 用 Secret 里的真实 Key 转发给 OpenRouter。
+学生默认不需要 API Key：网页把请求发给代理，代理用环境变量里的真实 Key 转发给 OpenRouter。
+
+### 10.1 默认：Netlify Edge Function
+
+`*.workers.dev` 在中国大陆经常被 DNS 污染，学生打不开；`*.netlify.app` 通常可以直连。因此默认代理是 Netlify：
+
+```text
+https://feynman-classroom-proxy.netlify.app/v1
+```
+
+代码在 `netlify/`，详细说明见 [`netlify/README.md`](netlify/README.md)。
 
 部署（Token 从本地文件读取，不写进命令历史、不打印）：
 
 ```powershell
-$env:CLOUDFLARE_API_TOKEN = (Get-Content '<本地 Token 文件>' -Raw).Trim()
+$env:NETLIFY_AUTH_TOKEN = (Get-Content '<本地 Netlify Token 文件>' -Raw).Trim()
+$env:NETLIFY_SITE_ID = '<Netlify Site ID>'
+cd D:\Feynman
+npx -y netlify-cli@latest deploy --prod --no-build --dir netlify/public
+```
+
+当前配置：
+
+| 项 | 值 |
+| --- | --- |
+| Netlify 站点 | `feynman-classroom-proxy` |
+| 代理地址 | `https://feynman-classroom-proxy.netlify.app/v1` |
+| 运行方式 | Netlify Edge Function（`netlify/edge-functions/chat.js`） |
+| 允许来源 | `https://yanqing11.github.io`、本地 `127.0.0.1:8000` / `localhost:8000` |
+| 允许模型 | `qwen/qwen3-vl-30b-a3b-instruct`、`qwen/qwen3-vl-8b-instruct`、`mistralai/mistral-small-3.2-24b-instruct`、`deepseek/deepseek-chat-v3-0324` |
+| 限流 | 每 IP 每分钟 30 次（单实例内存计数，软限流） |
+| 单次 token 上限 | 2000 |
+
+> **注意**：Netlify 新站点可能默认开启 SSO 保护，导致所有请求返回 401 登录跳转。需要在站点设置里关闭 SSO / Visitor access，或用 API 设置 `sso_login: false`。
+
+### 10.2 备用：Cloudflare Worker
+
+`worker/` 目录保留一个功能等价的 Worker，接口与 Netlify 版本一致，可作为备份。
+
+部署：
+
+```powershell
+$env:CLOUDFLARE_API_TOKEN = (Get-Content '<本地 Cloudflare Token 文件>' -Raw).Trim()
 $env:CLOUDFLARE_ACCOUNT_ID = '<Cloudflare Account ID>'
 cd worker
 npx -y wrangler@latest deploy
@@ -232,20 +270,9 @@ npx -y wrangler@latest secret put UPSTREAM_KEY   # OpenRouter Key
 npx -y wrangler@latest secret put ACCESS_CODE    # 课堂访问码
 ```
 
-当前配置：
-
-| 项 | 值 |
-| --- | --- |
-| Worker 名称 | `feynman-proxy` |
-| workers.dev 子域 | `yangqingliu64` |
-| 允许来源 | `https://yanqing11.github.io`、本地 `127.0.0.1:8000` / `localhost:8000` |
-| 允许模型 | `qwen/qwen3-vl-30b-a3b-instruct`、`qwen/qwen3-vl-8b-instruct`、`mistralai/mistral-small-3.2-24b-instruct`、`deepseek/deepseek-chat-v3-0324` |
-| 限流 | 每 IP 每分钟 30 次；每日额度默认关闭 |
-| 单次 token 上限 | 2000 |
+Worker 名称 `feynman-proxy`，地址 `https://feynman-proxy.yangqingliu64.workers.dev`。如果以后绑定了自己的域名，把 `js/config.js` 的 `defaults.proxyUrl` 换过去即可。
 
 访问码写在 `js/config.js` 的 `defaults.accessCode`（会随网页公开，只是防扫站的软门槛）。真正的保护是来源校验、限流和模型白名单。
-
-> **网络可达性提醒**：`*.workers.dev` 在中国大陆常被 DNS 污染，若学生打不开代理，需要给 Worker 绑定一个自己的域名（Cloudflare → Workers → feynman-proxy → Settings → Domains & Routes → Add custom domain），或把代理迁到其他可达主机。网页本身在 GitHub Pages 上通常可访问。
 
 ## 如需把提交作者改成你自己的姓名与邮箱
 
