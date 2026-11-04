@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261103j">
+  <link rel="stylesheet" href="./styles.css?v=20261104a">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -33,6 +33,10 @@
           <span class="status-dot" aria-hidden="true"></span>
           <span id="connectionLabel">未连接</span>
         </span>
+        <button class="btn btn-ghost btn-sm" id="historyBtn" type="button" title="查看学习档案">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M7 4v13a3 3 0 0 0 3 3"/><path d="M11 9h5"/><path d="M11 13h5"/></svg>
+          <span class="btn-label">学习档案</span>
+        </button>
         <button class="btn btn-ghost btn-sm" id="settingsBtn" type="button">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.54h.01A1.7 1.7 0 0 0 10.04 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
           设置
@@ -121,6 +125,15 @@
               <p>如果你能把一个概念讲到十二岁的孩子都听懂，你才是真的懂了。</p>
               <span class="side-note-by">— 理查德·费曼</span>
             </div>
+
+            <button class="history-entry" id="homeHistoryBtn" type="button" hidden>
+              <span class="history-entry-mark" aria-hidden="true">档</span>
+              <span class="history-entry-text">
+                <strong>学习档案</strong>
+                <small id="homeHistoryMeta">还没有记录</small>
+              </span>
+              <span class="history-entry-arrow" aria-hidden="true">→</span>
+            </button>
           </div>
         </div>
       </section>
@@ -132,7 +145,7 @@
             <div class="chat-head">
               <div class="chat-topic">
                 <span class="chat-kicker">正在讲课</span>
-                <h2 id="chatTopic">—</h2>
+                <p class="chat-sub">小问会围绕顶部的题目追问</p>
               </div>
               <div class="chat-head-right">
                 <span class="round-badge" id="roundBadge">第 0 轮</span>
@@ -143,17 +156,18 @@
               </div>
             </div>
 
+            <section class="chat-problem" id="topicCard" aria-label="本次题目" hidden>
+              <div class="chat-problem-head">
+                <span class="chat-problem-label">本次题目</span>
+                <button class="chat-problem-toggle" id="topicToggleBtn" type="button" hidden>展开全文</button>
+              </div>
+              <div class="chat-problem-body" id="topicCardBody">
+                <p class="chat-problem-text" id="topicCardText"></p>
+                <img class="chat-problem-image" id="topicCardImage" alt="题目图片" data-zoom="true" hidden>
+              </div>
+            </section>
+
             <div class="chat-body" id="chatBody">
-              <section class="topic-card" id="topicCard" aria-label="本次题目" hidden>
-                <div class="topic-card-inner">
-                  <div class="topic-card-head">
-                    <span class="topic-card-label">本次题目</span>
-                    <span class="topic-card-hint">小问会围绕这道题追问</span>
-                  </div>
-                  <p class="topic-card-text" id="topicCardText"></p>
-                  <img class="topic-card-image" id="topicCardImage" alt="题目图片" data-zoom="true" hidden>
-                </div>
-              </section>
               <div class="message-list" id="messageList" role="log" aria-live="polite" aria-label="对话记录"></div>
               <div class="typing-row" id="typingIndicator" hidden>
                 <div class="message-avatar student-avatar" aria-hidden="true">问</div>
@@ -413,6 +427,58 @@
     </div>
   </div>
 
+  <!-- ============ HISTORY MODAL ============ -->
+  <div class="modal-layer" id="historyModal" hidden>
+    <div class="modal-backdrop" data-close="historyModal"></div>
+    <div class="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle" tabindex="-1">
+      <div class="history-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>LEARNING ARCHIVE</p>
+          <h2 id="historyTitle">学习档案</h2>
+          <p>每讲完一课，主题、轮数和诊断报告都会留在这里，用来看清自己的长期变化。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="historyModal" type="button" aria-label="关闭学习档案">×</button>
+      </div>
+
+      <div class="history-empty" id="historyEmpty" hidden>
+        <div class="history-empty-mark" aria-hidden="true">档</div>
+        <h3>还没有记录</h3>
+        <p>讲完第一课、让 AI 老师点评一次，这里就会出现你的第一份学情档案。</p>
+        <button class="btn btn-primary" data-close="historyModal" type="button">去讲第一课</button>
+      </div>
+
+      <div class="history-content" id="historyContent" hidden>
+        <section class="history-summary" id="historySummary"></section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>综合评分走势</h3>
+            <span class="history-section-meta" id="historyTrendMeta"></span>
+          </div>
+          <div class="trend-chart" id="historyTrendChart"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>三个维度的平均表现</h3>
+            <span class="history-section-meta">只统计有诊断报告的课时</span>
+          </div>
+          <div class="history-dimensions" id="historyDimensions"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>历史课时</h3>
+            <button class="text-link" id="clearHistoryBtn" type="button">清空档案</button>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+
+        <p class="history-note">档案只保存在当前浏览器，不会上传服务器，也不包含聊天图片。清除浏览器数据会同时清除档案。</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ HANDWRITING MODAL ============ -->
   <div class="modal-layer" id="handwritingModal" hidden>
     <div class="modal-backdrop" data-close="handwritingModal"></div>
@@ -469,6 +535,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261103j"></script>
+  <script type="module" src="./app.js?v=20261104a"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ export const APP = {
   storage: {
     settings: 'feynman.settings.v1',
     session: 'feynman.session.v1',
+    history: 'feynman.history.v1',
     welcomed: 'feynman.welcomed.v1'
   },
   defaults: {

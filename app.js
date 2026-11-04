@@ -10,6 +10,14 @@ import {
 } from './js/store.js';
 import { SpeechInput } from './js/speech.js';
 import { HandwritingPad } from './js/canvas.js';
+import {
+  archiveSession,
+  clearHistory,
+  deleteRecord,
+  loadHistory,
+  reportToText,
+  summarizeHistory
+} from './js/history.js';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -136,6 +144,9 @@ const refs = {
   connectionPill: $('#connectionPill'),
   connectionLabel: $('#connectionLabel'),
   settingsBtn: $('#settingsBtn'),
+  historyBtn: $('#historyBtn'),
+  homeHistoryBtn: $('#homeHistoryBtn'),
+  homeHistoryMeta: $('#homeHistoryMeta'),
   endSessionBtn: $('#endSessionBtn'),
   homeScreen: $('#homeScreen'),
   chatScreen: $('#chatScreen'),
@@ -148,14 +159,15 @@ const refs = {
   topicImageThumb: $('#topicImageThumb'),
   removeTopicImage: $('#removeTopicImage'),
   startBtn: $('#startBtn'),
-  chatTopic: $('#chatTopic'),
   roundBadge: $('#roundBadge'),
   callTeacherMobile: $('#callTeacherMobile'),
   callTeacherMobileLabel: $('#callTeacherMobileLabel'),
   chatBody: $('#chatBody'),
   topicCard: $('#topicCard'),
+  topicCardBody: $('#topicCardBody'),
   topicCardText: $('#topicCardText'),
   topicCardImage: $('#topicCardImage'),
+  topicToggleBtn: $('#topicToggleBtn'),
   messageList: $('#messageList'),
   typingIndicator: $('#typingIndicator'),
   composer: $('#composer'),
@@ -193,6 +205,15 @@ const refs = {
   reportEncouragement: $('#reportEncouragement'),
   copyReportBtn: $('#copyReportBtn'),
   restartFromReportBtn: $('#restartFromReportBtn'),
+  historyModal: $('#historyModal'),
+  historyEmpty: $('#historyEmpty'),
+  historyContent: $('#historyContent'),
+  historySummary: $('#historySummary'),
+  historyTrendChart: $('#historyTrendChart'),
+  historyTrendMeta: $('#historyTrendMeta'),
+  historyDimensions: $('#historyDimensions'),
+  historyList: $('#historyList'),
+  clearHistoryBtn: $('#clearHistoryBtn'),
   settingsModal: $('#settingsModal'),
   settingsForm: $('#settingsForm'),
   apiKeyInput: $('#apiKeyInput'),
@@ -238,6 +259,9 @@ let lastFocused = null;
 let startAfterSettings = false;
 let connectionIssue = false;
 let currentReport = null;
+let currentReportTopic = '';
+let reportFromArchive = false;
+let openHistoryIds = new Set();
 let pad = null;
 let speech = null;
 let speechBase = '';
@@ -256,6 +280,7 @@ function init() {
   fillSettingsForm();
   setupSpeech();
   bindEvents();
+  renderHistoryEntry();
 
   if (store.session) {
     renderedSessionId = store.session.id;
@@ -359,7 +384,6 @@ function syncChrome() {
   const hasReport = Boolean(session?.report);
 
   refs.topbarTopic.textContent = session?.topic || '';
-  refs.chatTopic.textContent = session?.topic || '—';
   renderTopicCard(session);
   const turns = session ? humanTurnCount(session) : 0;
   const questions = session
@@ -408,11 +432,12 @@ function renderTopicCard(session) {
   const image = session?.messages?.[0]?.images?.[0] || '';
 
   refs.topicCard.hidden = !topic;
-  refs.chatTopic.title = topic;
   refs.topbarTopic.title = topic;
 
   if (refs.topicCardText.textContent !== topic) {
     refs.topicCardText.textContent = topic;
+    refs.topicCard.classList.remove('is-collapsed');
+    refs.topicToggleBtn.textContent = '收起';
   }
 
   if (refs.topicCardImage.dataset.src !== image) {
@@ -425,6 +450,34 @@ function renderTopicCard(session) {
       refs.topicCardImage.hidden = true;
     }
   }
+
+  updateTopicToggle();
+}
+
+function updateTopicToggle() {
+  if (refs.topicCard.hidden) {
+    refs.topicToggleBtn.hidden = true;
+    return;
+  }
+  requestAnimationFrame(() => {
+    if (refs.topicCard.hidden) return;
+    const body = refs.topicCardBody;
+    const collapsed = refs.topicCard.classList.contains('is-collapsed');
+    // scrollHeight is the full content height even while collapsed.
+    const limit = Math.min(window.innerHeight * 0.34, 240);
+    const tall = body.scrollHeight > limit + 2;
+    refs.topicToggleBtn.hidden = !tall;
+    refs.topicToggleBtn.textContent = collapsed ? '展开全文' : '收起';
+  });
+}
+
+function toggleTopicCard() {
+  const collapsed = refs.topicCard.classList.toggle('is-collapsed');
+  refs.topicToggleBtn.textContent = collapsed ? '展开全文' : '收起';
+  if (collapsed) {
+    refs.topicCardBody.scrollTop = 0;
+  }
+  updateTopicToggle();
 }
 
 function renderConnection() {
@@ -461,7 +514,6 @@ function renderSession() {
   const session = store.session;
   if (!session) return;
 
-  refs.chatTopic.textContent = session.topic;
   refs.topbarTopic.textContent = session.topic;
   refs.messageList.replaceChildren();
 
@@ -773,6 +825,7 @@ async function handleCallTeacher() {
     });
     if (!store.session) return;
     store.setReport(report);
+    archiveCurrentLesson();
     presentReport(report);
     store.setStatus(STATUS.REPORT);
     connectionIssue = false;
@@ -807,23 +860,27 @@ function showReportError(message) {
   refs.reportModal.querySelector('.modal').scrollTop = 0;
 }
 
-function presentReport(report) {
+function presentReport(report, { topic = '', archived = false } = {}) {
   if (!report) return;
   currentReport = report;
+  currentReportTopic = topic || store.session?.topic || '';
+  reportFromArchive = archived;
   openModal('reportModal');
   refs.reportLoading.hidden = true;
   refs.reportError.hidden = true;
   refs.reportContent.hidden = false;
   refs.reportModal.querySelector('.modal').scrollTop = 0;
-  renderReport(report);
+  renderReport(report, currentReportTopic);
 }
 
-function renderReport(report) {
-  const topic = store.session?.topic || '';
+function renderReport(report, topicOverride) {
+  const topic = topicOverride ?? store.session?.topic ?? '';
   refs.reportTopic.replaceChildren(document.createTextNode(topic));
   if (report.lowEvidence) {
     refs.reportTopic.append(el('span', 'evidence-note', '证据有限 · 已保守评分'));
   }
+
+  refs.restartFromReportBtn.textContent = reportFromArchive ? '返回学习档案' : '换个主题，重新开始';
 
   const overall = Math.max(0, Math.min(100, Math.round(report.overallScore || 0)));
   // Set the final value immediately. requestAnimationFrame is paused in
@@ -900,7 +957,7 @@ function renderReport(report) {
 async function copyReport() {
   if (!currentReport) return;
   const report = currentReport;
-  const topic = store.session?.topic || '';
+  const topic = currentReportTopic || store.session?.topic || '';
   const lines = [
     '费曼小课堂 · 学习诊断报告',
     `讲课主题：${topic}`,
@@ -1293,6 +1350,356 @@ function handleInsertHandwriting() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Learning archive                                                           */
+/* -------------------------------------------------------------------------- */
+
+function archiveCurrentLesson() {
+  if (!store.session) return;
+  try {
+    archiveSession(store.session, { model: store.settings?.model || '' });
+    renderHistoryEntry();
+  } catch (error) {
+    console.warn('保存学习档案失败：', error);
+  }
+}
+
+function renderHistoryEntry() {
+  if (!refs.homeHistoryBtn) return;
+  const records = loadHistory();
+  refs.homeHistoryBtn.hidden = false;
+  if (!records.length) {
+    refs.homeHistoryMeta.textContent = '还没有记录，讲完一课就会自动保存';
+    return;
+  }
+  const summary = summarizeHistory(records);
+  const parts = [`${summary.sessions} 课记录`];
+  if (Number.isFinite(summary.averageOverall)) parts.push(`平均 ${summary.averageOverall}%`);
+  if (summary.activeDays > 1) parts.push(`${summary.activeDays} 天`);
+  refs.homeHistoryMeta.textContent = parts.join(' · ');
+}
+
+function openHistory() {
+  openHistoryIds = new Set();
+  reportFromArchive = false;
+  renderHistory();
+  openModal('historyModal');
+}
+
+function renderHistory() {
+  const records = loadHistory();
+  refs.historyEmpty.hidden = records.length > 0;
+  refs.historyContent.hidden = records.length === 0;
+  if (!records.length) return;
+
+  const summary = summarizeHistory(records);
+  renderHistorySummary(summary);
+  renderHistoryTrend(records, summary);
+  renderHistoryDimensions(summary);
+  renderHistoryList(records);
+}
+
+function historyStat(value, unit, label, { accent = false, text = '' } = {}) {
+  const card = el('div', `history-stat${accent ? ' is-accent' : ''}`);
+  const strong = el('strong');
+  if (text) {
+    strong.append(document.createTextNode(text));
+  } else {
+    strong.append(document.createTextNode(Number.isFinite(value) ? String(value) : '—'));
+    if (unit && Number.isFinite(value)) strong.append(el('em', '', unit));
+  }
+  card.append(strong, el('small', '', label));
+  return card;
+}
+
+function renderHistorySummary(summary) {
+  refs.historySummary.replaceChildren();
+
+  if (summary.delta === null) {
+    refs.historySummary.append(historyStat(summary.sessions, '课', '累计讲课'));
+  } else {
+    const sign = summary.delta > 0 ? '+' : '';
+    refs.historySummary.append(
+      historyStat(summary.sessions, '课', `累计讲课 · 较前 5 课 ${sign}${summary.delta}`)
+    );
+  }
+  refs.historySummary.append(
+    historyStat(summary.averageOverall, '%', '平均综合分', { accent: true }),
+    historyStat(summary.recent, '%', '最近 5 课'),
+    historyStat(summary.activeDays, '天', '有记录的学习天')
+  );
+
+  if (summary.weakest) {
+    refs.historySummary.append(
+      historyStat(0, '', `最需要补：${summary.weakest.label}`, {
+        text: `${summary.metricAverages[summary.weakest.key]}%`
+      })
+    );
+  }
+}
+
+function renderHistoryTrend(records, summary) {
+  refs.historyTrendChart.replaceChildren();
+  const scored = records
+    .filter((record) => record.report && Number.isFinite(record.report.overallScore))
+    .slice(0, 12)
+    .reverse();
+
+  const meta = [];
+  if (summary.scored) meta.push(`${summary.scored} 次诊断`);
+  if (Number.isFinite(summary.averageOverall)) meta.push(`平均 ${summary.averageOverall}%`);
+  if (summary.delta !== null) {
+    const sign = summary.delta > 0 ? '+' : '';
+    meta.push(`较前 5 课 ${sign}${summary.delta}`);
+  }
+  refs.historyTrendMeta.textContent = meta.join(' · ');
+
+  if (scored.length < 2) {
+    const empty = el(
+      'div',
+      'trend-empty',
+      scored.length === 1
+        ? '再完成一课诊断，就能看到评分走势。'
+        : '还没有诊断报告。讲完一课后点「呼叫 AI 老师点评」，这里就会出现走势。'
+    );
+    refs.historyTrendChart.append(empty);
+    return;
+  }
+
+  const width = 640;
+  const height = 118;
+  const padLeft = 30;
+  const padRight = 12;
+  const padTop = 10;
+  const padBottom = 18;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', '综合评分走势');
+
+  for (const tick of [0, 25, 50, 75, 100]) {
+    const y = padTop + plotH - (tick / 100) * plotH;
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', String(padLeft));
+    line.setAttribute('x2', String(width - padRight));
+    line.setAttribute('y1', String(y));
+    line.setAttribute('y2', String(y));
+    line.setAttribute('class', tick === 0 ? 'trend-axis' : 'trend-grid');
+    svg.append(line);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', String(padLeft - 6));
+    label.setAttribute('y', String(y + 3));
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'trend-tick');
+    label.textContent = String(tick);
+    svg.append(label);
+  }
+
+  const points = scored.map((record, index) => {
+    const x = padLeft + (scored.length === 1 ? plotW / 2 : (index / (scored.length - 1)) * plotW);
+    const score = Math.max(0, Math.min(100, record.report.overallScore));
+    const y = padTop + plotH - (score / 100) * plotH;
+    return { x, y, score, record };
+  });
+
+  const area = document.createElementNS(ns, 'path');
+  area.setAttribute(
+    'd',
+    `M${points[0].x} ${padTop + plotH} ${points
+      .map((point) => `L${point.x} ${point.y}`)
+      .join(' ')} L${points[points.length - 1].x} ${padTop + plotH} Z`
+  );
+  area.setAttribute('class', 'trend-area');
+  svg.append(area);
+
+  const line = document.createElementNS(ns, 'polyline');
+  line.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
+  line.setAttribute('class', 'trend-line');
+  svg.append(line);
+
+  for (const point of points) {
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', String(point.x));
+    dot.setAttribute('cy', String(point.y));
+    dot.setAttribute('r', '4');
+    dot.setAttribute('class', 'trend-dot');
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = `${point.record.topic}：${point.score}%`;
+    dot.append(title);
+    svg.append(dot);
+  }
+
+  const last = points[points.length - 1];
+  const lastLabel = document.createElementNS(ns, 'text');
+  lastLabel.setAttribute('x', String(Math.min(last.x, width - padRight - 4)));
+  lastLabel.setAttribute('y', String(Math.max(last.y - 9, 11)));
+  lastLabel.setAttribute('text-anchor', 'end');
+  lastLabel.setAttribute('class', 'trend-last');
+  lastLabel.textContent = `${last.score}%`;
+  svg.append(lastLabel);
+
+  refs.historyTrendChart.append(svg);
+}
+
+function renderHistoryDimensions(summary) {
+  refs.historyDimensions.replaceChildren();
+  for (const metric of METRICS) {
+    const value = summary.metricAverages[metric.key];
+    const row = el(
+      'div',
+      `dimension-row${summary.weakest?.key === metric.key ? ' is-weak' : ''}${
+        summary.strongest?.key === metric.key ? ' is-strong' : ''
+      }`
+    );
+    const track = el('div', 'dimension-track');
+    const fill = el('div', 'dimension-fill');
+    fill.style.setProperty('--value', `${Number.isFinite(value) ? value : 0}%`);
+    track.append(fill);
+    row.append(
+      el('span', 'dimension-name', metric.label),
+      track,
+      el('span', 'dimension-value', Number.isFinite(value) ? `${value}%` : '—')
+    );
+    refs.historyDimensions.append(row);
+  }
+}
+
+function formatArchiveDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '—';
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}\n${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
+
+function renderHistoryList(records) {
+  refs.historyList.replaceChildren();
+  for (const record of records) {
+    const item = el('article', `history-item${openHistoryIds.has(record.id) ? ' is-open' : ''}`);
+    const main = el('button', 'history-item-main');
+    main.type = 'button';
+    main.setAttribute('aria-expanded', String(openHistoryIds.has(record.id)));
+
+    const date = el('span', 'history-item-date', formatArchiveDate(record.endedAt));
+    const body = el('div', 'history-item-body');
+    body.append(el('p', 'history-item-topic', record.topic));
+    const meta = [`${record.turns} 轮讲解`, `${record.questions} 个追问`];
+    if (record.model) meta.push(record.model.split('/').pop());
+    body.append(el('p', 'history-item-meta', meta.join(' · ')));
+
+    const score = el(
+      'span',
+      `history-item-score${Number.isFinite(record.report?.overallScore) ? '' : ' is-empty'}`
+    );
+    score.append(
+      el('strong', '', Number.isFinite(record.report?.overallScore) ? `${record.report.overallScore}%` : '—'),
+      el('small', '', Number.isFinite(record.report?.overallScore) ? '综合评分' : '未诊断')
+    );
+
+    main.append(date, body, score);
+    main.addEventListener('click', () => {
+      if (openHistoryIds.has(record.id)) openHistoryIds.delete(record.id);
+      else openHistoryIds.add(record.id);
+      renderHistoryList(loadHistory());
+    });
+
+    item.append(main);
+    if (openHistoryIds.has(record.id)) item.append(buildHistoryDetail(record));
+    refs.historyList.append(item);
+  }
+}
+
+function buildHistoryDetail(record) {
+  const detail = el('div', 'history-detail');
+
+  if (record.report) {
+    if (record.report.verdict) {
+      const verdict = el('p');
+      verdict.append(el('span', 'history-detail-label', '老师总评'));
+      verdict.append(document.createTextNode(record.report.verdict));
+      detail.append(verdict);
+    }
+
+    if (record.report.misconceptions?.length) {
+      const block = el('div');
+      block.append(el('span', 'history-detail-label', '关键理解缺口'));
+      const list = el('ul');
+      record.report.misconceptions.slice(0, 3).forEach((gap) => {
+        list.append(el('li', '', gap.title || ''));
+      });
+      block.append(list);
+      detail.append(block);
+    }
+
+    if (record.report.nextSteps?.length) {
+      const block = el('div');
+      block.append(el('span', 'history-detail-label', '下一次可以这样讲'));
+      const list = el('ul');
+      record.report.nextSteps.slice(0, 2).forEach((step) => {
+        list.append(el('li', '', step.title || step.action || ''));
+      });
+      block.append(list);
+      detail.append(block);
+    }
+  } else {
+    detail.append(el('p', '', '这节课还没有诊断报告。继续讲完再呼叫 AI 老师，就能拿到评分。'));
+  }
+
+  const actions = el('div', 'history-detail-actions');
+  if (record.report) {
+    const open = el('button', 'btn btn-primary btn-sm', '查看完整报告');
+    open.type = 'button';
+    open.addEventListener('click', () => {
+      presentReport(record.report, { topic: record.topic, archived: true });
+    });
+
+    const copy = el('button', 'btn btn-outline btn-sm', '复制报告');
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      const ok = await copyText(reportToText(record));
+      toast(ok ? '报告已复制到剪贴板。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
+    });
+
+    const del = el('button', 'btn btn-ghost btn-sm', '删除记录');
+    del.type = 'button';
+    del.addEventListener('click', () => handleDeleteRecord(record));
+    actions.append(open, copy, del);
+  } else {
+    const del = el('button', 'btn btn-ghost btn-sm', '删除记录');
+    del.type = 'button';
+    del.addEventListener('click', () => handleDeleteRecord(record));
+    actions.append(del);
+  }
+
+  detail.append(actions);
+  return detail;
+}
+
+function handleDeleteRecord(record) {
+  if (!window.confirm(`删除「${record.topic}」的学习记录？删除后无法恢复。`)) return;
+  deleteRecord(record.id);
+  openHistoryIds.delete(record.id);
+  renderHistory();
+  renderHistoryEntry();
+  toast('记录已删除。', 'success', 2400);
+}
+
+function handleClearHistory() {
+  if (!loadHistory().length) return;
+  if (!window.confirm('清空全部学习档案？所有历史课时和诊断报告都会被删除，无法恢复。')) return;
+  clearHistory();
+  openHistoryIds = new Set();
+  renderHistory();
+  renderHistoryEntry();
+  toast('学习档案已清空。', 'success', 2600);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Modals & focus                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -1381,21 +1788,29 @@ function closeLightbox() {
 
 function handleEndSession() {
   if (!store.session) return;
-  if (!window.confirm('结束本次讲课？对话会被清空，API Key 会保留。')) return;
+  if (!window.confirm('结束本次讲课？本次对话会存入学习档案，API Key 会保留。')) return;
 
+  archiveCurrentLesson();
   studentAbort?.abort();
   teacherAbort?.abort();
   if (activeModalId) closeModal(activeModalId);
   store.end();
   resetAfterSession();
-  toast('本次讲课已结束。', 'success');
+  renderHistoryEntry();
+  toast('本次讲课已结束，已存入学习档案。', 'success');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function handleRestartFromReport() {
+  if (reportFromArchive) {
+    openHistory();
+    return;
+  }
+  archiveCurrentLesson();
   closeModal('reportModal');
   store.end();
   resetAfterSession();
+  renderHistoryEntry();
   toast('新的一课，准备好了。', 'success', 2600);
   window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(() => refs.topicInput.focus(), 250);
@@ -1494,6 +1909,11 @@ function bindEvents() {
     fillSettingsForm();
     openModal('settingsModal');
   });
+
+  refs.historyBtn.addEventListener('click', openHistory);
+  refs.homeHistoryBtn.addEventListener('click', openHistory);
+  refs.topicToggleBtn.addEventListener('click', toggleTopicCard);
+  refs.clearHistoryBtn.addEventListener('click', handleClearHistory);
 
   refs.endSessionBtn.addEventListener('click', handleEndSession);
   refs.startBtn.addEventListener('click', handleStart);
@@ -1625,4 +2045,7 @@ function bindEvents() {
     connectionIssue = false;
     renderConnection();
   });
+
+  window.addEventListener('resize', () => updateTopicToggle());
+  window.addEventListener('pagehide', archiveCurrentLesson);
 }
