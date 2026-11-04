@@ -1,0 +1,28 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "feynman-proxy"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+# 线上课堂页面允许调用这个代理；本地调试也放行。
+# 部署到自己的域名后，把正式地址加进来。
+[vars]
+UPSTREAM_BASE = "https://openrouter.ai/api/v1"
+ALLOWED_ORIGINS = "https://yanqing11.github.io,http://127.0.0.1:8000,http://localhost:8000"
+# 只允许这些模型，留空表示不限制。用逗号分隔。
+ALLOWED_MODELS = "deepseek/deepseek-chat-v3-0324,google/gemini-2.0-flash-001,openai/gpt-4o-mini"
+SITE_URL = "https://yanqing11.github.io/feynman-classroom/"
+RATE_LIMIT_PER_MINUTE = "30"
+MAX_TOKENS = "2000"
+# 设为 0 关闭。开启需要 KV 绑定（见 README）。
+DAILY_LIMIT_PER_IP = "0"
+
+# 可选：按天限流需要用 KV。执行
+#   npx wrangler kv namespace create RATE_KV
+# 然后把返回的 id 填到下面，并取消注释。
+# [[kv_namespaces]]
+# binding = "RATE_KV"
+# id = "<your-kv-namespace-id>"
+
+# 密钥不要写在这个文件里，也不要在提交到 Git：
+#   npx wrangler secret put UPSTREAM_KEY     # OpenRouter / OpenAI Key
+#   npx wrangler secret put ACCESS_CODE      # 课堂访问码（可选）

@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261103b">
+  <link rel="stylesheet" href="./styles.css?v=20261103d">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -98,7 +98,7 @@
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                   导入题目图片
                 </button>
-                <span class="image-hint" id="topicImageHint">支持 JPG / PNG，可手写拍照</span>
+                <span class="image-hint" id="topicImageHint">支持 JPG / PNG · 只传图片也能自动识别题目</span>
               </div>
               <div class="topic-image-preview" id="topicImagePreview" hidden>
                 <img id="topicImageThumb" alt="题目图片预览">
@@ -346,9 +346,9 @@
     <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
       <div class="settings-head">
         <div>
-          <p class="eyebrow"><span class="eyebrow-line"></span>BRING YOUR OWN KEY</p>
+          <p class="eyebrow"><span class="eyebrow-line"></span>AI CONNECTION</p>
           <h2 id="settingsTitle">连接你的 AI</h2>
-          <p>小课堂没有后端。你的 Key 只保存在本机浏览器，并直接发往你选择的模型服务商。</p>
+          <p>默认使用课堂共享代理，打开就能上课，不用填 Key。想用自己的额度时，也可以填自己的 API Key 直连服务商。</p>
         </div>
         <button class="icon-btn modal-close" data-close="settingsModal" type="button" aria-label="关闭设置">×</button>
       </div>
@@ -360,14 +360,14 @@
             <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-v1-…">
             <button class="key-toggle" id="toggleKeyBtn" type="button" aria-label="显示或隐藏 API Key">显示</button>
           </div>
-          <p class="field-hint">推荐 OpenRouter，可同时使用 GPT-4o mini 与 Claude Haiku。也可以在 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a> 创建。</p>
+          <p class="field-hint">留空即可使用课堂共享代理。填自己的 Key 时只保存在本机浏览器，并直接发往你选择的模型服务商。</p>
         </div>
 
         <div class="field">
           <label for="modelInput">模型</label>
           <input id="modelInput" type="text" list="modelPresets" autocomplete="off" spellcheck="false" placeholder="openai/gpt-4o-mini">
           <datalist id="modelPresets"></datalist>
-          <p class="field-hint">默认 <code>openai/gpt-4o-mini</code>，便宜、够快，也支持图片。也可以换成 <code>anthropic/claude-3-haiku</code>。</p>
+          <p class="field-hint">默认 <code>openai/gpt-4o-mini</code>，便宜、够快，也支持图片。课堂共享代理开放 <code>openai/gpt-4o-mini</code>、<code>google/gemini-2.0-flash-001</code>、<code>deepseek/deepseek-chat-v3-0324</code>。</p>
         </div>
 
         <div class="field">
@@ -382,6 +382,16 @@
             <label for="baseUrlInput">API Base URL</label>
             <input id="baseUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1">
             <p class="field-hint">任何兼容 OpenAI Chat Completions 的服务都可以。浏览器直连需要服务商支持 CORS。</p>
+          </div>
+          <div class="field">
+            <label for="proxyUrlInput">课堂共享代理（可选）</label>
+            <input id="proxyUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://feynman-proxy.example.workers.dev">
+            <p class="field-hint">填了代理地址就<b>不需要 API Key</b>，学生打开链接即可上课。真正的 Key 保存在代理服务器里。</p>
+          </div>
+          <div class="field">
+            <label for="accessCodeInput">访问码（可选）</label>
+            <input id="accessCodeInput" type="text" autocomplete="off" spellcheck="false" placeholder="与代理的 ACCESS_CODE 一致">
+            <p class="field-hint">只是防扫站的软门槛，会随网页公开；真正的额度保护靠代理的限流。</p>
           </div>
         </details>
 
@@ -459,6 +469,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261103b"></script>
+  <script type="module" src="./app.js?v=20261103d"></script>
 </body>
 </html>

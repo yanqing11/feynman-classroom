@@ -1,5 +1,5 @@
 import { APP, METRICS } from './js/config.js';
-import { ApiError, isAbortError, testConnection } from './js/api.js';
+import { ApiError, isAbortError, isConfigured, recognizeProblem, testConnection } from './js/api.js';
 import { StudentAgent, TeacherAgent, humanTurnCount } from './js/agents.js';
 import {
   ClassroomStore,
@@ -189,6 +189,8 @@ const refs = {
   temperatureInput: $('#temperatureInput'),
   temperatureValue: $('#temperatureValue'),
   baseUrlInput: $('#baseUrlInput'),
+  proxyUrlInput: $('#proxyUrlInput'),
+  accessCodeInput: $('#accessCodeInput'),
   settingsStatus: $('#settingsStatus'),
   testKeyBtn: $('#testKeyBtn'),
   clearKeyBtn: $('#clearKeyBtn'),
@@ -282,7 +284,7 @@ function populateModelPresets() {
 }
 
 function maybeWelcome() {
-  if (store.settings.apiKey) return;
+  if (isConfigured(store.settings)) return;
   try {
     if (localStorage.getItem(APP.storage.welcomed)) return;
     localStorage.setItem(APP.storage.welcomed, '1');
@@ -413,7 +415,7 @@ function renderTopicCard(session) {
 }
 
 function renderConnection() {
-  const connected = Boolean(store.settings.apiKey);
+  const connected = isConfigured(store.settings);
   const healthy = connected && !connectionIssue;
 
   refs.connectionPill.classList.toggle('is-connected', healthy);
@@ -424,12 +426,14 @@ function renderConnection() {
   refs.sideStatusDot.classList.toggle('is-error', connected && connectionIssue);
   refs.sideModelName.textContent = connected ? store.settings.model : '未连接 AI';
   refs.sideModelHint.textContent = connected
-    ? `${maskKey(store.settings.apiKey)} · Key 仅存本机`
-    : '在设置中填入 API Key 后开始';
+    ? store.settings.proxyUrl
+      ? '课堂共享代理 · 无需 Key'
+      : `${maskKey(store.settings.apiKey)} · Key 仅存本机`
+    : '在设置中填入 API Key，或使用课堂共享代理';
 }
 
 function updateSettingsButtonState() {
-  refs.settingsBtn.classList.toggle('has-key', Boolean(store.settings.apiKey));
+  refs.settingsBtn.classList.toggle('has-key', isConfigured(store.settings));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -555,34 +559,62 @@ function showTyping(show) {
 /* Start, send, student agent                                                 */
 /* -------------------------------------------------------------------------- */
 
-function handleStart() {
+async function handleStart() {
   if (store.busy) return;
-  const topic = refs.topicInput.value.trim();
-  if (!topic) {
-    toast('先写一个想讲的数学主题或题目。', 'warm');
+  let topic = refs.topicInput.value.trim();
+  const image = topicImage;
+
+  if (!topic && !image) {
+    toast('写一个数学主题/题目，或者直接上传题目图片。', 'warm');
     refs.topicInput.focus();
     return;
   }
-  if (topic.length < 2) {
+  if (topic && topic.length < 2) {
     toast('主题太短了，再具体一点。', 'warm');
     refs.topicInput.focus();
     return;
   }
-  if (!store.settings.apiKey) {
+  if (!isConfigured(store.settings)) {
     startAfterSettings = true;
     fillSettingsForm();
     openModal('settingsModal');
-    toast('先连接你的 AI：填入 API Key，保存后会自动开课。', 'warm', 6500);
+    toast('先连接你的 AI：填入 API Key，或使用课堂共享代理，保存后会自动开课。', 'warm', 6500);
     return;
   }
 
-  const image = topicImage;
+  if (!topic && image) {
+    topic = await recognizeTopicFromImage(image);
+    if (!topic) return;
+  }
+
   store.start(topic, image);
   refs.topicInput.value = '';
   clearTopicImage();
   showScreen('chat');
   requestAnimationFrame(() => scrollToBottom(true));
   requestStudent();
+}
+
+async function recognizeTopicFromImage(image) {
+  const label = refs.startBtn.querySelector('span') || refs.startBtn;
+  const original = label.textContent;
+  refs.startBtn.disabled = true;
+  label.textContent = '正在识别题目…';
+  toast('正在从图片里识别题目，请稍等。', 'busy', 4000);
+
+  try {
+    const text = await recognizeProblem({ settings: store.settings, image });
+    refs.topicInput.value = text;
+    autoGrowTopic();
+    return text;
+  } catch (error) {
+    handleApiError(error, { openSettingsOnAuth: false });
+    refs.topicInput.focus();
+    return '';
+  } finally {
+    refs.startBtn.disabled = false;
+    label.textContent = original;
+  }
 }
 
 function handleSend(event) {
@@ -904,6 +936,8 @@ function fillSettingsForm() {
   refs.apiKeyInput.value = store.settings.apiKey || '';
   refs.modelInput.value = store.settings.model || APP.defaults.model;
   refs.baseUrlInput.value = store.settings.baseUrl || APP.defaults.baseUrl;
+  refs.proxyUrlInput.value = store.settings.proxyUrl || '';
+  refs.accessCodeInput.value = store.settings.accessCode || '';
   refs.temperatureInput.value = String(store.settings.temperature ?? APP.defaults.temperature);
   refs.temperatureValue.textContent = Number(refs.temperatureInput.value).toFixed(2).replace(/0$/, '');
   refs.apiKeyInput.type = 'password';
@@ -916,18 +950,30 @@ function readSettingsForm() {
     apiKey: refs.apiKeyInput.value.trim(),
     model: refs.modelInput.value.trim(),
     baseUrl: refs.baseUrlInput.value.trim(),
+    proxyUrl: refs.proxyUrlInput.value.trim(),
+    accessCode: refs.accessCodeInput.value.trim(),
     temperature: Number(refs.temperatureInput.value)
   };
 }
 
 function validateSettings(data) {
-  if (!data.apiKey) return '请填写 API Key。Key 只会保存在这个浏览器里。';
+  if (!data.apiKey && !data.proxyUrl) {
+    return '请填写 API Key，或填写课堂共享代理地址。';
+  }
   if (!data.model) return '请填写模型名称，例如 openai/gpt-4o-mini。';
   try {
     const url = new URL(data.baseUrl);
     if (!/^https?:$/.test(url.protocol)) throw new Error('protocol');
   } catch {
     return 'Base URL 需要是 http(s) 开头的完整地址。';
+  }
+  if (data.proxyUrl) {
+    try {
+      const proxy = new URL(data.proxyUrl);
+      if (!/^https?:$/.test(proxy.protocol)) throw new Error('protocol');
+    } catch {
+      return '课堂代理地址需要是 http(s) 开头的完整地址。';
+    }
   }
   return '';
 }
@@ -1001,11 +1047,11 @@ async function handleTestConnection() {
 }
 
 function handleClearKey() {
-  if (!store.settings.apiKey) {
-    toast('当前没有保存 API Key。', 'warm');
+  if (!store.settings.apiKey && !store.settings.proxyUrl) {
+    toast('当前没有保存 API Key 或代理设置。', 'warm');
     return;
   }
-  if (!window.confirm('清除保存在浏览器里的 API Key？这不会影响你的服务商账户。')) return;
+  if (!window.confirm('清除保存在浏览器里的 API Key / 代理设置？这不会影响你的服务商账户。')) return;
   clearSettings();
   store.settings = loadSettings();
   store.emit();
@@ -1169,7 +1215,7 @@ function setupSpeech() {
 
 function handleMic() {
   if (!speech) return;
-  if (!store.settings.apiKey) {
+  if (!isConfigured(store.settings)) {
     ensureKey();
     return;
   }
@@ -1375,10 +1421,10 @@ function handleApiError(error, { openSettingsOnAuth = true } = {}) {
 }
 
 function ensureKey() {
-  if (store.settings.apiKey) return true;
+  if (isConfigured(store.settings)) return true;
   fillSettingsForm();
   openModal('settingsModal');
-  toast('先连接你的 AI：填入 API Key 后即可开始。', 'warm', 6000);
+  toast('先连接你的 AI：填入 API Key，或使用课堂共享代理。', 'warm', 6000);
   return false;
 }
 

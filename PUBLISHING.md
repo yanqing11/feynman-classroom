@@ -209,8 +209,45 @@ git push
 | --- | --- |
 | 仓库 | <https://github.com/yanqing11/feynman-classroom> |
 | GitHub Pages | <https://yanqing11.github.io/feynman-classroom/> |
+| 课堂共享代理 | <https://feynman-proxy.yangqingliu64.workers.dev> |
+| 代理健康检查 | <https://feynman-proxy.yangqingliu64.workers.dev/health> |
 
-如需把提交作者改成你自己的姓名与邮箱：
+## 10. 课堂共享代理（Cloudflare Worker）
+
+学生默认不需要 API Key：网页把请求发给 Worker，Worker 用 Secret 里的真实 Key 转发给 OpenRouter。
+
+部署（Token 从本地文件读取，不写进命令历史、不打印）：
+
+```powershell
+$env:CLOUDFLARE_API_TOKEN = (Get-Content '<本地 Token 文件>' -Raw).Trim()
+$env:CLOUDFLARE_ACCOUNT_ID = '<Cloudflare Account ID>'
+cd worker
+npx -y wrangler@latest deploy
+```
+
+写入密钥（输入不回显）：
+
+```powershell
+npx -y wrangler@latest secret put UPSTREAM_KEY   # OpenRouter Key
+npx -y wrangler@latest secret put ACCESS_CODE    # 课堂访问码
+```
+
+当前配置：
+
+| 项 | 值 |
+| --- | --- |
+| Worker 名称 | `feynman-proxy` |
+| workers.dev 子域 | `yangqingliu64` |
+| 允许来源 | `https://yanqing11.github.io`、本地 `127.0.0.1:8000` / `localhost:8000` |
+| 允许模型 | `openai/gpt-4o-mini`、`google/gemini-2.0-flash-001`、`deepseek/deepseek-chat-v3-0324` |
+| 限流 | 每 IP 每分钟 30 次；每日额度默认关闭 |
+| 单次 token 上限 | 2000 |
+
+访问码写在 `js/config.js` 的 `defaults.accessCode`（会随网页公开，只是防扫站的软门槛）。真正的保护是来源校验、限流和模型白名单。
+
+> **网络可达性提醒**：`*.workers.dev` 在中国大陆常被 DNS 污染，若学生打不开代理，需要给 Worker 绑定一个自己的域名（Cloudflare → Workers → feynman-proxy → Settings → Domains & Routes → Add custom domain），或把代理迁到其他可达主机。网页本身在 GitHub Pages 上通常可访问。
+
+## 如需把提交作者改成你自己的姓名与邮箱
 
 ```bash
 git config user.name "Your Name"

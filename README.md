@@ -19,18 +19,22 @@
 - **输出倒逼输入**：讲不清的地方，就是还没真正懂的地方。
 - **两个 AI 角色**：面向学生的 `StudentAgent`（只追问，不给答案）与后台评审的 `TeacherAgent`（指出漏洞，给出下一步）。
 - **可量化**：概念掌握、逻辑与步骤完整性、表达清晰度三个 0–100 的维度，加上具体缺口和可执行的练习建议。
-- **多模态入口**：文字、图片、手写板、语音输入（Web Speech API）。
-- **隐私优先**：没有服务器、没有数据库、没有分析脚本；API Key 只保存在访问者自己的 `localStorage` 中。
+- **多模态入口**：文字、图片、手写板、语音输入（Web Speech API）。只上传题目图片也能自动识别题目。
+- **打开即用**：默认走课堂共享代理，学生不需要 API Key；也可以填自己的 Key 直连服务商（Key 只保存在本机 `localStorage`）。
 
 ## 快速开始
 
-### 1. 准备一个 API Key
+### 学生：直接打开链接
 
-推荐 [OpenRouter](https://openrouter.ai/keys)：一个 Key 可以调用 `openai/gpt-4o-mini` 和 `anthropic/claude-3-haiku`，并且允许浏览器直接请求（CORS）。
+<https://yanqing11.github.io/feynman-classroom/>
 
-也可以使用任何兼容 **OpenAI Chat Completions** 的服务，只要它允许浏览器直连。
+不用填 Key，直接写主题 / 传题目图片就能开课。
 
-### 2. 在本地打开
+### 老师：换成自己的 Key（可选）
+
+推荐 [OpenRouter](https://openrouter.ai/keys)：一个 Key 可以调用 `openai/gpt-4o-mini` 等模型，并且允许浏览器直接请求（CORS）。在设置里填入 Key 后，请求会绕过共享代理、直接发往你选择的模型服务商。
+
+### 本地开发
 
 直接双击 `index.html` 可以浏览界面，但**语音输入和部分浏览器的 API 调用需要安全上下文**，建议起一个本地静态服务器：
 
@@ -45,11 +49,22 @@ python -m http.server 8000
 npx serve .
 ```
 
-### 3. 连接 AI
+### 连接设置
 
-点击右上角 **设置**，填入 API Key、选择模型，点 **测试连接**，保存。
+点击右上角 **设置** 可以查看当前连接方式：
 
-> 本项目不会内置、上传或记录任何 API Key。Key 只存在于当前浏览器的 `localStorage`，并直接发送给你选择的模型服务商。
+- 默认：课堂共享代理（不用 Key）；
+- 自定义：填入自己的 API Key，请求直接发往你选择的模型服务商。
+
+> 仓库里没有任何 API Key。共享代理的真正 Key 存放在 Cloudflare Worker 的 Secret 中；自己的 Key 只存在于当前浏览器的 `localStorage`。
+
+## 课堂共享代理
+
+`worker/` 目录是一个 Cloudflare Worker，用来藏住真正的模型 Key，并做来源校验、访问码、限流、模型白名单和 token 上限。
+
+- 部署与接线步骤见 [`worker/README.md`](worker/README.md)；
+- 默认地址写在 `js/config.js` 的 `defaults.proxyUrl` 与 `defaults.accessCode`；
+- 学生打开页面即可开课，不需要填写任何密钥。
 
 ## 功能
 
@@ -62,7 +77,7 @@ npx serve .
 | 三维评分 | 概念掌握 40% + 逻辑与步骤 40% + 表达清晰度 20% |
 | 理解缺口 | 每条包含证据、原因、怎么补 |
 | 下一次这样讲 | 带示范话术的具体建议，可直接复制报告 |
-| 图片 | 题目拍照、手写推导；有视觉能力的模型会读取图片 |
+| 图片 | 题目拍照；只传图片也会自动识别成文字题目，再开始讲课 |
 | 手写板 | Pointer Events，支持鼠标 / 触控 / Apple Pencil |
 | 语音输入 | Web Speech API，中文识别，可中途停止 |
 | 自动保存 | 当前对话存在 `localStorage`，刷新后可继续；结束讲课时清空 |
@@ -75,6 +90,10 @@ npx serve .
 ├── index.html              # 唯一的页面入口（必须位于仓库根目录）
 ├── styles.css              # 纸张 / 墨水风格的设计系统
 ├── app.js                  # UI 状态机、事件、渲染
+├── worker/                 # Cloudflare Worker 共享代理（隐藏真正的 API Key）
+│   ├── index.js
+│   ├── wrangler.toml
+│   └── README.md
 ├── js/
 │   ├── config.js           # 应用配置、两个 System Prompt、模型预设
 │   ├── api.js              # OpenRouter / OpenAI-compatible 客户端（流式 + JSON）
@@ -99,6 +118,7 @@ npx serve .
 | 项 | 默认值 |
 | --- | --- |
 | API Base URL | `https://openrouter.ai/api/v1` |
+| 课堂共享代理 | `https://feynman-proxy.yangqingliu64.workers.dev` |
 | 模型 | `openai/gpt-4o-mini` |
 | 温度 | `0.75` |
 | 每轮学生回复上限 | `420` tokens |
@@ -110,10 +130,11 @@ npx serve .
 
 ## 数据与隐私
 
-- 无后端、无数据库、无日志、无分析、无第三方字体或 CDN。
-- API Key 仅存于 `localStorage`；不会写入代码、Git 仓库或部署产物。
+- 页面本身没有数据库、没有日志、没有分析、没有第三方字体或 CDN。
+- 默认请求经过课堂共享代理：代理持有模型 Key，只转发对话内容，不落库。
+- 自己填写的 API Key 仅存于 `localStorage`；不会写入代码、Git 仓库或部署产物。
 - 对话同样仅存于 `localStorage`；点击「结束讲课」会删除当前会话。
-- 图片在浏览器内压缩后，直接发送给模型服务商；不经过本站服务器。
+- 图片在浏览器内压缩后发送给模型服务商；只用于识别题目或回答，不经过本站服务器。
 - 若浏览器存储空间不足，应用会保留文字并丢弃图片，同时在界面提示。
 - 报告由 AI 生成，仅用于学习诊断，不替代真人老师的判断。
 

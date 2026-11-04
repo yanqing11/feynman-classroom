@@ -29,6 +29,7 @@ function safeParse(value) {
 
 export function loadSettings() {
   const stored = safeParse(localStorage.getItem(APP.storage.settings)) || {};
+  const storedProxy = typeof stored.proxyUrl === 'string' ? stored.proxyUrl.trim() : '';
   return {
     apiKey: typeof stored.apiKey === 'string' ? stored.apiKey : '',
     baseUrl:
@@ -42,7 +43,12 @@ export function loadSettings() {
     temperature:
       Number.isFinite(Number(stored.temperature)) && Number(stored.temperature) >= 0
         ? Math.min(1.2, Number(stored.temperature))
-        : APP.defaults.temperature
+        : APP.defaults.temperature,
+    proxyUrl: storedProxy || APP.defaults.proxyUrl || '',
+    accessCode:
+      typeof stored.accessCode === 'string' && stored.accessCode.trim()
+        ? stored.accessCode.trim()
+        : (APP.defaults.accessCode || '')
   };
 }
 
@@ -51,7 +57,9 @@ export function saveSettings(settings) {
     apiKey: (settings.apiKey || '').trim(),
     baseUrl: (settings.baseUrl || APP.defaults.baseUrl).trim().replace(/\/+$/, ''),
     model: (settings.model || APP.defaults.model).trim(),
-    temperature: Math.max(0, Math.min(1.2, Number(settings.temperature) || 0))
+    temperature: Math.max(0, Math.min(1.2, Number(settings.temperature) || 0)),
+    proxyUrl: (settings.proxyUrl || '').trim().replace(/\/+$/, ''),
+    accessCode: (settings.accessCode || '').trim()
   };
   localStorage.setItem(APP.storage.settings, JSON.stringify(normalized));
   return normalized;

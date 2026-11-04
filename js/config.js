@@ -5,7 +5,7 @@
 
 export const APP = {
   name: '费曼小课堂',
-  version: '1.0.0',
+  version: '1.1.0',
   storage: {
     settings: 'feynman.settings.v1',
     session: 'feynman.session.v1',
@@ -14,7 +14,9 @@ export const APP = {
   defaults: {
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'openai/gpt-4o-mini',
-    temperature: 0.75
+    temperature: 0.75,
+    proxyUrl: 'https://feynman-proxy.yangqingliu64.workers.dev',
+    accessCode: 'feynman-2026-k7m3'
   },
   limits: {
     maxImages: 4,
