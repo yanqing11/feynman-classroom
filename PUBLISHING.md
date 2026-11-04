@@ -239,7 +239,7 @@ npx -y wrangler@latest secret put ACCESS_CODE    # 课堂访问码
 | Worker 名称 | `feynman-proxy` |
 | workers.dev 子域 | `yangqingliu64` |
 | 允许来源 | `https://yanqing11.github.io`、本地 `127.0.0.1:8000` / `localhost:8000` |
-| 允许模型 | `z-ai/glm-5.3-flash`、`mistralai/mistral-small-3.2-24b-instruct`、`deepseek/deepseek-chat-v3-0324`、`qwen/qwen3.7-flash` |
+| 允许模型 | `qwen/qwen3-vl-30b-a3b-instruct`、`qwen/qwen3-vl-8b-instruct`、`mistralai/mistral-small-3.2-24b-instruct`、`deepseek/deepseek-chat-v3-0324` |
 | 限流 | 每 IP 每分钟 30 次；每日额度默认关闭 |
 | 单次 token 上限 | 2000 |
 

@@ -85,7 +85,7 @@ Invoke-RestMethod -Uri 'https://feynman-proxy.<your-subdomain>.workers.dev/v1/ch
 
 - Cloudflare Workers 免费版：每天 100,000 次请求，个人课堂完全够用；
 - 你只为上游模型付费（OpenRouter 按 token 计费）；
-- 建议把 `ALLOWED_MODELS` 设成便宜模型（示例中 GLM 5.3 Flash + Mistral Small），并把 `MAX_TOKENS` 控制在 2000 以内；
+- 建议把 `ALLOWED_MODELS` 设成便宜模型（示例中 Qwen3-VL + Mistral Small），并把 `MAX_TOKENS` 控制在 2000 以内；
 - 想按学生限制每日次数：创建 KV 后打开 `DAILY_LIMIT_PER_IP`。注意 KV 免费版每天 1,000 次写入。
 
 ## 安全清单
@@ -106,7 +106,7 @@ A：`js/config.js` 里的 `accessCode` 与 Worker 的 `ACCESS_CODE` 不一致，
 A：把页面域名加进 `ALLOWED_ORIGINS`，重新 `npx wrangler deploy`。
 
 **Q：提示「当前地区不支持这个模型」？**
-A：部分 OpenAI / Google 模型会按地区限制，换用 GLM 5.3 Flash、Mistral Small 或 DeepSeek 等模型。
+A：部分 OpenAI / Google 模型会按地区限制，换用 Qwen3-VL、Mistral Small 或 DeepSeek 等模型。
 
 **Q：想撤销某个 Key？**
 A：到服务商后台吊销旧 Key，再 `npx wrangler secret put UPSTREAM_KEY` 写入新的，网页无需改动。

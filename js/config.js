@@ -13,7 +13,7 @@ export const APP = {
   },
   defaults: {
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'z-ai/glm-5.3-flash',
+    model: 'qwen/qwen3-vl-30b-a3b-instruct',
     temperature: 0.75,
     proxyUrl: 'https://feynman-proxy.yangqingliu64.workers.dev',
     accessCode: 'feynman-2026-k7m3'
@@ -31,10 +31,10 @@ export const APP = {
     maxMessageChars: 4000
   },
   modelPresets: [
-    { id: 'z-ai/glm-5.3-flash', label: 'GLM 5.3 Flash · 快 & 便宜，能看图片（推荐）' },
-    { id: 'mistralai/mistral-small-3.2-24b-instruct', label: 'Mistral Small 3.2 · 看图片稳' },
-    { id: 'deepseek/deepseek-chat-v3-0324', label: 'DeepSeek V3 · 纯文字性价比高' },
-    { id: 'qwen/qwen3.7-flash', label: 'Qwen 3.7 Flash · 纯文字备选' }
+    { id: 'qwen/qwen3-vl-30b-a3b-instruct', label: 'Qwen3-VL 30B · 中文好、能看图片（推荐）' },
+    { id: 'qwen/qwen3-vl-8b-instruct', label: 'Qwen3-VL 8B · 更便宜、能看图片' },
+    { id: 'mistralai/mistral-small-3.2-24b-instruct', label: 'Mistral Small 3.2 · 能看图片，备选' },
+    { id: 'deepseek/deepseek-chat-v3-0324', label: 'DeepSeek V3 · 纯文字性价比高' }
   ],
   samples: [
     '一元二次方程的求根公式',
