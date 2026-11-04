@@ -428,19 +428,20 @@ function syncChrome() {
 }
 
 function renderTopicCard(session) {
+  if (!refs.topicCard) return;
   const topic = (session?.topic || '').trim();
   const image = session?.messages?.[0]?.images?.[0] || '';
 
   refs.topicCard.hidden = !topic;
-  refs.topbarTopic.title = topic;
+  if (refs.topbarTopic) refs.topbarTopic.title = topic;
 
-  if (refs.topicCardText.textContent !== topic) {
+  if (refs.topicCardText && refs.topicCardText.textContent !== topic) {
     refs.topicCardText.textContent = topic;
     refs.topicCard.classList.remove('is-collapsed');
-    refs.topicToggleBtn.textContent = '收起';
+    if (refs.topicToggleBtn) refs.topicToggleBtn.textContent = '收起';
   }
 
-  if (refs.topicCardImage.dataset.src !== image) {
+  if (refs.topicCardImage && refs.topicCardImage.dataset.src !== image) {
     refs.topicCardImage.dataset.src = image;
     if (image) {
       refs.topicCardImage.src = image;
@@ -455,11 +456,13 @@ function renderTopicCard(session) {
 }
 
 function updateTopicToggle() {
+  if (!refs.topicCard || !refs.topicCardBody || !refs.topicToggleBtn) return;
   if (refs.topicCard.hidden) {
     refs.topicToggleBtn.hidden = true;
     return;
   }
   requestAnimationFrame(() => {
+    if (!refs.topicCard || !refs.topicCardBody || !refs.topicToggleBtn) return;
     if (refs.topicCard.hidden) return;
     const body = refs.topicCardBody;
     const collapsed = refs.topicCard.classList.contains('is-collapsed');
@@ -472,6 +475,7 @@ function updateTopicToggle() {
 }
 
 function toggleTopicCard() {
+  if (!refs.topicCard || !refs.topicCardBody || !refs.topicToggleBtn) return;
   const collapsed = refs.topicCard.classList.toggle('is-collapsed');
   refs.topicToggleBtn.textContent = collapsed ? '展开全文' : '收起';
   if (collapsed) {
@@ -1910,10 +1914,10 @@ function bindEvents() {
     openModal('settingsModal');
   });
 
-  refs.historyBtn.addEventListener('click', openHistory);
-  refs.homeHistoryBtn.addEventListener('click', openHistory);
-  refs.topicToggleBtn.addEventListener('click', toggleTopicCard);
-  refs.clearHistoryBtn.addEventListener('click', handleClearHistory);
+  refs.historyBtn?.addEventListener('click', openHistory);
+  refs.homeHistoryBtn?.addEventListener('click', openHistory);
+  refs.topicToggleBtn?.addEventListener('click', toggleTopicCard);
+  refs.clearHistoryBtn?.addEventListener('click', handleClearHistory);
 
   refs.endSessionBtn.addEventListener('click', handleEndSession);
   refs.startBtn.addEventListener('click', handleStart);
