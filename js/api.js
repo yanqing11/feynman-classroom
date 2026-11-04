@@ -108,12 +108,13 @@ async function readError(response) {
   return new ApiError(message, { status: response.status, code, details: body.slice(0, 800) });
 }
 
-function networkError(error) {
+function networkError(error, settings) {
   if (isAbortError(error)) throw error;
-  return new ApiError(
-    '无法连接到模型服务。请检查网络、Base URL，以及服务商是否允许浏览器直连（CORS）。OpenRouter 通常可以直接连接。',
-    { details: error?.message || '' }
-  );
+  const usingProxy = Boolean((settings?.proxyUrl || '').trim());
+  const message = usingProxy
+    ? '连不上课堂共享代理。请检查网络，或确认当前网络能打开代理地址；也可以先在设置里填自己的 API Key 直连。'
+    : '无法连接到模型服务。请检查网络、Base URL，以及服务商是否允许浏览器直连（CORS）。OpenRouter 通常可以直接连接。';
+  return new ApiError(message, { details: error?.message || '' });
 }
 
 function createAbort(externalSignal, timeoutMs = 120000) {
@@ -181,7 +182,7 @@ export async function streamChat({
   } catch (error) {
     abort.cleanup();
     if (abort.didTimeOut()) throw new ApiError('模型响应超时，请稍后再试。');
-    throw networkError(error);
+    throw networkError(error, settings);
   }
 
   if (!response.ok) {
@@ -238,7 +239,7 @@ export async function streamChat({
   } catch (error) {
     if (isAbortError(error)) throw error;
     if (error instanceof ApiError) throw error;
-    throw networkError(error);
+    throw networkError(error, settings);
   } finally {
     abort.cleanup();
     try {
@@ -289,7 +290,7 @@ export async function completeChat({
     } catch (error) {
       abort.cleanup();
       if (abort.didTimeOut()) throw new ApiError('模型响应超时，请稍后再试。');
-      throw networkError(error);
+      throw networkError(error, settings);
     }
 
     if (!response.ok) {
