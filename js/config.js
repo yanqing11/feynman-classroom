@@ -13,7 +13,7 @@ export const APP = {
   },
   defaults: {
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'openai/gpt-4o-mini',
+    model: 'z-ai/glm-5.3-flash',
     temperature: 0.75,
     proxyUrl: 'https://feynman-proxy.yangqingliu64.workers.dev',
     accessCode: 'feynman-2026-k7m3'
@@ -31,11 +31,10 @@ export const APP = {
     maxMessageChars: 4000
   },
   modelPresets: [
-    { id: 'openai/gpt-4o-mini', label: 'GPT-4o mini · 快 & 便宜（推荐）' },
-    { id: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku · 温和稳定' },
-    { id: 'openai/gpt-4o', label: 'GPT-4o · 更会看图片' },
-    { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash · 长上下文' },
-    { id: 'deepseek/deepseek-chat-v3-0324', label: 'DeepSeek V3 · 性价比高' }
+    { id: 'z-ai/glm-5.3-flash', label: 'GLM 5.3 Flash · 快 & 便宜，能看图片（推荐）' },
+    { id: 'mistralai/mistral-small-3.2-24b-instruct', label: 'Mistral Small 3.2 · 看图片稳' },
+    { id: 'deepseek/deepseek-chat-v3-0324', label: 'DeepSeek V3 · 纯文字性价比高' },
+    { id: 'qwen/qwen3.7-flash', label: 'Qwen 3.7 Flash · 纯文字备选' }
   ],
   samples: [
     '一元二次方程的求根公式',

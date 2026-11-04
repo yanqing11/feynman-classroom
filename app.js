@@ -960,7 +960,7 @@ function validateSettings(data) {
   if (!data.apiKey && !data.proxyUrl) {
     return '请填写 API Key，或填写课堂共享代理地址。';
   }
-  if (!data.model) return '请填写模型名称，例如 openai/gpt-4o-mini。';
+  if (!data.model) return '请填写模型名称，例如 z-ai/glm-5.3-flash。';
   try {
     const url = new URL(data.baseUrl);
     if (!/^https?:$/.test(url.protocol)) throw new Error('protocol');

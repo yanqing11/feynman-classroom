@@ -32,7 +32,7 @@
 
 ### 老师：换成自己的 Key（可选）
 
-推荐 [OpenRouter](https://openrouter.ai/keys)：一个 Key 可以调用 `openai/gpt-4o-mini` 等模型，并且允许浏览器直接请求（CORS）。在设置里填入 Key 后，请求会绕过共享代理、直接发往你选择的模型服务商。
+推荐 [OpenRouter](https://openrouter.ai/keys)：一个 Key 可以调用 `z-ai/glm-5.3-flash` 等模型，并且允许浏览器直接请求（CORS）。在设置里填入 Key 后，请求会绕过共享代理、直接发往你选择的模型服务商。
 
 ### 本地开发
 
@@ -119,7 +119,7 @@ npx serve .
 | --- | --- |
 | API Base URL | `https://openrouter.ai/api/v1` |
 | 课堂共享代理 | `https://feynman-proxy.yangqingliu64.workers.dev` |
-| 模型 | `openai/gpt-4o-mini` |
+| 模型 | `z-ai/glm-5.3-flash` |
 | 温度 | `0.75` |
 | 每轮学生回复上限 | `420` tokens |
 | 报告上限 | `1600` tokens |
