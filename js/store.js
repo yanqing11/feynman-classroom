@@ -32,7 +32,7 @@ export function loadSettings() {
   const storedProxy = typeof stored.proxyUrl === 'string' ? stored.proxyUrl.trim() : '';
   const retired = (APP.defaults.retiredProxyUrls || []).map((url) => url.replace(/\/+$/, ''));
   const proxyIsRetired = retired.includes(storedProxy.replace(/\/+$/, ''));
-  return {
+  const settings = {
     apiKey: typeof stored.apiKey === 'string' ? stored.apiKey : '',
     baseUrl:
       typeof stored.baseUrl === 'string' && stored.baseUrl.trim()
@@ -52,6 +52,17 @@ export function loadSettings() {
         ? stored.accessCode.trim()
         : (APP.defaults.accessCode || '')
   };
+
+  if (proxyIsRetired) {
+    stored.proxyUrl = settings.proxyUrl;
+    try {
+      localStorage.setItem(APP.storage.settings, JSON.stringify(stored));
+    } catch {
+      /* Storage may be full or blocked; the in-memory value is still correct. */
+    }
+  }
+
+  return settings;
 }
 
 export function saveSettings(settings) {
