@@ -3977,3 +3977,179 @@ body.is-chat .topbar-tagline {
     margin-top: 11px;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Archive transcripts & simplified chat                                      */
+/* -------------------------------------------------------------------------- */
+
+.history-list {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.history-transcript {
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-deep);
+}
+
+.history-transcript-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.history-transcript-head .history-detail-label {
+  margin-bottom: 0;
+}
+
+.history-transcript-count {
+  color: var(--faint);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+.history-transcript-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.history-message {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.history-message-user {
+  background: rgba(31, 111, 92, 0.07);
+  border-color: rgba(31, 111, 92, 0.14);
+}
+
+.history-message-assistant {
+  background: #fffdf8;
+  border-color: var(--line);
+}
+
+.history-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.history-message-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--green-deep);
+}
+
+.history-message-assistant .history-message-name {
+  color: var(--ink-soft);
+}
+
+.history-message-index {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--faint);
+}
+
+.history-message-text {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Single-column, quieter chat */
+
+.chat-layout {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 880px;
+  margin: 0 auto;
+  gap: 0;
+}
+
+.side-panel {
+  display: none !important;
+}
+
+.chat-panel {
+  border-color: rgba(31, 111, 92, 0.12);
+  box-shadow: 0 14px 40px rgba(23, 79, 67, 0.06);
+}
+
+.chat-topic {
+  display: none;
+}
+
+.chat-head {
+  padding: 12px clamp(16px, 2.6vw, 24px);
+  background: rgba(255, 253, 248, 0.72);
+  border-bottom-color: rgba(31, 111, 92, 0.1);
+}
+
+.chat-head-right {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.mobile-teacher-btn {
+  display: inline-flex;
+}
+
+.chat-report-btn {
+  margin-right: auto;
+  padding-left: 0;
+  color: var(--green-deep);
+}
+
+.send-hint {
+  display: none;
+}
+
+.composer {
+  border-top-color: rgba(31, 111, 92, 0.1);
+  background: rgba(251, 247, 238, 0.9);
+}
+
+.message-list {
+  padding-left: clamp(16px, 3vw, 30px);
+  padding-right: clamp(16px, 3vw, 30px);
+}
+
+@media (max-width: 520px) {
+  .history-detail {
+    padding: 12px 11px 14px;
+    gap: 9px;
+  }
+
+  .history-transcript {
+    margin-bottom: 10px;
+    padding: 10px;
+  }
+
+  .history-transcript-list {
+    max-height: 260px;
+  }
+
+  .history-message {
+    padding: 8px 10px;
+  }
+
+  .history-message-text {
+    font-size: 12.5px;
+  }
+}

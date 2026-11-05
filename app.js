@@ -408,7 +408,7 @@ function syncChrome() {
       : '呼叫老师';
 
   refs.viewLastReportBtn.hidden = !hasReport;
-  refs.viewLastReportBtn.textContent = hasReport ? '查看上一次诊断报告 →' : '';
+  refs.viewLastReportBtn.textContent = hasReport ? '查看报告 →' : '';
 
   const sendLabel = refs.sendBtn.querySelector('span');
   if (sendLabel) sendLabel.textContent = busy ? '停止' : '发送';
@@ -1618,8 +1618,42 @@ function renderHistoryList(records) {
   }
 }
 
+function buildHistoryTranscript(record) {
+  const messages = Array.isArray(record.messages) ? record.messages : [];
+  if (!messages.length) return null;
+
+  const block = el('section', 'history-transcript');
+
+  const head = el('div', 'history-transcript-head');
+  const title = el('div');
+  title.append(el('span', 'history-detail-label', '当时的回答记录'));
+  title.append(el('span', 'history-transcript-count', `共 ${messages.length} 条对话`));
+  head.append(title);
+  block.append(head);
+
+  const list = el('div', 'history-transcript-list');
+  const names = { user: '你', assistant: '小问' };
+
+  messages.forEach((message, index) => {
+    const role = message.role === 'assistant' ? 'assistant' : 'user';
+    const row = el('div', `history-message history-message-${role}`);
+    const meta = el('div', 'history-message-meta');
+    meta.append(el('span', 'history-message-name', names[role]));
+    meta.append(el('span', 'history-message-index', String(index + 1)));
+    row.append(meta);
+    row.append(el('p', 'history-message-text', message.content || ''));
+    list.append(row);
+  });
+
+  block.append(list);
+  return block;
+}
+
 function buildHistoryDetail(record) {
   const detail = el('div', 'history-detail');
+
+  const transcript = buildHistoryTranscript(record);
+  if (transcript) detail.append(transcript);
 
   if (record.report) {
     if (record.report.verdict) {
