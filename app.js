@@ -408,7 +408,7 @@ function syncChrome() {
       : '呼叫老师';
 
   refs.viewLastReportBtn.hidden = !hasReport;
-  refs.viewLastReportBtn.textContent = hasReport ? '查看报告 →' : '';
+  refs.viewLastReportBtn.textContent = hasReport ? '查看上一次诊断报告 →' : '';
 
   const sendLabel = refs.sendBtn.querySelector('span');
   if (sendLabel) sendLabel.textContent = busy ? '停止' : '发送';

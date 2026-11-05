@@ -4073,63 +4073,6 @@ body.is-chat .topbar-tagline {
   overflow-wrap: anywhere;
 }
 
-/* Single-column, quieter chat */
-
-.chat-layout {
-  grid-template-columns: minmax(0, 1fr);
-  max-width: 880px;
-  margin: 0 auto;
-  gap: 0;
-}
-
-.side-panel {
-  display: none !important;
-}
-
-.chat-panel {
-  border-color: rgba(31, 111, 92, 0.12);
-  box-shadow: 0 14px 40px rgba(23, 79, 67, 0.06);
-}
-
-.chat-topic {
-  display: none;
-}
-
-.chat-head {
-  padding: 12px clamp(16px, 2.6vw, 24px);
-  background: rgba(255, 253, 248, 0.72);
-  border-bottom-color: rgba(31, 111, 92, 0.1);
-}
-
-.chat-head-right {
-  width: 100%;
-  justify-content: flex-end;
-}
-
-.mobile-teacher-btn {
-  display: inline-flex;
-}
-
-.chat-report-btn {
-  margin-right: auto;
-  padding-left: 0;
-  color: var(--green-deep);
-}
-
-.send-hint {
-  display: none;
-}
-
-.composer {
-  border-top-color: rgba(31, 111, 92, 0.1);
-  background: rgba(251, 247, 238, 0.9);
-}
-
-.message-list {
-  padding-left: clamp(16px, 3vw, 30px);
-  padding-right: clamp(16px, 3vw, 30px);
-}
-
 @media (max-width: 520px) {
   .history-detail {
     padding: 12px 11px 14px;

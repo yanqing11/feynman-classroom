@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261105a">
+  <link rel="stylesheet" href="./styles.css?v=20261105b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -104,7 +104,6 @@
               </div>
               <div class="chat-head-right">
                 <span class="round-badge" id="roundBadge">第 0 轮</span>
-                <button class="btn btn-ghost btn-sm chat-report-btn" id="viewLastReportBtn" type="button" hidden>查看报告</button>
                 <button class="btn btn-primary btn-sm mobile-teacher-btn" id="callTeacherMobile" type="button">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
                   <span id="callTeacherMobileLabel">呼叫老师</span>
@@ -196,6 +195,7 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
                 <span id="callTeacherLabel">呼叫 AI 老师点评</span>
               </button>
+              <button class="text-link" id="viewLastReportBtn" type="button" hidden>查看上一次诊断报告 →</button>
               <p class="tiny-note">建议先讲 2–3 轮，老师的诊断会更准确。</p>
             </div>
 
@@ -490,6 +490,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261105a"></script>
+  <script type="module" src="./app.js?v=20261105b"></script>
 </body>
 </html>
