@@ -5,7 +5,15 @@
  * 数据只保存在本机 localStorage，不上传服务器；不保存图片。
  */
 
-import { APP, METRICS } from './config.js';
+import {
+  APP,
+  METRICS,
+  SUBJECT_LIST,
+  difficultyInfo,
+  normalizeTags,
+  sourceInfo,
+  subjectInfo
+} from './config.js';
 
 const MAX_RECORDS = 60;
 const MAX_MESSAGE_CHARS = 8000;
@@ -120,6 +128,13 @@ export function archiveSession(session, { model = '', endedAt = new Date().toISO
   const record = {
     id: session.id,
     topic: String(session.topic).slice(0, APP.limits.maxTopicChars),
+    subject: subjectInfo(session.subject) ? session.subject : null,
+    difficulty: session.difficulty || null,
+    tags: normalizeTags(session.tags),
+    source: sourceInfo(session.source).key,
+    studentPersona: session.studentPersona || null,
+    studentMode: session.studentMode || 'real',
+    studentIntensity: session.studentIntensity || 'normal',
     startedAt: session.createdAt || endedAt,
     endedAt,
     turns,
@@ -201,11 +216,68 @@ export function summarizeHistory(records) {
   };
 }
 
+/** 按学科拆分统计，供学习档案总览使用。 */
+export function summarizeBySubject(records) {
+  return SUBJECT_LIST.map((subject) => ({
+    subject,
+    summary: summarizeHistory(records.filter((record) => record.subject === subject.key))
+  }));
+}
+
+/** 按知识点聚合平均分和练习次数，供薄弱点热力图使用。 */
+export function summarizeTags(records) {
+  const map = new Map();
+  for (const record of records) {
+    const score = Number(record.report?.overallScore);
+    for (const tag of normalizeTags(record.tags)) {
+      const key = `${record.subject || 'unsorted'}::${tag}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          tag,
+          subject: record.subject || null,
+          total: 0,
+          count: 0,
+          sessions: 0
+        });
+      }
+      const item = map.get(key);
+      item.sessions += 1;
+      if (Number.isFinite(score)) {
+        item.total += score;
+        item.count += 1;
+      }
+    }
+  }
+  return [...map.values()]
+    .map((item) => ({
+      ...item,
+      average: item.count ? Math.round(item.total / item.count) : null
+    }))
+    .sort((a, b) => {
+      if (a.average == null && b.average == null) return b.sessions - a.sessions;
+      if (a.average == null) return 1;
+      if (b.average == null) return -1;
+      return a.average - b.average;
+    });
+}
+
 /** 把报告转成可复制的纯文本，历史详情里用。 */
 export function reportToText(record) {
   if (!record?.report) return '';
   const { report } = record;
-  const lines = [`学习诊断报告 · ${record.topic}`, `综合评分：${report.overallScore ?? '—'}%`];
+  const subject = subjectInfo(record.subject);
+  const difficulty = difficultyInfo(record.difficulty);
+  const source = sourceInfo(record.source);
+  const meta = [];
+  if (subject) meta.push(subject.label);
+  if (difficulty) meta.push(difficulty.label);
+  if (record.tags?.length) meta.push(record.tags.join('、'));
+  if (record.source) meta.push(source.full);
+  const lines = [
+    `学习诊断报告 · ${record.topic}`,
+    meta.length ? `题目信息：${meta.join(' · ')}` : '',
+    `综合评分：${report.overallScore ?? '—'}%`
+  ].filter(Boolean);
   for (const metric of METRICS) {
     lines.push(`${metric.label}：${report.scores?.[metric.key] ?? '—'}%`);
   }

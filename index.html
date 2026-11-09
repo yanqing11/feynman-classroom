@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261105b">
+  <link rel="stylesheet" href="./styles.css?v=20261109a">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -62,9 +62,31 @@
 
         <div class="home-card">
           <div class="home-input">
+            <div class="home-subject-bar">
+              <div class="subject-tabs" id="subjectTabs" role="tablist" aria-label="选择学科"></div>
+              <span class="home-subject-hint" id="subjectHint">整节课会锁定在这个学科</span>
+            </div>
+
             <label class="sr-only" for="topicInput">讲课主题或题目</label>
             <textarea id="topicInput" class="topic-input" rows="3" maxlength="1200"
               placeholder="输入你想讲解的内容，也可以上传题目图片。"></textarea>
+
+            <div class="home-meta">
+              <label class="home-meta-field home-meta-difficulty" for="difficultySelect">
+                <span>难度</span>
+                <select id="difficultySelect"></select>
+              </label>
+              <label class="home-meta-field" for="tagInput">
+                <span>知识点</span>
+                <input id="tagInput" type="text" list="tagOptions" maxlength="48" placeholder="选择或输入知识点，可用逗号分隔">
+                <datalist id="tagOptions"></datalist>
+              </label>
+            </div>
+
+            <label class="home-note">
+              <span class="sr-only">题目备注</span>
+              <input id="noteInput" type="text" maxlength="1200" placeholder="备注（可选）：易错点、来源或给自己的提醒">
+            </label>
 
             <div class="topic-image-preview" id="topicImagePreview" hidden>
               <img id="topicImageThumb" alt="题目图片预览">
@@ -74,13 +96,25 @@
             <div class="home-input-foot">
               <div class="topic-image-row">
                 <input type="file" id="topicImageInput" accept="image/*" hidden>
+                <input type="file" id="topicCameraInput" accept="image/*" capture="environment" hidden>
                 <button class="btn btn-outline btn-sm" id="topicImageBtn" type="button">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                  上传题目图片
+                  上传图片
                 </button>
-                <span class="image-hint" id="topicImageHint">支持 JPG / PNG</span>
+                <button class="btn btn-outline btn-sm" id="topicCameraBtn" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v12H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  拍照
+                </button>
+                <button class="btn btn-ghost btn-sm" id="recognizeBtn" type="button" hidden>识别文字</button>
+                <span class="image-hint" id="topicImageHint">支持 JPG / PNG，可手写拍照</span>
               </div>
               <button class="btn btn-primary btn-start" id="startBtn" type="button">开始讲课</button>
+            </div>
+
+            <div class="home-bank-row">
+              <button class="text-link" id="saveBankBtn" type="button">存入我的题库</button>
+              <button class="text-link" id="openBankBtn" type="button">我的题库</button>
+              <span class="home-source-note" id="sourceNote"></span>
             </div>
           </div>
 
@@ -88,7 +122,7 @@
 
           <p class="privacy-note">
             <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-            API Key 仅保存在本地。
+            题目和档案只保存在本地；图片识题会把图片发给你配置的 AI 模型。
           </p>
         </div>
       </section>
@@ -100,7 +134,7 @@
             <div class="chat-head">
               <div class="chat-topic">
                 <span class="chat-kicker">正在讲课</span>
-                <p class="chat-sub">小问会围绕顶部的题目追问</p>
+                <p class="chat-sub" id="chatSub">小问会围绕顶部的题目追问</p>
               </div>
               <div class="chat-head-right">
                 <span class="round-badge" id="roundBadge">第 0 轮</span>
@@ -114,6 +148,7 @@
             <section class="chat-problem" id="topicCard" aria-label="本次题目" hidden>
               <div class="chat-problem-head">
                 <span class="chat-problem-label">本次题目</span>
+                <div class="chat-problem-meta" id="topicMeta"></div>
                 <button class="chat-problem-toggle" id="topicToggleBtn" type="button" hidden>展开全文</button>
               </div>
               <div class="chat-problem-body" id="topicCardBody">
@@ -184,6 +219,30 @@
               </div>
             </div>
 
+            <div class="side-card practice-card">
+              <div class="side-card-head">
+                <span class="side-kicker">CLASS SETTINGS</span>
+                <h3>这节课的参数</h3>
+              </div>
+              <div class="practice-row">
+                <label for="chatSubjectSelect">学科</label>
+                <select id="chatSubjectSelect"></select>
+              </div>
+              <div class="practice-row">
+                <label for="chatPersonaSelect">学生人设</label>
+                <select id="chatPersonaSelect"></select>
+              </div>
+              <div class="practice-row">
+                <label for="chatIntensitySelect">追问强度</label>
+                <select id="chatIntensitySelect"></select>
+              </div>
+              <div class="practice-row">
+                <label for="chatModeSelect">学生模式</label>
+                <select id="chatModeSelect"></select>
+              </div>
+              <p class="tiny-note" id="practiceLockHint">学科已锁定；到设置里可以关闭锁定。</p>
+            </div>
+
             <div class="side-card teacher-call-card">
               <div class="teacher-seal" aria-hidden="true">评</div>
               <div class="side-card-head">
@@ -252,6 +311,7 @@
             <p class="eyebrow"><span class="eyebrow-line"></span>学习诊断报告</p>
             <h2 id="reportTitle">你把这道题，讲清楚了吗？</h2>
             <p class="report-topic" id="reportTopic"></p>
+            <p class="report-meta" id="reportMeta"></p>
           </div>
           <div class="overall-score">
             <div class="score-ring" id="overallRing" style="--score:0">
@@ -345,6 +405,29 @@
           <div class="range-labels"><span>更严谨</span><span>更活泼</span></div>
         </div>
 
+        <fieldset class="practice-settings">
+          <legend>AI 学生设置</legend>
+          <div class="field">
+            <label for="studentPersonaSelect">学生人设</label>
+            <select id="studentPersonaSelect"></select>
+            <p class="field-hint" id="studentPersonaHint">刨根问底型：总想问“为什么这个规则成立”。</p>
+          </div>
+          <div class="field">
+            <label for="studentModeSelect">学生模式</label>
+            <select id="studentModeSelect"></select>
+            <p class="field-hint" id="studentModeHint">真实学生模式：疑问从你的讲解里自然生长。</p>
+          </div>
+          <div class="field">
+            <label for="studentIntensitySelect">追问强度</label>
+            <select id="studentIntensitySelect"></select>
+            <p class="field-hint" id="studentIntensityHint">正常：每次抓一个最关键的点追问。</p>
+          </div>
+          <label class="toggle-field" for="lockSubjectToggle">
+            <input id="lockSubjectToggle" type="checkbox">
+            <span>学科锁定：一节课内不能切换学科</span>
+          </label>
+        </fieldset>
+
         <details class="advanced">
           <summary>高级设置</summary>
           <div class="field">
@@ -403,7 +486,31 @@
       </div>
 
       <div class="history-content" id="historyContent" hidden>
+        <div class="history-filters">
+          <div class="filter-tabs" id="historySubjectFilter" role="tablist" aria-label="按学科筛选"></div>
+          <label class="history-source-filter">
+            <span class="sr-only">按题目来源筛选</span>
+            <select id="historySourceFilter"></select>
+          </label>
+        </div>
+
         <section class="history-summary" id="historySummary"></section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>分学科总览</h3>
+            <span class="history-section-meta">三科独立统计，不混算</span>
+          </div>
+          <div class="subject-overview" id="historySubjectOverview"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>知识点薄弱点</h3>
+            <span class="history-section-meta" id="historyTagMeta"></span>
+          </div>
+          <div class="tag-stats" id="historyTagStats"></div>
+        </section>
 
         <section class="history-block">
           <div class="history-section-head">
@@ -431,6 +538,40 @@
 
         <p class="history-note">档案只保存在当前浏览器，不会上传服务器，也不包含聊天图片。清除浏览器数据会同时清除档案。</p>
       </div>
+    </div>
+  </div>
+
+  <!-- ============ MY QUESTION BANK ============ -->
+  <div class="modal-layer" id="bankModal" hidden>
+    <div class="modal-backdrop" data-close="bankModal"></div>
+    <div class="modal bank-modal" role="dialog" aria-modal="true" aria-labelledby="bankTitle" tabindex="-1">
+      <div class="bank-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>MY QUESTION BANK</p>
+          <h2 id="bankTitle">我的题库</h2>
+          <p>手动录入和拍照识别的题目都存在本机，可以随时找回、修改或删除。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="bankModal" type="button" aria-label="关闭我的题库">×</button>
+      </div>
+
+      <div class="bank-toolbar">
+        <label class="bank-search">
+          <span class="sr-only">搜索题目</span>
+          <input id="bankSearch" type="search" autocomplete="off" placeholder="搜索题干或知识点">
+        </label>
+        <select id="bankSubjectFilter" aria-label="按学科筛选"></select>
+        <select id="bankSourceFilter" aria-label="按来源筛选"></select>
+      </div>
+
+      <div class="bank-empty" id="bankEmpty" hidden>
+        <div class="history-empty-mark" aria-hidden="true">题</div>
+        <h3>题库还是空的</h3>
+        <p>在首页输入题目后点「存入我的题库」，或拍一张题目照片识别后保存。</p>
+      </div>
+
+      <div class="bank-list" id="bankList"></div>
+
+      <p class="bank-note">题库和图片只保存在当前浏览器。清除浏览器数据会同时清除题库。</p>
     </div>
   </div>
 
@@ -490,6 +631,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261105b"></script>
+  <script type="module" src="./app.js?v=20261109a"></script>
 </body>
 </html>

@@ -10,7 +10,9 @@ export const APP = {
     settings: 'feynman.settings.v1',
     session: 'feynman.session.v1',
     history: 'feynman.history.v1',
-    welcomed: 'feynman.welcomed.v1'
+    welcomed: 'feynman.welcomed.v1',
+    practice: 'feynman.practice.v1',
+    bank: 'feynman.bank.v1'
   },
   defaults: {
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -47,32 +49,236 @@ export const APP = {
   ]
 };
 
-export const STUDENT_PROMPT = `你是「小问」，一个正在读初中的学生。你的数学基础不太好，但你很好奇，也很想弄懂。
-现在，人类用户扮演你的老师，正在给你讲一道数学题或一个数学概念。你要认真听，并通过提问帮助老师把思路讲清楚。
+export const SUBJECT_KEYS = ['primary', 'junior', 'senior'];
 
-【你的说话方式】
-- 像日常聊天一样说口语，不用“综上所述”“首先/其次”这种书面腔。
-- 每次只说 1～2 句话，最多问 1～2 个问题；通常不超过 80 个汉字。
-- 可以偶尔说“哦——”“等等”“我有点绕晕了”“老师你慢一点”。
-- 称呼对方为“老师”，不要自称 AI。
+export const SUBJECTS = {
+  primary: {
+    key: 'primary',
+    label: '小学数学',
+    short: '小学',
+    stage: '小学',
+    tags: [
+      '和倍差倍',
+      '归一归总',
+      '分数应用题',
+      '长方形正方形面积',
+      '简易方程',
+      '鸡兔同笼',
+      '行程基础',
+      '百分数',
+      '钟表',
+      '平均数'
+    ],
+    misconceptions: [
+      '不同物品的量不能直接相加，比如苹果和梨的数量',
+      '分不清“一共”“比…多”“比…少”',
+      '设未知数时不知道谁是 1 份量',
+      '单位不统一就直接计算',
+      '只会套算式，不会用份数图或线段图表示关系'
+    ],
+    teacherFocus:
+      '小学阶段重点看：有没有用具体例子、画图或份数关系讲清楚数量关系；能不能帮学生区分文字条件；每一步算式是否说清含义。',
+    reportFocus: '具象例子、画图、数量关系、文字条件区分'
+  },
+  junior: {
+    key: 'junior',
+    label: '初中数学',
+    short: '初中',
+    stage: '初中',
+    tags: [
+      '一元一次方程',
+      '二元一次方程组',
+      '不等式',
+      '整式分式',
+      '全等三角形',
+      '一次函数',
+      '反比例函数',
+      '勾股定理',
+      '一元二次方程',
+      '平行四边形'
+    ],
+    misconceptions: [
+      '等式变形时忘记变号',
+      '分式运算忽略分母不为 0',
+      '几何证明想当然，缺少判定条件',
+      '函数里分不清自变量和因变量',
+      '忽略题目里的隐藏限制条件'
+    ],
+    teacherFocus:
+      '初中阶段重点看：是否讲清定理的适用前提、隐含条件和代数变形依据；几何证明有没有写清判定条件；函数是否区分自变量与因变量。',
+    reportFocus: '定理前提、隐含条件、代数变形依据、几何判定'
+  },
+  senior: {
+    key: 'senior',
+    label: '高中数学',
+    short: '高中',
+    stage: '高中',
+    tags: [
+      '函数性质',
+      '导数',
+      '三角函数',
+      '数列',
+      '立体几何',
+      '解析几何',
+      '向量',
+      '概率统计',
+      '不等式',
+      '圆锥曲线'
+    ],
+    misconceptions: [
+      '忽略函数定义域',
+      '分类讨论漏情况',
+      '立体几何混淆线面平行与垂直的判定',
+      '圆锥曲线忘记判别式或范围限制',
+      '向量夹角、斜率不存在等特殊情况遗漏'
+    ],
+    teacherFocus:
+      '高中阶段重点看：是否讲清定义域、边界和分类讨论；有没有漏掉特殊情况；数形结合与陷阱提醒是否到位；推导是否严谨。',
+    reportFocus: '定义域、边界、分类讨论、数形结合、特殊情况'
+  }
+};
 
-【你要做的事】
-1. 针对老师刚刚讲的内容，提出一个具体问题。优先问：
-   - “这一步为什么要这样算？”
-   - “这个符号 / 这个数是什么意思？”
-   - “老师能举一个具体数字的例子吗？”
-   - “如果换成另一个数，还能这样做吗？”
-2. 老师讲得跳跃时，请老师补上中间那一步。
-3. 老师用了没解释的公式或术语时，请老师用大白话解释。
-4. 如果你发现老师的说法可能有问题，不要直接说“你错了”，也不要说正确答案。用困惑或反问让老师自己检查，例如：“可是我把 x=2 代进去，左右两边不一样，是我哪里算错了吗？”
-5. 如果老师一次讲了很多，就抓住其中最关键的一步追问，不要泛泛地说“我懂了”。
+export const SUBJECT_LIST = SUBJECT_KEYS.map((key) => SUBJECTS[key]);
+
+export const DIFFICULTIES = [
+  { key: 'basic', label: '基础', hint: '先站稳概念和第一步' },
+  { key: 'medium', label: '中档', hint: '需要完整步骤和依据' },
+  { key: 'hard', label: '压轴', hint: '重点看边界与分类讨论' }
+];
+
+export const DIFFICULTY_MAP = Object.fromEntries(DIFFICULTIES.map((item) => [item.key, item]));
+
+export const SOURCES = {
+  builtin: { key: 'builtin', label: '题库', full: '内置题库' },
+  custom: { key: 'custom', label: '自定义', full: '自定义录入' },
+  ocr: { key: 'ocr', label: '拍照识题', full: '图片识题' }
+};
+
+export const PERSONAS = [
+  {
+    key: 'cautious',
+    label: '谨慎型',
+    prompt: '你有点胆小，害怕说错。经常先确认“这样是不是对的呀？”，希望老师慢一点、讲清楚一点。'
+  },
+  {
+    key: 'concrete',
+    label: '具象依赖型',
+    prompt: '你看不太懂抽象式子，需要老师画图、举生活里的例子才能跟上。遇到符号会请老师换成具体数字。'
+  },
+  {
+    key: 'associative',
+    label: '联想发散型',
+    prompt: '你容易把新知识和以前学过的东西混在一起，会突然联想到别的题型，需要老师帮你区分。'
+  },
+  {
+    key: 'careless',
+    label: '粗心易错型',
+    prompt: '你容易漏看条件、看错符号或忽略范围。老师讲完后，你可能会复述错一个细节，需要老师帮你纠正。'
+  },
+  {
+    key: 'curious',
+    label: '刨根问底型',
+    prompt: '你总想问“为什么这个规则成立”。你不满足于记住做法，希望老师把底层原因讲透。'
+  }
+];
+
+export const PERSONA_MAP = Object.fromEntries(PERSONAS.map((item) => [item.key, item]));
+
+export const STUDENT_MODES = [
+  { key: 'real', label: '真实学生模式', hint: '疑问自然生长，默认模式' },
+  { key: 'examiner', label: '考官模式', hint: '按固定梯度追问，适合新手训练' }
+];
+
+export const INTENSITIES = [
+  { key: 'gentle', label: '保守', hint: '追问少一点，节奏更温和' },
+  { key: 'normal', label: '正常', hint: '默认提问频率' },
+  { key: 'challenge', label: '挑战', hint: '追问更密，偶尔会遗忘或混淆' }
+];
+
+export const MODE_MAP = Object.fromEntries(STUDENT_MODES.map((item) => [item.key, item]));
+export const INTENSITY_MAP = Object.fromEntries(INTENSITIES.map((item) => [item.key, item]));
+
+export function subjectInfo(key) {
+  return SUBJECTS[key] || null;
+}
+
+export function difficultyInfo(key) {
+  return DIFFICULTY_MAP[key] || DIFFICULTIES[1];
+}
+
+export function sourceInfo(key) {
+  return SOURCES[key] || SOURCES.custom;
+}
+
+export function personaInfo(key) {
+  return PERSONA_MAP[key] || PERSONAS[0];
+}
+
+export function modeInfo(key) {
+  return MODE_MAP[key] || STUDENT_MODES[0];
+}
+
+export function intensityInfo(key) {
+  return INTENSITY_MAP[key] || INTENSITIES[1];
+}
+
+export function normalizeTags(tags) {
+  return (Array.isArray(tags) ? tags : [])
+    .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+export function sessionMeta(session) {
+  const subject = subjectInfo(session?.subject);
+  const difficulty = difficultyInfo(session?.difficulty);
+  const source = sourceInfo(session?.source);
+  return {
+    subject,
+    difficulty,
+    source,
+    tags: normalizeTags(session?.tags)
+  };
+}
+
+export const STUDENT_PROMPT = `你是「小问」，一个 12 岁的初中生。你的数学基础很差，经常完全没有解题思路，但你很想弄懂。
+现在，人类用户扮演你的老师，正在给你讲一道数学题或一个数学概念。你要以小问的身份向老师请教，认真听，并通过追问让老师把思路讲清楚。
+
+【你是谁】
+- 你绝对不能扮演老师，不能自己推导公式，也不能给出答案或完整解法。
+- 你不需要装作聪明；没听懂就坦白说没听懂。
+- 你称呼对方为“老师”，不要自称 AI。
 
 【绝对禁止】
-- 不要直接给出正确答案、完整解法、最终结果或公式推导。
-- 不要替老师总结整道题，不要长篇大论。
-- 不要编造老师没有讲过的步骤或数字。
-- 不要使用 LaTeX、$ 符号或 Markdown 标题；公式用普通文本写，例如 x = (-b ± √(b² - 4ac)) / 2a。
-- 不要输出 JSON、评分或“作为 AI”之类的话。
+- 禁止主动提出解题思路，例如“是不是可以设 x”“是不是要加起来”。
+- 禁止自己进行数学计算或逻辑推导。
+- 禁止在老师没有给出明确步骤时，自己脑补后续步骤。
+- 禁止给出最终答案、完整解法或公式推导。
+- 禁止输出 JSON、评分、Markdown 标题或“作为 AI”之类的话。
+- 不要使用 LaTeX 或 $ 符号；公式用普通文本写，例如 x = (-b ± √(b² - 4ac)) / 2a。
+
+【说话风格】
+- 像 12 岁学生日常聊天，多用语气词（啊、呀、呢、哦），可以有委屈、恍然大悟、迷糊的情绪。
+- 每次只说 1～2 句话，最多问 1～2 个问题；通常不超过 80 个汉字。
+- 可以偶尔说“哦——”“等等”“我有点绕晕了”“老师你慢一点”。
+- 不要像机器人，也不要长篇大论。
+
+【怎么反应】
+1. 老师回答很短（如“是的”“对”“应该吧”）时，不要假装懂了。要追问：“老师，你只说对，可是为什么呀？我还是不懂，你能展开讲讲吗？”
+2. 老师讲了很复杂的公式时，先用自己的大白话复述一遍，再问：“老师，你刚才说的那个 XX，用我平时生活里的东西怎么理解呀？”
+3. 如果你真的卡壳了，就说：“老师，我脑子有点乱，你能像教小学生一样，第一步先告诉我该干嘛吗？”
+4. 老师讲得跳跃时，请老师补上中间那一步。
+5. 老师用了没解释的公式或术语时，请老师用大白话解释。
+6. 如果你发现老师的说法可能有问题，不要直接说“你错了”，也不要说正确答案。用困惑或反问让老师自己检查，例如：“可是我把 x=2 代进去，左右两边不一样，是我哪里算错了吗？”
+7. 如果老师一次讲了很多，就抓住其中最关键的一步追问，不要泛泛地说“我懂了”。
+8. 不要重复追问已经聊清楚的问题；你的疑问要从老师上一句讲解里自然长出来。
+
+【老师卡壳时】
+如果老师向你求助，或系统提示老师卡壳：
+- 你仍然不能说出这道题的最终答案。
+- 你要扮演一个“翻书找提示”的学生，给老师一个半成品线索，例如一个类比、一个反例，或某个步骤的起点。
+- 给完线索后说：“老师，这是我在书上查到的/这是我自己瞎猜的，你看对吗？你能借这个思路继续教教我吗？”
+- 严禁替老师推导完剩余步骤，必须停下来等老师接话。
 
 【开场】
 如果是老师刚选了主题、还没有开始讲，你就用一两句话打个招呼，请老师开始讲，并表现出一点好奇。例如：“老师好！我数学不太好，你讲慢一点哈。我们今天讲什么呀？”`;
@@ -139,6 +345,17 @@ export const METRICS = [
 export const kickoffMessage = (topic) =>
   `我选择了讲课主题：《${topic}》。现在由我扮演老师，向你讲解。请你以小问的身份先跟我打个招呼，请我开始讲。`;
 
-export const teacherRequest = (topic) =>
-  `请评审下面这堂数学课。讲课主题是：《${topic}》。
-请严格按系统提示中的 JSON 结构输出，只评价人类老师（老师）的讲解，不要替老师重讲。`;
+export function teacherRequest(input) {
+  const session = typeof input === 'string' ? { topic: input } : input || {};
+  const meta = sessionMeta(session);
+  const lines = [`请评审下面这堂数学课。讲课主题是：《${session.topic || '未命名题目'}》。`];
+
+  if (meta.subject) lines.push(`学科：${meta.subject.label}（${meta.subject.stage}学段）。`);
+  if (meta.difficulty) lines.push(`难度：${meta.difficulty.label}。`);
+  if (meta.tags.length) lines.push(`知识点：${meta.tags.join('、')}。`);
+  if (meta.source) lines.push(`题目来源：${meta.source.full}。`);
+  if (meta.subject) lines.push(`本学段评分侧重点：${meta.subject.teacherFocus}`);
+
+  lines.push('请严格按系统提示中的 JSON 结构输出，只评价人类老师（老师）的讲解，不要替老师重讲。');
+  return lines.join('\n');
+}

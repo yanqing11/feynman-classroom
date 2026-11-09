@@ -1,4 +1,14 @@
-import { APP, kickoffMessage } from './config.js';
+import {
+  APP,
+  DIFFICULTIES,
+  INTENSITIES,
+  PERSONAS,
+  SOURCES,
+  STUDENT_MODES,
+  SUBJECT_KEYS,
+  kickoffMessage,
+  normalizeTags
+} from './config.js';
 
 export const STATUS = Object.freeze({
   HOME: 'home',
@@ -25,6 +35,61 @@ function safeParse(value) {
   } catch {
     return null;
   }
+}
+
+const SUBJECT_KEYS_SET = new Set(SUBJECT_KEYS);
+const DIFFICULTY_KEYS = new Set(DIFFICULTIES.map((item) => item.key));
+const SOURCE_KEYS = new Set(Object.keys(SOURCES));
+const PERSONA_KEYS = new Set(PERSONAS.map((item) => item.key));
+const MODE_KEYS = new Set(STUDENT_MODES.map((item) => item.key));
+const INTENSITY_KEYS = new Set(INTENSITIES.map((item) => item.key));
+
+const PRACTICE_DEFAULT = {
+  subject: 'junior',
+  difficulty: 'medium',
+  persona: 'curious',
+  mode: 'real',
+  intensity: 'normal',
+  lockSubject: true
+};
+
+function pick(value, allowed, fallback) {
+  return allowed.has(value) ? value : fallback;
+}
+
+export function loadPractice() {
+  const stored = safeParse(localStorage.getItem(APP.storage.practice)) || {};
+  return {
+    subject: pick(stored.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
+    difficulty: pick(stored.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
+    persona: pick(stored.persona, PERSONA_KEYS, PRACTICE_DEFAULT.persona),
+    mode: pick(stored.mode, MODE_KEYS, PRACTICE_DEFAULT.mode),
+    intensity: pick(stored.intensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
+    lockSubject:
+      typeof stored.lockSubject === 'boolean' ? stored.lockSubject : PRACTICE_DEFAULT.lockSubject
+  };
+}
+
+export function savePractice(practice) {
+  const merged = { ...loadPractice(), ...practice };
+  const normalized = {
+    subject: pick(merged.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
+    difficulty: pick(merged.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
+    persona: pick(merged.persona, PERSONA_KEYS, PRACTICE_DEFAULT.persona),
+    mode: pick(merged.mode, MODE_KEYS, PRACTICE_DEFAULT.mode),
+    intensity: pick(merged.intensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
+    lockSubject: Boolean(merged.lockSubject)
+  };
+  try {
+    localStorage.setItem(APP.storage.practice, JSON.stringify(normalized));
+  } catch {
+    /* Storage may be blocked; the in-memory value is still correct. */
+  }
+  return normalized;
+}
+
+function randomPersona() {
+  return PERSONAS[Math.floor(Math.random() * PERSONAS.length)].key;
 }
 
 export function loadSettings() {
@@ -88,7 +153,7 @@ export function maskKey(key) {
   return `${key.slice(0, 6)}…${key.slice(-4)}`;
 }
 
-function createSession(topic, topicImage) {
+function createSession(topic, topicImage, meta = {}) {
   const now = new Date().toISOString();
   const kickoff = {
     id: newId(),
@@ -101,6 +166,13 @@ function createSession(topic, topicImage) {
   return {
     id: newId(),
     topic,
+    subject: pick(meta.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
+    difficulty: pick(meta.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
+    tags: normalizeTags(meta.tags),
+    source: pick(meta.source, SOURCE_KEYS, 'builtin'),
+    studentPersona: pick(meta.studentPersona ?? meta.persona, PERSONA_KEYS, randomPersona()),
+    studentMode: pick(meta.studentMode, MODE_KEYS, PRACTICE_DEFAULT.mode),
+    studentIntensity: pick(meta.studentIntensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
     createdAt: now,
     updatedAt: now,
     messages: [kickoff],
@@ -116,6 +188,13 @@ function restoreSession() {
   return {
     id: typeof stored.id === 'string' ? stored.id : newId(),
     topic: String(stored.topic).slice(0, APP.limits.maxTopicChars),
+    subject: pick(stored.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
+    difficulty: pick(stored.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
+    tags: normalizeTags(stored.tags),
+    source: pick(stored.source, SOURCE_KEYS, 'builtin'),
+    studentPersona: pick(stored.studentPersona, PERSONA_KEYS, randomPersona()),
+    studentMode: pick(stored.studentMode, MODE_KEYS, PRACTICE_DEFAULT.mode),
+    studentIntensity: pick(stored.studentIntensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
     createdAt: stored.createdAt || new Date().toISOString(),
     updatedAt: stored.updatedAt || new Date().toISOString(),
     messages: stored.messages
@@ -137,6 +216,7 @@ export class ClassroomStore {
   constructor() {
     const session = restoreSession();
     this.settings = loadSettings();
+    this.practice = loadPractice();
     this.busy = false;
     this.listeners = new Set();
     this.persistenceWarning = '';
@@ -179,12 +259,47 @@ export class ClassroomStore {
     return this.state.session;
   }
 
-  start(topic, topicImage) {
+  start(topic, topicImage, meta = {}) {
     if (!this.canTransition(STATUS.TEACHING)) return;
-    this.state.session = createSession(topic, topicImage);
+    this.state.session = createSession(topic, topicImage, {
+      ...this.practice,
+      ...meta
+    });
     this.state.status = STATUS.TEACHING;
     this.persist();
     this.emit();
+  }
+
+  updatePractice(practice) {
+    this.practice = savePractice({ ...this.practice, ...practice });
+    this.emit();
+  }
+
+  updateSessionMeta(patch = {}) {
+    const session = this.session;
+    if (!session) return;
+    if (patch.subject != null) {
+      session.subject = pick(patch.subject, SUBJECT_KEYS_SET, session.subject);
+    }
+    if (patch.difficulty != null) {
+      session.difficulty = pick(patch.difficulty, DIFFICULTY_KEYS, session.difficulty);
+    }
+    if (patch.tags != null) session.tags = normalizeTags(patch.tags);
+    if (patch.source != null) session.source = pick(patch.source, SOURCE_KEYS, session.source);
+    if (patch.studentPersona != null) {
+      session.studentPersona = pick(patch.studentPersona, PERSONA_KEYS, session.studentPersona);
+    }
+    if (patch.studentMode != null) {
+      session.studentMode = pick(patch.studentMode, MODE_KEYS, session.studentMode);
+    }
+    if (patch.studentIntensity != null) {
+      session.studentIntensity = pick(
+        patch.studentIntensity,
+        INTENSITY_KEYS,
+        session.studentIntensity
+      );
+    }
+    this.touch();
   }
 
   updateSettings(settings) {

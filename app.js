@@ -1,4 +1,22 @@
-import { APP, METRICS } from './js/config.js';
+import {
+  APP,
+  DIFFICULTIES,
+  INTENSITIES,
+  METRICS,
+  PERSONAS,
+  SOURCES,
+  STUDENT_MODES,
+  SUBJECT_LIST,
+  SUBJECT_KEYS,
+  difficultyInfo,
+  intensityInfo,
+  modeInfo,
+  normalizeTags,
+  personaInfo,
+  sessionMeta,
+  sourceInfo,
+  subjectInfo
+} from './js/config.js';
 import { ApiError, isAbortError, isConfigured, recognizeProblem, testConnection } from './js/api.js';
 import { StudentAgent, TeacherAgent, humanTurnCount } from './js/agents.js';
 import {
@@ -16,8 +34,11 @@ import {
   deleteRecord,
   loadHistory,
   reportToText,
-  summarizeHistory
+  summarizeBySubject,
+  summarizeHistory,
+  summarizeTags
 } from './js/history.js';
+import { deleteQuestion, listQuestions, saveQuestion } from './js/bank.js';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -152,13 +173,26 @@ const refs = {
   chatScreen: $('#chatScreen'),
   topicInput: $('#topicInput'),
   exampleChips: $('#exampleChips'),
+  subjectTabs: $('#subjectTabs'),
+  subjectHint: $('#subjectHint'),
+  difficultySelect: $('#difficultySelect'),
+  tagInput: $('#tagInput'),
+  tagOptions: $('#tagOptions'),
+  noteInput: $('#noteInput'),
+  sourceNote: $('#sourceNote'),
   topicImageInput: $('#topicImageInput'),
+  topicCameraInput: $('#topicCameraInput'),
   topicImageBtn: $('#topicImageBtn'),
+  topicCameraBtn: $('#topicCameraBtn'),
+  recognizeBtn: $('#recognizeBtn'),
+  saveBankBtn: $('#saveBankBtn'),
+  openBankBtn: $('#openBankBtn'),
   topicImageHint: $('#topicImageHint'),
   topicImagePreview: $('#topicImagePreview'),
   topicImageThumb: $('#topicImageThumb'),
   removeTopicImage: $('#removeTopicImage'),
   startBtn: $('#startBtn'),
+  chatSub: $('#chatSub'),
   roundBadge: $('#roundBadge'),
   callTeacherMobile: $('#callTeacherMobile'),
   callTeacherMobileLabel: $('#callTeacherMobileLabel'),
@@ -167,6 +201,7 @@ const refs = {
   topicCardBody: $('#topicCardBody'),
   topicCardText: $('#topicCardText'),
   topicCardImage: $('#topicCardImage'),
+  topicMeta: $('#topicMeta'),
   topicToggleBtn: $('#topicToggleBtn'),
   messageList: $('#messageList'),
   typingIndicator: $('#typingIndicator'),
@@ -194,6 +229,7 @@ const refs = {
   retryReportBtn: $('#retryReportBtn'),
   reportContent: $('#reportContent'),
   reportTopic: $('#reportTopic'),
+  reportMeta: $('#reportMeta'),
   overallRing: $('#overallRing'),
   overallScore: $('#overallScore'),
   reportVerdict: $('#reportVerdict'),
@@ -209,6 +245,11 @@ const refs = {
   historyEmpty: $('#historyEmpty'),
   historyContent: $('#historyContent'),
   historySummary: $('#historySummary'),
+  historySubjectFilter: $('#historySubjectFilter'),
+  historySourceFilter: $('#historySourceFilter'),
+  historySubjectOverview: $('#historySubjectOverview'),
+  historyTagStats: $('#historyTagStats'),
+  historyTagMeta: $('#historyTagMeta'),
   historyTrendChart: $('#historyTrendChart'),
   historyTrendMeta: $('#historyTrendMeta'),
   historyDimensions: $('#historyDimensions'),
@@ -229,6 +270,24 @@ const refs = {
   testKeyBtn: $('#testKeyBtn'),
   clearKeyBtn: $('#clearKeyBtn'),
   saveSettingsBtn: $('#saveSettingsBtn'),
+  studentPersonaSelect: $('#studentPersonaSelect'),
+  studentPersonaHint: $('#studentPersonaHint'),
+  studentModeSelect: $('#studentModeSelect'),
+  studentModeHint: $('#studentModeHint'),
+  studentIntensitySelect: $('#studentIntensitySelect'),
+  studentIntensityHint: $('#studentIntensityHint'),
+  lockSubjectToggle: $('#lockSubjectToggle'),
+  chatSubjectSelect: $('#chatSubjectSelect'),
+  chatPersonaSelect: $('#chatPersonaSelect'),
+  chatIntensitySelect: $('#chatIntensitySelect'),
+  chatModeSelect: $('#chatModeSelect'),
+  practiceLockHint: $('#practiceLockHint'),
+  bankModal: $('#bankModal'),
+  bankSearch: $('#bankSearch'),
+  bankSubjectFilter: $('#bankSubjectFilter'),
+  bankSourceFilter: $('#bankSourceFilter'),
+  bankEmpty: $('#bankEmpty'),
+  bankList: $('#bankList'),
   handwritingModal: $('#handwritingModal'),
   handwritingCanvas: $('#handwritingCanvas'),
   padPlaceholder: $('#padPlaceholder'),
@@ -260,6 +319,7 @@ let startAfterSettings = false;
 let connectionIssue = false;
 let currentReport = null;
 let currentReportTopic = '';
+let currentReportMeta = '';
 let reportFromArchive = false;
 let openHistoryIds = new Set();
 let pad = null;
@@ -267,6 +327,11 @@ let speech = null;
 let speechBase = '';
 let renderedSessionId = null;
 let lastPersistenceWarning = '';
+let homeSource = 'custom';
+let bankEditingId = '';
+let bankCache = [];
+let historyFilter = { subject: 'all', source: 'all' };
+let bankFilter = { subject: 'all', source: 'all', query: '' };
 
 /* -------------------------------------------------------------------------- */
 /* Bootstrap                                                                  */
@@ -277,10 +342,12 @@ init();
 function init() {
   populateExamples();
   populateModelPresets();
+  populatePracticeControls();
   fillSettingsForm();
   setupSpeech();
   bindEvents();
   renderHistoryEntry();
+  setHomeSource('custom');
 
   if (store.session) {
     renderedSessionId = store.session.id;
@@ -305,11 +372,207 @@ function populateExamples() {
     chip.type = 'button';
     chip.addEventListener('click', () => {
       refs.topicInput.value = sample;
+      setHomeSource('builtin');
+      const tag = inferTag(sample);
+      if (tag) refs.tagInput.value = tag;
       refs.topicInput.focus();
       autoGrowTopic();
     });
     refs.exampleChips.append(chip);
   }
+}
+
+function populatePracticeControls() {
+  populateSubjectTabs();
+
+  refs.difficultySelect.replaceChildren();
+  for (const difficulty of DIFFICULTIES) {
+    const option = document.createElement('option');
+    option.value = difficulty.key;
+    option.textContent = `${difficulty.label} · ${difficulty.hint}`;
+    refs.difficultySelect.append(option);
+  }
+
+  populateSelect(refs.studentPersonaSelect, PERSONAS);
+  populateSelect(refs.studentModeSelect, STUDENT_MODES);
+  populateSelect(refs.studentIntensitySelect, INTENSITIES);
+  populateSelect(refs.chatPersonaSelect, PERSONAS);
+  populateSelect(refs.chatModeSelect, STUDENT_MODES);
+  populateSelect(refs.chatIntensitySelect, INTENSITIES);
+  populateSelect(refs.chatSubjectSelect, SUBJECT_LIST);
+
+  refs.historySourceFilter.replaceChildren();
+  const allSources = document.createElement('option');
+  allSources.value = 'all';
+  allSources.textContent = '全部来源';
+  refs.historySourceFilter.append(allSources);
+  for (const source of Object.values(SOURCES)) {
+    const option = document.createElement('option');
+    option.value = source.key;
+    option.textContent = source.full;
+    refs.historySourceFilter.append(option);
+  }
+
+  refs.bankSubjectFilter.replaceChildren();
+  const allSubjects = document.createElement('option');
+  allSubjects.value = 'all';
+  allSubjects.textContent = '全部学科';
+  refs.bankSubjectFilter.append(allSubjects);
+  for (const subject of SUBJECT_LIST) {
+    const option = document.createElement('option');
+    option.value = subject.key;
+    option.textContent = subject.label;
+    refs.bankSubjectFilter.append(option);
+  }
+
+  refs.bankSourceFilter.replaceChildren();
+  const bankAll = document.createElement('option');
+  bankAll.value = 'all';
+  bankAll.textContent = '全部来源';
+  refs.bankSourceFilter.append(bankAll);
+  for (const source of Object.values(SOURCES)) {
+    const option = document.createElement('option');
+    option.value = source.key;
+    option.textContent = source.label;
+    refs.bankSourceFilter.append(option);
+  }
+
+  refs.historySubjectFilter.replaceChildren();
+  const historyAll = el('button', 'filter-tab', '全部');
+  historyAll.type = 'button';
+  historyAll.dataset.subject = 'all';
+  refs.historySubjectFilter.append(historyAll);
+  for (const subject of SUBJECT_LIST) {
+    const button = el('button', 'filter-tab', subject.short);
+    button.type = 'button';
+    button.dataset.subject = subject.key;
+    refs.historySubjectFilter.append(button);
+  }
+
+  renderPracticeUI();
+}
+
+function populateSelect(select, items) {
+  if (!select) return;
+  select.replaceChildren();
+  for (const item of items) {
+    const option = document.createElement('option');
+    option.value = item.key;
+    option.textContent = item.label;
+    select.append(option);
+  }
+}
+
+function populateSubjectTabs() {
+  if (!refs.subjectTabs) return;
+  refs.subjectTabs.replaceChildren();
+  for (const subject of SUBJECT_LIST) {
+    const button = el('button', 'subject-tab', subject.label);
+    button.type = 'button';
+    button.dataset.subject = subject.key;
+    button.setAttribute('role', 'tab');
+    button.addEventListener('click', () => {
+      if (store.session && store.practice.lockSubject) {
+        toast('这节课的学科已经锁定；到设置里关闭锁定后才能换。', 'warm');
+        return;
+      }
+      store.updatePractice({ subject: subject.key });
+      renderPracticeUI();
+    });
+    refs.subjectTabs.append(button);
+  }
+}
+
+function renderPracticeUI() {
+  const practice = store.practice;
+  const subject = subjectInfo(practice.subject);
+
+  if (refs.subjectTabs) {
+    for (const button of refs.subjectTabs.querySelectorAll('.subject-tab')) {
+      const active = button.dataset.subject === practice.subject;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+    }
+  }
+
+  if (refs.subjectHint) {
+    refs.subjectHint.textContent = practice.lockSubject
+      ? `整节课会锁定在${subject.label}`
+      : `${subject.label} · 课堂中可以切换`;
+  }
+
+  if (refs.difficultySelect) refs.difficultySelect.value = practice.difficulty;
+
+  if (refs.tagOptions) {
+    refs.tagOptions.replaceChildren();
+    for (const tag of subject.tags) {
+      const option = document.createElement('option');
+      option.value = tag;
+      refs.tagOptions.append(option);
+    }
+  }
+
+  if (refs.studentPersonaSelect) refs.studentPersonaSelect.value = practice.persona;
+  if (refs.studentModeSelect) refs.studentModeSelect.value = practice.mode;
+  if (refs.studentIntensitySelect) refs.studentIntensitySelect.value = practice.intensity;
+  if (refs.lockSubjectToggle) refs.lockSubjectToggle.checked = practice.lockSubject;
+
+  const persona = personaInfo(practice.persona);
+  const intensity = intensityInfo(practice.intensity);
+  if (refs.studentPersonaHint) {
+    refs.studentPersonaHint.textContent = `${persona.label}：${persona.prompt}`;
+  }
+  if (refs.studentModeHint) {
+    refs.studentModeHint.textContent =
+      practice.mode === 'examiner'
+        ? '考官模式：按由浅入深的固定梯度追问，适合新手训练。'
+        : '真实学生模式：疑问从你的讲解里自然生长，不按固定顺序。';
+  }
+  if (refs.studentIntensityHint) {
+    refs.studentIntensityHint.textContent = `${intensity.label}：${intensity.hint}。`;
+  }
+
+  refs.historySourceFilter.value = historyFilter.source;
+  renderHistoryFilterState();
+  renderSourceNote();
+  renderChatPractice();
+}
+
+function renderHistoryFilterState() {
+  if (!refs.historySubjectFilter) return;
+  for (const button of refs.historySubjectFilter.querySelectorAll('.filter-tab')) {
+    const active = button.dataset.subject === historyFilter.subject;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+}
+
+function renderSourceNote() {
+  if (!refs.sourceNote) return;
+  const subject = subjectInfo(store.practice.subject);
+  const difficulty = difficultyInfo(store.practice.difficulty);
+  const source = sourceInfo(homeSource);
+  refs.sourceNote.textContent = `${subject.short} · ${difficulty.label} · ${source.label}`;
+  if (refs.recognizeBtn) refs.recognizeBtn.hidden = !topicImage;
+}
+
+function setHomeSource(key) {
+  homeSource = SOURCES[key] ? key : 'custom';
+  renderSourceNote();
+}
+
+function inferTag(text) {
+  const subject = subjectInfo(store.practice.subject);
+  return subject.tags.find((tag) => String(text).includes(tag)) || '';
+}
+
+function parseTags(value) {
+  return normalizeTags(
+    String(value || '')
+      .split(/[,，、;；]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+  );
 }
 
 function populateModelPresets() {
@@ -423,8 +686,60 @@ function syncChrome() {
   refs.endSessionBtn.hidden = !session;
   refs.topbarSession.hidden = !session;
 
+  renderPracticeUI();
   renderConnection();
   updateSettingsButtonState();
+}
+
+function renderTopicMeta(session) {
+  if (!refs.topicMeta) return;
+  refs.topicMeta.replaceChildren();
+  if (!session) return;
+
+  const meta = sessionMeta(session);
+  const add = (text, kind) => {
+    if (!text) return;
+    refs.topicMeta.append(el('span', `topic-chip topic-chip-${kind}`, text));
+  };
+
+  add(meta.subject?.label, 'subject');
+  add(meta.difficulty?.label, 'difficulty');
+  for (const tag of meta.tags) add(tag, 'tag');
+  add(meta.source?.full, 'source');
+
+  const persona = personaInfo(session.studentPersona);
+  const mode = modeInfo(session.studentMode);
+  if (refs.chatSub) {
+    const parts = [];
+    if (meta.subject) parts.push(meta.subject.short);
+    parts.push(persona.label);
+    parts.push(mode.label);
+    refs.chatSub.textContent = `小问 · ${parts.join(' · ')}`;
+  }
+}
+
+function renderChatPractice() {
+  const session = store.session;
+  if (!session) return;
+  if (refs.chatSubjectSelect) {
+    refs.chatSubjectSelect.replaceChildren();
+    for (const subject of SUBJECT_LIST) {
+      const option = document.createElement('option');
+      option.value = subject.key;
+      option.textContent = subject.label;
+      refs.chatSubjectSelect.append(option);
+    }
+    refs.chatSubjectSelect.value = session.subject;
+    refs.chatSubjectSelect.disabled = Boolean(store.practice.lockSubject);
+  }
+  if (refs.chatPersonaSelect) refs.chatPersonaSelect.value = session.studentPersona;
+  if (refs.chatIntensitySelect) refs.chatIntensitySelect.value = session.studentIntensity;
+  if (refs.chatModeSelect) refs.chatModeSelect.value = session.studentMode;
+  if (refs.practiceLockHint) {
+    refs.practiceLockHint.textContent = store.practice.lockSubject
+      ? '学科已锁定；到设置里可以关闭锁定。'
+      : '学科未锁定，可以在课堂中切换。';
+  }
 }
 
 function renderTopicCard(session) {
@@ -453,6 +768,7 @@ function renderTopicCard(session) {
   }
 
   updateTopicToggle();
+  renderTopicMeta(session);
 }
 
 function updateTopicToggle() {
@@ -632,6 +948,8 @@ async function handleStart() {
   if (store.busy) return;
   let topic = refs.topicInput.value.trim();
   const image = topicImage;
+  const difficulty = refs.difficultySelect?.value || store.practice.difficulty;
+  const tags = parseTags(refs.tagInput?.value);
 
   if (!topic && !image) {
     toast('写一个数学主题/题目，或者直接上传题目图片。', 'warm');
@@ -664,9 +982,21 @@ async function handleStart() {
     if (!topic) return;
   }
 
-  store.start(topic, image);
+  store.updatePractice({ difficulty });
+  const source = homeSource;
+  store.start(topic, image, {
+    subject: store.practice.subject,
+    difficulty,
+    tags,
+    source,
+    studentPersona: store.practice.persona
+  });
+  bankEditingId = '';
   refs.topicInput.value = '';
+  if (refs.tagInput) refs.tagInput.value = '';
+  if (refs.noteInput) refs.noteInput.value = '';
   clearTopicImage();
+  setHomeSource('custom');
   showScreen('chat');
   requestAnimationFrame(() => scrollToBottom(true));
   requestStudent();
@@ -864,24 +1194,51 @@ function showReportError(message) {
   refs.reportModal.querySelector('.modal').scrollTop = 0;
 }
 
-function presentReport(report, { topic = '', archived = false } = {}) {
+function presentReport(report, { topic = '', archived = false, meta = '' } = {}) {
   if (!report) return;
   currentReport = report;
   currentReportTopic = topic || store.session?.topic || '';
+  currentReportMeta = meta || (store.session ? formatSessionMeta(store.session) : '');
   reportFromArchive = archived;
   openModal('reportModal');
   refs.reportLoading.hidden = true;
   refs.reportError.hidden = true;
   refs.reportContent.hidden = false;
   refs.reportModal.querySelector('.modal').scrollTop = 0;
-  renderReport(report, currentReportTopic);
+  renderReport(report, currentReportTopic, currentReportMeta);
 }
 
-function renderReport(report, topicOverride) {
+function formatSessionMeta(session) {
+  const meta = sessionMeta(session);
+  const parts = [];
+  if (meta.subject) parts.push(meta.subject.label);
+  if (meta.difficulty) parts.push(meta.difficulty.label);
+  if (meta.tags.length) parts.push(meta.tags.join('、'));
+  if (meta.source) parts.push(meta.source.full);
+  return parts.join(' · ');
+}
+
+function formatRecordMeta(record) {
+  const parts = [];
+  const subject = subjectInfo(record.subject);
+  const difficulty = difficultyInfo(record.difficulty);
+  const source = sourceInfo(record.source);
+  if (subject) parts.push(subject.label);
+  if (difficulty) parts.push(difficulty.label);
+  if (record.tags?.length) parts.push(record.tags.join('、'));
+  if (record.source) parts.push(source.full);
+  return parts.join(' · ');
+}
+
+function renderReport(report, topicOverride, meta = '') {
   const topic = topicOverride ?? store.session?.topic ?? '';
   refs.reportTopic.replaceChildren(document.createTextNode(topic));
   if (report.lowEvidence) {
     refs.reportTopic.append(el('span', 'evidence-note', '证据有限 · 已保守评分'));
+  }
+  if (refs.reportMeta) {
+    refs.reportMeta.textContent = meta;
+    refs.reportMeta.hidden = !meta;
   }
 
   refs.restartFromReportBtn.textContent = reportFromArchive ? '返回学习档案' : '换个主题，重新开始';
@@ -965,6 +1322,7 @@ async function copyReport() {
   const lines = [
     '费曼小课堂 · 学习诊断报告',
     `讲课主题：${topic}`,
+    ...(currentReportMeta ? [`题目信息：${currentReportMeta}`] : []),
     `综合评分：${report.overallScore}%`,
     ...METRICS.map((metric) => `${metric.label}：${report.scores?.[metric.key] ?? 0}%`),
     '',
@@ -1206,11 +1564,12 @@ async function handleTopicImage(file) {
     topicImage = dataUrl;
     refs.topicImageThumb.src = dataUrl;
     refs.topicImagePreview.hidden = false;
-    refs.topicImageHint.textContent = '已添加题目图片，可移除后重选';
+    refs.topicImageHint.textContent = '已添加题目图片，可点「识别文字」校对后开课';
+    setHomeSource('ocr');
     if (isTextOnlyModel(store.settings.model)) {
       warnTextOnlyModel();
     } else {
-      toast('题目图片已添加。', 'success');
+      toast('题目图片已添加。点「识别文字」可以把题干读出来。', 'success');
     }
   } catch (error) {
     toast(error.message, 'error');
@@ -1223,6 +1582,39 @@ function clearTopicImage() {
   refs.topicImagePreview.hidden = true;
   refs.topicImageHint.textContent = '支持 JPG / PNG，可手写拍照';
   refs.topicImageInput.value = '';
+  if (refs.topicCameraInput) refs.topicCameraInput.value = '';
+  if (refs.recognizeBtn) refs.recognizeBtn.hidden = true;
+  if (homeSource === 'ocr') setHomeSource('custom');
+}
+
+async function recognizeTopicImage() {
+  if (!topicImage) {
+    toast('先上传或拍一张题目图片。', 'warm');
+    return;
+  }
+  if (!ensureKey()) return;
+  if (isTextOnlyModel(store.settings.model)) {
+    warnTextOnlyModel();
+    return;
+  }
+
+  const label = refs.recognizeBtn;
+  const original = label.textContent;
+  label.disabled = true;
+  label.textContent = '识别中…';
+  try {
+    const text = await recognizeProblem({ settings: store.settings, image: topicImage });
+    refs.topicInput.value = text;
+    autoGrowTopic();
+    setHomeSource('ocr');
+    toast('识别完成，请先校对题干和公式，再开始讲课。', 'success', 6000);
+    refs.topicInput.focus();
+  } catch (error) {
+    handleApiError(error, { openSettingsOnAuth: false });
+  } finally {
+    label.disabled = false;
+    label.textContent = original;
+  }
 }
 
 async function handleChatImages(fileList) {
@@ -1395,11 +1787,101 @@ function renderHistory() {
   refs.historyContent.hidden = records.length === 0;
   if (!records.length) return;
 
-  const summary = summarizeHistory(records);
+  renderHistoryFilterState();
+  refs.historySourceFilter.value = historyFilter.source;
+
+  const visible = filterHistoryRecords(records);
+  const summary = summarizeHistory(visible);
   renderHistorySummary(summary);
-  renderHistoryTrend(records, summary);
+  renderSubjectOverview(records);
+  renderTagStats(visible);
+  renderHistoryTrend(visible, summary);
   renderHistoryDimensions(summary);
-  renderHistoryList(records);
+  renderHistoryList(visible);
+}
+
+function filterHistoryRecords(records) {
+  return records.filter((record) => {
+    if (historyFilter.subject !== 'all' && record.subject !== historyFilter.subject) return false;
+    if (historyFilter.source !== 'all' && record.source !== historyFilter.source) return false;
+    return true;
+  });
+}
+
+function renderSubjectOverview(records) {
+  if (!refs.historySubjectOverview) return;
+  refs.historySubjectOverview.replaceChildren();
+  for (const entry of summarizeBySubject(records)) {
+    const { subject, summary } = entry;
+    const card = el('article', 'subject-overview-card');
+    const head = el('div', 'subject-overview-head');
+    head.append(el('strong', '', subject.label), el('span', '', subject.stage));
+    card.append(head);
+
+    if (!summary.sessions) {
+      card.append(el('p', 'subject-overview-empty', '还没有练习'));
+      refs.historySubjectOverview.append(card);
+      continue;
+    }
+
+    const scoredRecords = records.filter(
+      (record) =>
+        record.subject === subject.key && Number.isFinite(record.report?.overallScore)
+    );
+    const best = scoredRecords.length
+      ? Math.max(...scoredRecords.map((record) => record.report.overallScore))
+      : null;
+
+    const stats = el('div', 'subject-overview-stats');
+    const stat = (value, label) => {
+      const item = el('div');
+      item.append(el('strong', '', value), el('small', '', label));
+      return item;
+    };
+    stats.append(
+      stat(summary.sessions, '课'),
+      stat(Number.isFinite(summary.averageOverall) ? `${summary.averageOverall}%` : '—', '平均'),
+      stat(best == null ? '—' : `${best}%`, '最高')
+    );
+    card.append(stats);
+    refs.historySubjectOverview.append(card);
+  }
+}
+
+function renderTagStats(records) {
+  if (!refs.historyTagStats) return;
+  refs.historyTagStats.replaceChildren();
+  const tags = summarizeTags(records).slice(0, 10);
+
+  if (refs.historyTagMeta) {
+    refs.historyTagMeta.textContent = tags.length
+      ? '平均分越低越需要补 · 最多显示 10 个'
+      : '讲过并标注知识点的课会出现在这里';
+  }
+
+  if (!tags.length) {
+    refs.historyTagStats.append(
+      el('p', 'tag-stats-empty', '还没有带知识点的记录。开课时选一个知识点，就能看到薄弱点。')
+    );
+    return;
+  }
+
+  for (const item of tags) {
+    const subject = subjectInfo(item.subject);
+    const row = el('div', 'tag-stat');
+    const head = el('div', 'tag-stat-head');
+    head.append(
+      el('span', 'tag-stat-name', item.tag),
+      el('span', 'tag-stat-subject', subject?.short || '未分科'),
+      el('span', 'tag-stat-value', item.average == null ? '—' : `${item.average}%`)
+    );
+    const track = el('div', 'tag-stat-track');
+    const fill = el('div', 'tag-stat-fill');
+    fill.style.width = `${item.average == null ? 0 : item.average}%`;
+    track.append(fill);
+    row.append(head, track, el('small', 'tag-stat-count', `${item.sessions} 次练习`));
+    refs.historyTagStats.append(row);
+  }
 }
 
 function historyStat(value, unit, label, { accent = false, text = '' } = {}) {
@@ -1583,6 +2065,14 @@ function formatArchiveDate(value) {
 
 function renderHistoryList(records) {
   refs.historyList.replaceChildren();
+
+  if (!records.length) {
+    refs.historyList.append(
+      el('p', 'history-list-empty', '当前筛选下还没有记录。换一个学科或来源试试。')
+    );
+    return;
+  }
+
   for (const record of records) {
     const item = el('article', `history-item${openHistoryIds.has(record.id) ? ' is-open' : ''}`);
     const main = el('button', 'history-item-main');
@@ -1592,6 +2082,19 @@ function renderHistoryList(records) {
     const date = el('span', 'history-item-date', formatArchiveDate(record.endedAt));
     const body = el('div', 'history-item-body');
     body.append(el('p', 'history-item-topic', record.topic));
+
+    const subject = subjectInfo(record.subject);
+    const difficulty = difficultyInfo(record.difficulty);
+    const source = sourceInfo(record.source);
+    const chips = el('div', 'history-item-chips');
+    if (subject) chips.append(el('span', 'topic-chip topic-chip-subject', subject.label));
+    if (difficulty) chips.append(el('span', 'topic-chip topic-chip-difficulty', difficulty.label));
+    if (record.source) chips.append(el('span', 'topic-chip topic-chip-source', source.label));
+    for (const tag of normalizeTags(record.tags)) {
+      chips.append(el('span', 'topic-chip topic-chip-tag', tag));
+    }
+    if (chips.childElementCount) body.append(chips);
+
     const meta = [`${record.turns} 轮讲解`, `${record.questions} 个追问`];
     if (record.model) meta.push(record.model.split('/').pop());
     body.append(el('p', 'history-item-meta', meta.join(' · ')));
@@ -1609,7 +2112,7 @@ function renderHistoryList(records) {
     main.addEventListener('click', () => {
       if (openHistoryIds.has(record.id)) openHistoryIds.delete(record.id);
       else openHistoryIds.add(record.id);
-      renderHistoryList(loadHistory());
+      renderHistoryList(filterHistoryRecords(loadHistory()));
     });
 
     item.append(main);
@@ -1693,7 +2196,11 @@ function buildHistoryDetail(record) {
     const open = el('button', 'btn btn-primary btn-sm', '查看完整报告');
     open.type = 'button';
     open.addEventListener('click', () => {
-      presentReport(record.report, { topic: record.topic, archived: true });
+      presentReport(record.report, {
+        topic: record.topic,
+        archived: true,
+        meta: formatRecordMeta(record)
+      });
     });
 
     const copy = el('button', 'btn btn-outline btn-sm', '复制报告');
@@ -1735,6 +2242,157 @@ function handleClearHistory() {
   renderHistory();
   renderHistoryEntry();
   toast('学习档案已清空。', 'success', 2600);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Custom question bank                                                       */
+/* -------------------------------------------------------------------------- */
+
+async function handleSaveBank() {
+  const topic = refs.topicInput.value.trim();
+  if (!topic) {
+    toast('先写题干，再存入题库。', 'warm');
+    refs.topicInput.focus();
+    return;
+  }
+  try {
+    const wasEditing = Boolean(bankEditingId);
+    const item = await saveQuestion({
+      id: bankEditingId || undefined,
+      topic,
+      subject: store.practice.subject,
+      difficulty: refs.difficultySelect?.value || store.practice.difficulty,
+      tags: parseTags(refs.tagInput?.value),
+      note: refs.noteInput?.value.trim() || '',
+      image: topicImage || '',
+      source: homeSource === 'ocr' ? 'ocr' : 'custom'
+    });
+    bankEditingId = wasEditing ? item.id : '';
+    setHomeSource(item.source);
+    bankCache = await listQuestions();
+    toast(wasEditing ? '题目修改已保存。' : '题目已存入我的题库。', 'success');
+  } catch (error) {
+    toast(error.message || '保存失败，请再试一次。', 'error');
+  }
+}
+
+async function openBank() {
+  bankFilter = { ...bankFilter, query: '' };
+  if (refs.bankSearch) refs.bankSearch.value = '';
+  refs.bankSubjectFilter.value = bankFilter.subject;
+  refs.bankSourceFilter.value = bankFilter.source;
+  try {
+    bankCache = await listQuestions();
+  } catch (error) {
+    toast(error.message || '题库读取失败。', 'error');
+    bankCache = [];
+  }
+  renderBankList();
+  openModal('bankModal');
+}
+
+function renderBankList() {
+  if (!refs.bankList) return;
+  refs.bankList.replaceChildren();
+  const query = bankFilter.query.trim().toLowerCase();
+  const items = bankCache.filter((item) => {
+    if (bankFilter.subject !== 'all' && item.subject !== bankFilter.subject) return false;
+    if (bankFilter.source !== 'all' && item.source !== bankFilter.source) return false;
+    if (!query) return true;
+    return `${item.topic} ${(item.tags || []).join(' ')} ${item.note || ''}`
+      .toLowerCase()
+      .includes(query);
+  });
+
+  if (refs.bankEmpty) refs.bankEmpty.hidden = items.length > 0;
+
+  for (const item of items) {
+    const card = el('article', 'bank-item');
+    if (bankEditingId === item.id) card.classList.add('is-editing');
+
+    const head = el('div', 'bank-item-head');
+    head.append(el('span', 'bank-item-subject', subjectInfo(item.subject)?.short || '未分科'));
+    head.append(el('span', 'bank-item-difficulty', difficultyInfo(item.difficulty).label));
+    head.append(el('span', 'bank-item-source', sourceInfo(item.source).label));
+
+    const body = el('div', 'bank-item-body');
+    body.append(el('p', 'bank-item-topic', item.topic));
+
+    const chips = el('div', 'bank-item-tags');
+    (item.tags || []).forEach((tag) => chips.append(el('span', 'topic-chip topic-chip-tag', tag)));
+    if (chips.childElementCount) body.append(chips);
+    if (item.note) body.append(el('p', 'bank-item-note', item.note));
+
+    const actions = el('div', 'bank-item-actions');
+    const use = el('button', 'btn btn-primary btn-sm', '用这道题');
+    use.type = 'button';
+    use.addEventListener('click', () => loadBankQuestion(item, false));
+
+    const edit = el('button', 'btn btn-outline btn-sm', '编辑');
+    edit.type = 'button';
+    edit.addEventListener('click', () => loadBankQuestion(item, true));
+
+    const del = el('button', 'btn btn-ghost btn-sm', '删除');
+    del.type = 'button';
+    del.addEventListener('click', () => handleDeleteBankQuestion(item));
+
+    actions.append(use, edit, del);
+    body.append(actions);
+
+    if (item.image) {
+      const thumb = document.createElement('img');
+      thumb.className = 'bank-item-image';
+      thumb.src = item.image;
+      thumb.alt = '题目图片';
+      thumb.loading = 'lazy';
+      thumb.dataset.zoom = 'true';
+      head.append(thumb);
+    }
+
+    card.append(head, body);
+    refs.bankList.append(card);
+  }
+}
+
+function loadBankQuestion(item, editing) {
+  bankEditingId = editing ? item.id : '';
+  store.updatePractice({ subject: item.subject, difficulty: item.difficulty });
+  refs.topicInput.value = item.topic;
+  if (refs.tagInput) refs.tagInput.value = (item.tags || []).join('、');
+  if (refs.noteInput) refs.noteInput.value = item.note || '';
+  if (item.image) {
+    topicImage = item.image;
+    refs.topicImageThumb.src = item.image;
+    refs.topicImagePreview.hidden = false;
+    refs.topicImageHint.textContent = '来自我的题库的题目图片';
+  } else {
+    topicImage = null;
+    refs.topicImageThumb.removeAttribute('src');
+    refs.topicImagePreview.hidden = true;
+    refs.topicImageHint.textContent = '支持 JPG / PNG，可手写拍照';
+  }
+  setHomeSource(item.source);
+  autoGrowTopic();
+  closeModal('bankModal');
+  showScreen('home');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderBankList();
+  setTimeout(() => refs.topicInput.focus(), 220);
+  toast(
+    editing
+      ? '题目已放回首页，修改后点「存入我的题库」保存。'
+      : '题目已载入，检查后可开始讲课。',
+    'success'
+  );
+}
+
+async function handleDeleteBankQuestion(item) {
+  if (!window.confirm(`从题库删除「${item.topic}」？删除后无法恢复。`)) return;
+  await deleteQuestion(item.id);
+  if (bankEditingId === item.id) bankEditingId = '';
+  bankCache = await listQuestions();
+  renderBankList();
+  toast('题目已从题库删除。', 'success', 2400);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1862,10 +2520,15 @@ function resetAfterSession() {
   pendingImages = [];
   topicImage = null;
   currentReport = null;
+  currentReportMeta = '';
   startAfterSettings = false;
+  bankEditingId = '';
   refs.messageInput.value = '';
   refs.topicInput.value = '';
+  if (refs.tagInput) refs.tagInput.value = '';
+  if (refs.noteInput) refs.noteInput.value = '';
   clearTopicImage();
+  setHomeSource('custom');
   renderPendingImages();
   autoGrowMessage();
   showTyping(false);
@@ -1873,6 +2536,7 @@ function resetAfterSession() {
   refs.micBtn.classList.remove('is-listening');
   refs.micLabel.textContent = '语音';
   showScreen('home');
+  renderPracticeUI();
   syncChrome();
 }
 
@@ -1963,12 +2627,44 @@ function bindEvents() {
     }
   });
 
+  refs.difficultySelect?.addEventListener('change', () => {
+    store.updatePractice({ difficulty: refs.difficultySelect.value });
+  });
+  refs.tagInput?.addEventListener('change', () => {
+    refs.tagInput.value = parseTags(refs.tagInput.value).join('、');
+  });
+
   refs.topicImageBtn.addEventListener('click', () => refs.topicImageInput.click());
   refs.topicImageInput.addEventListener('change', () => {
     handleTopicImage(refs.topicImageInput.files?.[0]);
     refs.topicImageInput.value = '';
   });
+  refs.topicCameraBtn?.addEventListener('click', () => refs.topicCameraInput?.click());
+  refs.topicCameraInput?.addEventListener('change', () => {
+    handleTopicImage(refs.topicCameraInput.files?.[0]);
+    refs.topicCameraInput.value = '';
+  });
+  refs.recognizeBtn?.addEventListener('click', recognizeTopicImage);
   refs.removeTopicImage.addEventListener('click', clearTopicImage);
+
+  refs.saveBankBtn?.addEventListener('click', handleSaveBank);
+  refs.openBankBtn?.addEventListener('click', openBank);
+  refs.bankSearch?.addEventListener('input', () => {
+    bankFilter.query = refs.bankSearch.value;
+    renderBankList();
+  });
+  refs.bankSubjectFilter?.addEventListener('change', () => {
+    bankFilter.subject = refs.bankSubjectFilter.value;
+    renderBankList();
+  });
+  refs.bankSourceFilter?.addEventListener('change', () => {
+    bankFilter.source = refs.bankSourceFilter.value;
+    renderBankList();
+  });
+  refs.bankList?.addEventListener('click', (event) => {
+    const image = event.target.closest('img[data-zoom]');
+    if (image) openLightbox(image.src);
+  });
 
   refs.composer.addEventListener('submit', handleSend);
   refs.messageInput.addEventListener('input', autoGrowMessage);
@@ -2041,6 +2737,64 @@ function bindEvents() {
   refs.settingsForm.addEventListener('submit', handleSaveSettings);
   refs.testKeyBtn.addEventListener('click', handleTestConnection);
   refs.clearKeyBtn.addEventListener('click', handleClearKey);
+  refs.studentPersonaSelect?.addEventListener('change', () => {
+    store.updatePractice({ persona: refs.studentPersonaSelect.value });
+    if (store.session) store.updateSessionMeta({ studentPersona: refs.studentPersonaSelect.value });
+    renderPracticeUI();
+  });
+  refs.studentModeSelect?.addEventListener('change', () => {
+    store.updatePractice({ mode: refs.studentModeSelect.value });
+    if (store.session) store.updateSessionMeta({ studentMode: refs.studentModeSelect.value });
+    renderPracticeUI();
+  });
+  refs.studentIntensitySelect?.addEventListener('change', () => {
+    store.updatePractice({ intensity: refs.studentIntensitySelect.value });
+    if (store.session) {
+      store.updateSessionMeta({ studentIntensity: refs.studentIntensitySelect.value });
+    }
+    renderPracticeUI();
+  });
+  refs.lockSubjectToggle?.addEventListener('change', () => {
+    store.updatePractice({ lockSubject: refs.lockSubjectToggle.checked });
+    renderPracticeUI();
+  });
+
+  refs.chatSubjectSelect?.addEventListener('change', () => {
+    if (store.practice.lockSubject) {
+      refs.chatSubjectSelect.value = store.session?.subject || store.practice.subject;
+      toast('学科已锁定；到设置里关闭锁定后才能换。', 'warm');
+      return;
+    }
+    store.updateSessionMeta({ subject: refs.chatSubjectSelect.value });
+    store.updatePractice({ subject: refs.chatSubjectSelect.value });
+    toast('已切换学科，接下来会按新学科追问和评分。', 'success', 3200);
+  });
+  refs.chatPersonaSelect?.addEventListener('change', () => {
+    store.updateSessionMeta({ studentPersona: refs.chatPersonaSelect.value });
+    store.updatePractice({ persona: refs.chatPersonaSelect.value });
+  });
+  refs.chatIntensitySelect?.addEventListener('change', () => {
+    store.updateSessionMeta({ studentIntensity: refs.chatIntensitySelect.value });
+    store.updatePractice({ intensity: refs.chatIntensitySelect.value });
+  });
+  refs.chatModeSelect?.addEventListener('change', () => {
+    store.updateSessionMeta({ studentMode: refs.chatModeSelect.value });
+    store.updatePractice({ mode: refs.chatModeSelect.value });
+  });
+
+  refs.historySubjectFilter?.addEventListener('click', (event) => {
+    const button = event.target.closest('.filter-tab');
+    if (!button) return;
+    historyFilter.subject = button.dataset.subject || 'all';
+    openHistoryIds = new Set();
+    renderHistory();
+  });
+  refs.historySourceFilter?.addEventListener('change', () => {
+    historyFilter.source = refs.historySourceFilter.value;
+    openHistoryIds = new Set();
+    renderHistory();
+  });
+
   refs.toggleKeyBtn.addEventListener('click', () => {
     const showing = refs.apiKeyInput.type === 'text';
     refs.apiKeyInput.type = showing ? 'password' : 'text';

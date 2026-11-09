@@ -19,6 +19,8 @@
 - **输出倒逼输入**：讲不清的地方，就是还没真正懂的地方。
 - **两个 AI 角色**：面向学生的 `StudentAgent`（只追问，不给答案）与后台评审的 `TeacherAgent`（指出漏洞，给出下一步）。
 - **可量化**：概念掌握、逻辑与步骤完整性、表达清晰度三个 0–100 的维度，加上具体缺口和可执行的练习建议。
+- **三科独立**：小学数学 / 初中数学 / 高中数学各自拥有知识点、误区池、追问风格和档案统计；一节课内可锁定学科。
+- **自定义题库**：内置例题、手动录入、拍照识别都能进入同一套讲课 / 评分 / 档案流程；我的题库支持学科、难度、知识点、备注、编辑和删除。
 - **多模态入口**：文字、图片、手写板、语音输入（Web Speech API）。只上传题目图片也能自动识别题目。
 - **打开即用**：默认走课堂共享代理，学生不需要 API Key；也可以填自己的 Key 直连服务商（Key 只保存在本机 `localStorage`）。
 
@@ -80,8 +82,10 @@ https://feynman-classroom-proxy.netlify.app/v1
 
 | 功能 | 说明 |
 | --- | --- |
-| 主题输入 | 文字主题 / 题目；支持导入题目图片 |
-| AI 学生小问 | 口语化追问、装傻、要例子，**绝不直接给答案** |
+| 主题输入 | 文字主题 / 题目；支持导入题目图片、拍照识别并校对 |
+| 学科与难度 | 小学数学 / 初中数学 / 高中数学；基础 / 中档 / 压轴 |
+| 我的题库 | 题目、学科、难度、知识点、备注和图片存在本机，可搜索、载入、编辑、删除 |
+| AI 学生小问 | 12 岁、基础很弱，只追问不给答案；可设人设、真实 / 考官模式和追问强度 |
 | 对话界面 | 老师右侧、AI 学生左侧；支持多轮上下文 |
 | 呼叫 AI 老师 | 对完整对话做结构化诊断，报告以独立弹窗展示 |
 | 三维评分 | 概念掌握 40% + 逻辑与步骤 40% + 表达清晰度 20% |
@@ -90,7 +94,8 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 图片 | 题目拍照；只传图片也会自动识别成文字题目，再开始讲课 |
 | 手写板 | Pointer Events，支持鼠标 / 触控 / Apple Pencil |
 | 语音输入 | Web Speech API，中文识别，可中途停止 |
-| 自动保存 | 当前对话存在 `localStorage`，刷新后可继续；结束讲课时清空 |
+| 自动保存 | 当前对话存在 `localStorage`，刷新后可继续；结束讲课时归档到学习档案，并按学科、来源、知识点统计 |
+| 题库存储 | 我的题库优先用 IndexedDB，不可用时退回 `localStorage`；图片不离开本机 |
 | 键盘 | `Enter` 发送、`Shift+Enter` 换行、`Ctrl/Cmd+Enter` 开始讲课、`Esc` 关闭弹窗 |
 
 ## 文件结构
@@ -111,10 +116,12 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   ├── wrangler.toml
 │   └── README.md
 ├── js/
-│   ├── config.js           # 应用配置、两个 System Prompt、模型预设
+│   ├── config.js           # 学科 / 难度 / 人设 / 模式配置、两个 System Prompt、模型预设
 │   ├── api.js              # OpenRouter / OpenAI-compatible 客户端（流式 + JSON）
-│   ├── agents.js           # StudentAgent / TeacherAgent、上下文与报告归一化
-│   ├── store.js            # 状态机、会话持久化、设置
+│   ├── agents.js           # StudentAgent / TeacherAgent、学科上下文与报告归一化
+│   ├── store.js            # 状态机、会话与课堂参数持久化、设置
+│   ├── history.js          # 学习档案、分学科 / 来源 / 知识点统计
+│   ├── bank.js             # 我的题库（IndexedDB + localStorage 回退）
 │   ├── speech.js           # Web Speech API 封装
 │   └── canvas.js           # 手写板（Pointer Events + 压感）
 ├── assets/favicon.svg
@@ -149,7 +156,8 @@ https://feynman-classroom-proxy.netlify.app/v1
 - 页面本身没有数据库、没有日志、没有分析、没有第三方字体或 CDN。
 - 默认请求经过课堂共享代理：代理持有模型 Key，只转发对话内容，不落库。
 - 自己填写的 API Key 仅存于 `localStorage`；不会写入代码、Git 仓库或部署产物。
-- 对话同样仅存于 `localStorage`；点击「结束讲课」会删除当前会话。
+- 当前对话、课堂参数和学习档案仅存于 `localStorage`；结束讲课时当前会话转为学习档案，可随时清空。
+- 我的题库优先存于 IndexedDB（不可用时回退 `localStorage`），包括题目图片；所有数据都不会上传到本站服务器。
 - 图片在浏览器内压缩后发送给模型服务商；只用于识别题目或回答，不经过本站服务器。
 - 若浏览器存储空间不足，应用会保留文字并丢弃图片，同时在界面提示。
 - 报告由 AI 生成，仅用于学习诊断，不替代真人老师的判断。

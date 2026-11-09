@@ -3,7 +3,14 @@ import {
   METRICS,
   STUDENT_PROMPT,
   TEACHER_PROMPT,
+  difficultyInfo,
+  intensityInfo,
   kickoffMessage,
+  modeInfo,
+  normalizeTags,
+  personaInfo,
+  sourceInfo,
+  subjectInfo,
   teacherRequest
 } from './config.js';
 import { ApiError, completeChat, streamChat } from './api.js';
@@ -43,6 +50,61 @@ function visibleMessages(session) {
   return session.messages.filter((message) => !message.hidden);
 }
 
+const STUCK_PATTERN =
+  /(我不会|不知道|卡住|卡壳|没思路|不会做|给点提示|提示一下|帮帮我|想不出来|教教我)/;
+
+function teacherSeemsStuck(session) {
+  const lastUser = [...visibleMessages(session)].reverse().find((message) => message.role === 'user');
+  return Boolean(lastUser && STUCK_PATTERN.test(lastUser.content || ''));
+}
+
+function studentClassContext(session) {
+  const subject = subjectInfo(session.subject);
+  const difficulty = difficultyInfo(session.difficulty);
+  const source = sourceInfo(session.source);
+  const persona = personaInfo(session.studentPersona);
+  const mode = modeInfo(session.studentMode);
+  const intensity = intensityInfo(session.studentIntensity);
+  const tags = normalizeTags(session.tags);
+  const lines = [];
+
+  if (subject) {
+    lines.push(
+      `【当前学科】${subject.label}。你正在学${subject.stage}数学，这块内容对你来说很难，需要老师一步一步讲。`
+    );
+    lines.push(
+      `【本学段常见误区】${subject.misconceptions.join('；')}。不要逐条背诵，只在老师讲到相关地方时，自然表现出其中一种困惑。`
+    );
+  }
+  if (difficulty) lines.push(`【题目难度】${difficulty.label}：${difficulty.hint}。`);
+  if (tags.length) lines.push(`【知识点】${tags.join('、')}。`);
+  if (source) lines.push(`【题目来源】${source.full}。`);
+
+  lines.push(`【这节课的学生人设】${persona.label}：${persona.prompt}`);
+
+  if (mode.key === 'examiner') {
+    lines.push(
+      '【提问模式：考官模式】按由浅入深的固定梯度追问：先确认题目条件，再逐步追问每一步的依据，最后请老师举例验证。不要主动给答案，也不要跳过中间步骤。'
+    );
+  } else {
+    lines.push(
+      '【提问模式：真实学生模式】你的疑问要从老师上一句讲解里自然生长，不按固定顺序。可以听懂后复述，可以半懂卡在一个点，可以完全跟不上请求简化，也可以说出自己的错误猜想。'
+    );
+  }
+
+  if (intensity.key === 'gentle') {
+    lines.push('【提问强度：保守】提问频率低一些，每次最多问一个问题；老师讲得清楚时，先用一句话复述，再决定要不要追问。');
+  } else if (intensity.key === 'challenge') {
+    lines.push(
+      '【提问强度：挑战】追问更密一些，每个关键步骤都可以停一下问依据；偶尔会混淆前面讲过的内容，请老师帮你澄清。但不要故意刁难，也不要重复已经讲清楚的问题。'
+    );
+  } else {
+    lines.push('【提问强度：正常】保持自然的提问频率，通常每次只抓一个最关键的点追问。');
+  }
+
+  return lines.join('\n');
+}
+
 export function humanTurnCount(session) {
   return visibleMessages(session).filter((message) => message.role === 'user').length;
 }
@@ -62,10 +124,19 @@ export function buildStudentMessages(session) {
 【当前讲课主题】
 ${session.topic}
 
+${studentClassContext(session)}
+
 【重要边界】
 - 你只能以「小问」这个学生的身份说话。
 - 你绝不能给出答案、解法或公式推导。
-- 你看不到评分报告；不要假装自己知道老师讲得对不对。`;
+- 你看不到评分报告；不要假装自己知道老师讲得对不对。${
+    teacherSeemsStuck(session)
+      ? `
+
+【系统提示：老师可能卡住了】
+老师刚刚在向你求助。请按“翻书找提示”的规则，只给一个半成品线索（类比、反例或某一步的起点），不要说最终答案，也不要把剩余步骤推导完。说完线索后，停下来等老师接话。`
+      : ''
+  }`;
 
   return [{ role: 'system', content: system }, ...trimmed];
 }
@@ -101,7 +172,7 @@ export function buildTeacherMessages(session, { includeImages = true } = {}) {
   const parts = [
     {
       type: 'text',
-      text: `${teacherRequest(session.topic)}
+      text: `${teacherRequest(session)}
 
 【对话记录开始】
 ${transcript}
