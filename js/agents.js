@@ -102,6 +102,15 @@ function studentClassContext(session) {
     lines.push('【提问强度：正常】保持自然的提问频率，通常每次只抓一个最关键的点追问。');
   }
 
+  if (persona.rules) {
+    lines.push(`【人设行为规则：${persona.label}】\n${persona.rules}`);
+    if (persona.key === 'curious') {
+      lines.push(
+        '【规则优先级】上面的人设规则优先于“考官模式”的固定梯度：刨根问底型学生也绝不能按预设顺序提问，疑问必须从老师上一句讲解里生长。'
+      );
+    }
+  }
+
   return lines.join('\n');
 }
 
