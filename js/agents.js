@@ -11,6 +11,7 @@ import {
   personaInfo,
   sourceInfo,
   subjectInfo,
+  TAG_MISCONCEPTIONS,
   teacherRequest
 } from './config.js';
 import { ApiError, completeChat, streamChat } from './api.js';
@@ -72,6 +73,13 @@ function studentClassContext(session) {
     lines.push(
       `【当前学科】${subject.label}。你正在学${subject.stage}数学，这块内容对你来说很难，需要老师一步一步讲。`
     );
+  }
+  const tagMisconceptions = tags.flatMap((tag) => TAG_MISCONCEPTIONS[tag] || []);
+  if (tagMisconceptions.length) {
+    lines.push(
+      `【当前知识点误区池】${tagMisconceptions.join('；')}。这些只是你脑子里存的错误想法，不是必须依次提问的清单；只在老师讲到相关地方时，自然冒出其中一种，不要逐条背诵。`
+    );
+  } else if (subject) {
     lines.push(
       `【本学段常见误区】${subject.misconceptions.join('；')}。不要逐条背诵，只在老师讲到相关地方时，自然表现出其中一种困惑。`
     );
