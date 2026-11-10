@@ -284,6 +284,8 @@ const refs = {
   studentIntensitySelect: $('#studentIntensitySelect'),
   studentIntensityHint: $('#studentIntensityHint'),
   lockSubjectToggle: $('#lockSubjectToggle'),
+  personaPicker: $('#personaPicker'),
+  homePersonaHint: $('#homePersonaHint'),
   chatSubjectSelect: $('#chatSubjectSelect'),
   chatPersonaSelect: $('#chatPersonaSelect'),
   chatIntensitySelect: $('#chatIntensitySelect'),
@@ -405,6 +407,7 @@ function populatePracticeControls() {
   populateSelect(refs.studentPersonaSelect, PERSONAS);
   populateSelect(refs.studentModeSelect, STUDENT_MODES);
   populateSelect(refs.studentIntensitySelect, INTENSITIES);
+  populatePersonaPicker();
   populateSelect(refs.chatPersonaSelect, PERSONAS);
   populateSelect(refs.chatModeSelect, STUDENT_MODES);
   populateSelect(refs.chatIntensitySelect, INTENSITIES);
@@ -472,6 +475,58 @@ function populateSelect(select, items) {
   }
 }
 
+function populatePersonaPicker() {
+  if (!refs.personaPicker) return;
+  refs.personaPicker.replaceChildren();
+  for (const persona of PERSONAS) {
+    const button = el('button', 'persona-option', persona.label);
+    button.type = 'button';
+    button.dataset.persona = persona.key;
+    button.setAttribute('role', 'radio');
+    button.title = `${persona.label}：${persona.prompt}`;
+    button.addEventListener('click', () => selectPersona(persona.key));
+    button.addEventListener('pointerenter', () => showPersonaHint(persona.key));
+    button.addEventListener('focus', () => showPersonaHint(persona.key));
+    button.addEventListener('pointerleave', () => showPersonaHint(store.practice.persona));
+    button.addEventListener('blur', () => showPersonaHint(store.practice.persona));
+    button.addEventListener('keydown', handlePersonaKeydown);
+    refs.personaPicker.append(button);
+  }
+}
+
+function selectPersona(key) {
+  const persona = personaInfo(key);
+  store.updatePractice({ persona: persona.key });
+  if (store.session) store.updateSessionMeta({ studentPersona: persona.key });
+  renderPracticeUI();
+}
+
+function showPersonaHint(key) {
+  if (!refs.homePersonaHint) return;
+  const persona = personaInfo(key);
+  refs.homePersonaHint.textContent = `${persona.label}：${persona.prompt}`;
+}
+
+function handlePersonaKeydown(event) {
+  const keys = PERSONAS.map((persona) => persona.key);
+  const current = keys.indexOf(store.practice.persona);
+  let next = current;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    next = (current + 1) % keys.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    next = (current - 1 + keys.length) % keys.length;
+  } else if (event.key === 'Home') {
+    next = 0;
+  } else if (event.key === 'End') {
+    next = keys.length - 1;
+  } else {
+    return;
+  }
+  event.preventDefault();
+  selectPersona(keys[next]);
+  refs.personaPicker?.querySelector(`[data-persona="${keys[next]}"]`)?.focus();
+}
+
 function populateSubjectTabs() {
   if (!refs.subjectTabs) return;
   refs.subjectTabs.replaceChildren();
@@ -528,7 +583,19 @@ function renderPracticeUI() {
   if (refs.studentIntensitySelect) refs.studentIntensitySelect.value = practice.intensity;
   if (refs.lockSubjectToggle) refs.lockSubjectToggle.checked = practice.lockSubject;
 
+  if (refs.personaPicker) {
+    for (const button of refs.personaPicker.querySelectorAll('.persona-option')) {
+      const active = button.dataset.persona === practice.persona;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-checked', String(active));
+      button.tabIndex = active ? 0 : -1;
+    }
+  }
+
   const persona = personaInfo(practice.persona);
+  if (refs.homePersonaHint) {
+    refs.homePersonaHint.textContent = `${persona.label}：${persona.prompt}`;
+  }
   const intensity = intensityInfo(practice.intensity);
   if (refs.studentPersonaHint) {
     refs.studentPersonaHint.textContent = `${persona.label}：${persona.prompt}`;

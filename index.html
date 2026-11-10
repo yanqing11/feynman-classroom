@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261110g">
+  <link rel="stylesheet" href="./styles.css?v=20261110h">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -69,7 +69,11 @@
 
             <label class="sr-only" for="topicInput">讲课主题或题目</label>
             <textarea id="topicInput" class="topic-input" rows="3" maxlength="1200"
-              placeholder="输入你想讲解的内容，也可以上传题目图片。"></textarea>
+              placeholder="写下你要讲解的数学主题，你作为老师来讲。例如：用配方法解 x²−6x+5=0，讲清楚每一步为什么这样做"></textarea>
+            <p class="home-teacher-hint">
+              <span aria-hidden="true">⚠️</span>
+              开始讲课之后，需要由你先进行讲解，AI 学生等待你的发言，不会主动提问。
+            </p>
 
             <div class="home-meta">
               <label class="home-meta-field home-meta-difficulty" for="difficultySelect">
@@ -86,6 +90,14 @@
             <div class="quick-tag-row">
               <span class="quick-tag-label">快捷标签</span>
               <div class="quick-tags" id="quickTags" role="group" aria-label="快捷知识点标签"></div>
+            </div>
+
+            <div class="home-persona">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
+                <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
+              </div>
+              <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
             </div>
 
             <label class="home-note">
@@ -496,7 +508,7 @@
       <div class="history-empty" id="historyEmpty" hidden>
         <div class="history-empty-mark" aria-hidden="true">档</div>
         <h3>还没有记录</h3>
-        <p>讲完第一课、让 AI 老师点评一次，这里就会出现你的第一份学情档案。</p>
+        <p>完成一节练习课程，这里就会展示你的讲课记录。</p>
         <button class="btn btn-primary" data-close="historyModal" type="button">去讲第一课</button>
       </div>
 
@@ -663,6 +675,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261110g"></script>
+  <script type="module" src="./app.js?v=20261110h"></script>
 </body>
 </html>

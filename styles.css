@@ -3951,6 +3951,28 @@ body.is-chat .topbar-tagline {
     font-size: 15px;
   }
 
+  .home-teacher-hint {
+    font-size: 11.5px;
+  }
+
+  .home-persona-head {
+    gap: 4px;
+  }
+
+  .home-persona-hint {
+    flex-basis: 100%;
+  }
+
+  .persona-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .persona-option {
+    min-height: 42px;
+    font-size: 12.5px;
+  }
+
   .home-input-foot {
     flex-direction: column;
     align-items: stretch;
@@ -4247,6 +4269,95 @@ body.is-chat .topbar-tagline {
   background: var(--green-soft);
   color: var(--green-deep);
   font-weight: 600;
+}
+
+.home-teacher-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 9px 2px 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(217, 164, 65, 0.28);
+  border-radius: 9px;
+  background: rgba(217, 164, 65, 0.09);
+  color: #7a5a1f;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.home-teacher-hint span {
+  flex: none;
+  line-height: 1.4;
+}
+
+.home-persona {
+  margin: 12px 2px 0;
+  padding-top: 11px;
+  border-top: 1px dashed var(--line);
+}
+
+.home-persona-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.home-persona-label {
+  flex: none;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.home-persona-hint {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.persona-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 6px;
+}
+
+.persona-option {
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #e4e7de;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.persona-option:hover {
+  border-color: #aab58e;
+  background: #f6f8ef;
+  color: #3f4c2a;
+}
+
+.persona-option.is-active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(31, 111, 92, 0.14);
+}
+
+.persona-option:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
 }
 
 .home-note {
