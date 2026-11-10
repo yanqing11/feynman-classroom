@@ -146,6 +146,13 @@ export function buildStudentMessages(session) {
     trimmed = [{ role: 'user', content: kickoffMessage(session.topic) }, ...trimmed];
   }
 
+  const stagePrompt = visibleMessages(session).some((message) => message.role === 'user')
+    ? ''
+    : `
+
+【系统提示：当前是阶段 A】
+课堂刚开始，还没有老师真正的讲解内容。只输出一句安静等待的话，不要提问、不要猜、不要拆解知识点、不要主动发起任何问题。`;
+
   const stuckPrompt = !teacherSeemsStuck(session)
     ? ''
     : teacherAskedForHint(session)
@@ -168,7 +175,7 @@ ${studentClassContext(session)}
 【重要边界】
 - 你只能以「小问」这个学生的身份说话。
 - 你绝不能给出答案、解法或公式推导。
-- 你看不到评分报告；不要假装自己知道老师讲得对不对。${stuckPrompt}`;
+- 你看不到评分报告；不要假装自己知道老师讲得对不对。${stagePrompt}${stuckPrompt}`;
 
   return [{ role: 'system', content: system }, ...trimmed];
 }

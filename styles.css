@@ -4199,6 +4199,56 @@ body.is-chat .topbar-tagline {
   box-shadow: 0 0 0 3px rgba(31, 111, 92, 0.08);
 }
 
+.quick-tag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 9px 2px 0;
+}
+
+.quick-tag-label {
+  flex: 0 0 auto;
+  padding-top: 4px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.quick-tag {
+  padding: 4px 10px;
+  border: 1px solid #e4e7de;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.quick-tag:hover {
+  border-color: #aab58e;
+  background: #f6f8ef;
+  color: #3f4c2a;
+}
+
+.quick-tag.is-active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-weight: 600;
+}
+
 .home-note {
   display: block;
   margin-top: 9px;

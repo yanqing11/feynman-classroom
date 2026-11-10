@@ -178,6 +178,7 @@ const refs = {
   difficultySelect: $('#difficultySelect'),
   tagInput: $('#tagInput'),
   tagOptions: $('#tagOptions'),
+  quickTags: $('#quickTags'),
   noteInput: $('#noteInput'),
   sourceNote: $('#sourceNote'),
   topicImageInput: $('#topicImageInput'),
@@ -512,6 +513,8 @@ function renderPracticeUI() {
     }
   }
 
+  renderQuickTags(subject);
+
   if (refs.studentPersonaSelect) refs.studentPersonaSelect.value = practice.persona;
   if (refs.studentModeSelect) refs.studentModeSelect.value = practice.mode;
   if (refs.studentIntensitySelect) refs.studentIntensitySelect.value = practice.intensity;
@@ -536,6 +539,47 @@ function renderPracticeUI() {
   renderHistoryFilterState();
   renderSourceNote();
   renderChatPractice();
+}
+
+function renderQuickTags(subject = subjectInfo(store.practice.subject)) {
+  if (!refs.quickTags) return;
+  refs.quickTags.replaceChildren();
+  const selected = new Set(parseTags(refs.tagInput?.value));
+  for (const tag of subject.tags) {
+    const chip = el('button', 'quick-tag', tag);
+    chip.type = 'button';
+    chip.dataset.tag = tag;
+    chip.classList.toggle('is-active', selected.has(tag));
+    chip.setAttribute('aria-pressed', String(selected.has(tag)));
+    chip.addEventListener('click', () => toggleQuickTag(tag));
+    refs.quickTags.append(chip);
+  }
+}
+
+function toggleQuickTag(tag) {
+  const current = parseTags(refs.tagInput?.value);
+  const index = current.indexOf(tag);
+  if (index >= 0) {
+    current.splice(index, 1);
+  } else {
+    if (current.length >= 4) {
+      toast('知识点最多选 4 个。', 'warm');
+      return;
+    }
+    current.push(tag);
+  }
+  if (refs.tagInput) refs.tagInput.value = current.join('、');
+  syncQuickTagState();
+}
+
+function syncQuickTagState() {
+  if (!refs.quickTags) return;
+  const selected = new Set(parseTags(refs.tagInput?.value));
+  for (const chip of refs.quickTags.querySelectorAll('.quick-tag')) {
+    const active = selected.has(chip.dataset.tag);
+    chip.classList.toggle('is-active', active);
+    chip.setAttribute('aria-pressed', String(active));
+  }
 }
 
 function renderHistoryFilterState() {
@@ -2632,7 +2676,9 @@ function bindEvents() {
   });
   refs.tagInput?.addEventListener('change', () => {
     refs.tagInput.value = parseTags(refs.tagInput.value).join('、');
+    syncQuickTagState();
   });
+  refs.tagInput?.addEventListener('input', syncQuickTagState);
 
   refs.topicImageBtn.addEventListener('click', () => refs.topicImageInput.click());
   refs.topicImageInput.addEventListener('change', () => {
