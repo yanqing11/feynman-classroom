@@ -94,6 +94,11 @@ function studentClassContext(session) {
       `【本学段常见误区】${subject.misconceptions.join('；')}。不要逐条背诵，只在老师讲到相关地方时，自然表现出其中一种困惑。`
     );
   }
+  if (persona.misconceptions?.length) {
+    lines.push(
+      `【人设常见误区】${persona.misconceptions.join('；')}。这些是你可能卡住的细节，不是固定提问清单；不要逐条问，也不要在老师没提到相关内容时硬套。`
+    );
+  }
   if (difficulty) lines.push(`【题目难度】${difficulty.label}：${difficulty.hint}。`);
   if (tags.length) lines.push(`【知识点】${tags.join('、')}。`);
   if (source) lines.push(`【题目来源】${source.full}。`);
@@ -102,7 +107,7 @@ function studentClassContext(session) {
 
   if (mode.key === 'examiner') {
     lines.push(
-      '【提问模式：考官模式】按由浅入深的固定梯度追问：先确认题目条件，再逐步追问每一步的依据，最后请老师举例验证。不要主动给答案，也不要跳过中间步骤。'
+      '【提问模式：考官模式】在不违反阶段锁的前提下，可以比真实学生更认真地核对每一步依据；但依然一次只问一个问题，不能按固定清单或固定梯度连环追问，也不能主动规划学习路线。'
     );
   } else {
     lines.push(
@@ -122,11 +127,9 @@ function studentClassContext(session) {
 
   if (persona.rules) {
     lines.push(`【人设行为规则：${persona.label}】\n${persona.rules}`);
-    if (persona.key === 'curious') {
-      lines.push(
-        '【规则优先级】上面的人设规则优先于“考官模式”的固定梯度：刨根问底型学生也绝不能按预设顺序提问，疑问必须从老师上一句讲解里生长。'
-      );
-    }
+    lines.push(
+      '【规则优先级】人设规则和阶段锁优先于“考官模式”的任何追问安排；所有模式都不能按预设清单连环提问，疑问只能从老师上一句话里长出来。'
+    );
   }
 
   return lines.join('\n');
@@ -146,14 +149,24 @@ export function buildStudentMessages(session) {
     trimmed = [{ role: 'user', content: kickoffMessage(session.topic) }, ...trimmed];
   }
 
-  const stagePrompt = visibleMessages(session).some((message) => message.role === 'user')
-    ? ''
+  const hasTeacherSpeak =
+    Boolean(session.hasTeacherSpeak) ||
+    visibleMessages(session).some((message) => message.role === 'user');
+
+  const stagePrompt = hasTeacherSpeak
+    ? `
+
+【系统提示：当前是阶段 B（hasTeacherSpeak = true）】
+老师已经开口讲解。继续遵守防越界铁律：不自己推理、不计算、不判断对错、不替老师分析式子；一次只问一个问题，疑问只能来自老师上一句话。`
     : `
 
-【系统提示：当前是阶段 A】
-课堂刚开始，还没有老师真正的讲解内容。只输出一句安静等待的话，不要提问、不要猜、不要拆解知识点、不要主动发起任何问题。`;
+【系统提示：当前是阶段 A（hasTeacherSpeak = false）】
+课堂刚开始，还没有老师真正的讲解内容。你只能从下面两句里逐字选一句输出，不能增删、改写任何字，也不要加引号：
+老师，我准备好了，你来讲吧。
+老师，我听着，你开始讲。
+不要提问、不要猜、不要拆解知识点、不要主动发起任何问题。`;
 
-  const stuckPrompt = !teacherSeemsStuck(session)
+  const stuckPrompt = !hasTeacherSpeak || !teacherSeemsStuck(session)
     ? ''
     : teacherAskedForHint(session)
       ? `
@@ -276,6 +289,17 @@ export function normalizeReport(raw, session) {
     METRICS.reduce((total, metric) => total + scores[metric.key] * metric.weight, 0)
   );
 
+  const sourceDimensions =
+    object.dimensions && typeof object.dimensions === 'object' ? object.dimensions : {};
+  const dimensions = {};
+  for (const metric of METRICS) {
+    const note = sourceDimensions[metric.key];
+    dimensions[metric.key] = {
+      evidence: clean(note?.evidence),
+      advice: clean(note?.advice)
+    };
+  }
+
   const misconceptions = (Array.isArray(object.misconceptions) ? object.misconceptions : [])
     .map((item) => normalizeItem(item, ['title', 'evidence', 'why', 'fix']))
     .filter(Boolean)
@@ -319,6 +343,7 @@ export function normalizeReport(raw, session) {
   return {
     overallScore: overall,
     scores,
+    dimensions,
     verdict: clean(object.verdict) || '这轮讲解已经有了一些骨架，下一步是把每一步的依据说得更清楚。',
     strengths,
     misconceptions,

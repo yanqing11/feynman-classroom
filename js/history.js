@@ -65,9 +65,18 @@ function sanitizeReport(report) {
     scores[metric.key] = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null;
   }
   const overall = Number(report.overallScore);
+  const dimensions = {};
+  for (const metric of METRICS) {
+    const note = report.dimensions?.[metric.key] || {};
+    dimensions[metric.key] = {
+      evidence: typeof note.evidence === 'string' ? note.evidence : '',
+      advice: typeof note.advice === 'string' ? note.advice : ''
+    };
+  }
   return {
     overallScore: Number.isFinite(overall) ? Math.max(0, Math.min(100, Math.round(overall))) : null,
     scores,
+    dimensions,
     verdict: typeof report.verdict === 'string' ? report.verdict : '',
     strengths: Array.isArray(report.strengths) ? report.strengths.slice(0, 3) : [],
     misconceptions: Array.isArray(report.misconceptions) ? report.misconceptions.slice(0, 5) : [],
@@ -261,7 +270,7 @@ export function summarizeTags(records) {
     });
 }
 
-/** 把报告转成可复制的纯文本，历史详情里用。 */
+/** 把报告转成 Markdown，历史详情和报告弹窗都复用它。 */
 export function reportToText(record) {
   if (!record?.report) return '';
   const { report } = record;
@@ -273,26 +282,40 @@ export function reportToText(record) {
   if (difficulty) meta.push(difficulty.label);
   if (record.tags?.length) meta.push(record.tags.join('、'));
   if (record.source) meta.push(source.full);
-  const lines = [
-    `学习诊断报告 · ${record.topic}`,
-    meta.length ? `题目信息：${meta.join(' · ')}` : '',
-    `综合评分：${report.overallScore ?? '—'}%`
-  ].filter(Boolean);
+
+  const lines = [`# 学习诊断报告 · ${record.topic}`, ''];
+  if (meta.length) lines.push(`**题目信息**：${meta.join(' · ')}`, '');
+  lines.push(`**综合评分**：${report.overallScore ?? '—'}%`, '');
+  lines.push('## 三维评分');
   for (const metric of METRICS) {
-    lines.push(`${metric.label}：${report.scores?.[metric.key] ?? '—'}%`);
+    const score = report.scores?.[metric.key];
+    const note = report.dimensions?.[metric.key] || {};
+    lines.push(`### ${metric.label}：${score ?? '—'}%`);
+    if (note.evidence) lines.push(`- 对话证据：${note.evidence}`);
+    if (note.advice) lines.push(`- 改进建议：${note.advice}`);
+    lines.push('');
   }
-  if (report.verdict) lines.push('', `老师总评：${report.verdict}`);
+
+  if (report.verdict) lines.push('## 老师总评', report.verdict, '');
   if (report.misconceptions?.length) {
-    lines.push('', '关键理解缺口：');
+    lines.push('## 关键理解缺口');
     report.misconceptions.forEach((item, index) => {
-      lines.push(`${index + 1}. ${item.title || ''}${item.fix ? `（${item.fix}）` : ''}`);
+      lines.push(`${index + 1}. **${item.title || '理解缺口'}**`);
+      if (item.evidence) lines.push(`   - 证据：${item.evidence}`);
+      if (item.why) lines.push(`   - 为什么：${item.why}`);
+      if (item.fix) lines.push(`   - 怎么补：${item.fix}`);
     });
+    lines.push('');
   }
   if (report.nextSteps?.length) {
-    lines.push('', '下一次可以这样讲：');
+    lines.push('## 下一次可以这样讲');
     report.nextSteps.forEach((item, index) => {
-      lines.push(`${index + 1}. ${item.title || ''}${item.action ? `：${item.action}` : ''}`);
+      lines.push(`${index + 1}. **${item.title || '下一步'}**`);
+      if (item.action) lines.push(`   - 动作：${item.action}`);
+      if (item.example) lines.push(`   - 示范：${item.example}`);
     });
+    lines.push('');
   }
-  return lines.join('\n');
+  if (report.encouragement) lines.push('## 陈老师想说', report.encouragement);
+  return lines.join('\n').trim();
 }

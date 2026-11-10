@@ -175,6 +175,7 @@ function createSession(topic, topicImage, meta = {}) {
     studentIntensity: pick(meta.studentIntensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
     createdAt: now,
     updatedAt: now,
+    hasTeacherSpeak: false,
     messages: [kickoff],
     report: null
   };
@@ -185,6 +186,21 @@ function restoreSession() {
   if (!stored || typeof stored !== 'object' || !stored.topic || !Array.isArray(stored.messages)) {
     return null;
   }
+  const messages = stored.messages
+    .filter((message) => message && (message.role === 'user' || message.role === 'assistant'))
+    .filter((message) => (typeof message.content === 'string' && message.content.trim()) || message.images?.length)
+    .map((message) => ({
+      id: message.id || newId(),
+      role: message.role,
+      content: typeof message.content === 'string' ? message.content : '',
+      images: Array.isArray(message.images) ? message.images.slice(0, APP.limits.maxImages) : [],
+      hidden: Boolean(message.hidden),
+      createdAt: message.createdAt || new Date().toISOString()
+    }));
+  const hasVisibleTeacherMessage = messages.some(
+    (message) => message.role === 'user' && !message.hidden
+  );
+
   return {
     id: typeof stored.id === 'string' ? stored.id : newId(),
     topic: String(stored.topic).slice(0, APP.limits.maxTopicChars),
@@ -197,17 +213,8 @@ function restoreSession() {
     studentIntensity: pick(stored.studentIntensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
     createdAt: stored.createdAt || new Date().toISOString(),
     updatedAt: stored.updatedAt || new Date().toISOString(),
-    messages: stored.messages
-      .filter((message) => message && (message.role === 'user' || message.role === 'assistant'))
-      .filter((message) => (typeof message.content === 'string' && message.content.trim()) || message.images?.length)
-      .map((message) => ({
-        id: message.id || newId(),
-        role: message.role,
-        content: typeof message.content === 'string' ? message.content : '',
-        images: Array.isArray(message.images) ? message.images.slice(0, APP.limits.maxImages) : [],
-        hidden: Boolean(message.hidden),
-        createdAt: message.createdAt || new Date().toISOString()
-      })),
+    hasTeacherSpeak: Boolean(stored.hasTeacherSpeak) || hasVisibleTeacherMessage,
+    messages,
     report: stored.report && typeof stored.report === 'object' ? stored.report : null
   };
 }
@@ -257,6 +264,10 @@ export class ClassroomStore {
 
   get session() {
     return this.state.session;
+  }
+
+  get hasTeacherSpeak() {
+    return Boolean(this.session?.hasTeacherSpeak);
   }
 
   start(topic, topicImage, meta = {}) {
@@ -318,6 +329,7 @@ export class ClassroomStore {
       createdAt: new Date().toISOString()
     };
     this.session.messages.push(message);
+    if (role === 'user') this.session.hasTeacherSpeak = true;
     this.touch();
     return message;
   }

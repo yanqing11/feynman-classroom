@@ -162,6 +162,7 @@ const refs = {
   brandHome: $('#brandHome'),
   topbarSession: $('#topbarSession'),
   topbarTopic: $('#topbarTopic'),
+  abandonSessionBtn: $('#abandonSessionBtn'),
   connectionPill: $('#connectionPill'),
   connectionLabel: $('#connectionLabel'),
   settingsBtn: $('#settingsBtn'),
@@ -255,6 +256,11 @@ const refs = {
   historyTrendMeta: $('#historyTrendMeta'),
   historyDimensions: $('#historyDimensions'),
   historyList: $('#historyList'),
+  replayModal: $('#replayModal'),
+  replayTitle: $('#replayTitle'),
+  replayMeta: $('#replayMeta'),
+  replayList: $('#replayList'),
+  replayNote: $('#replayNote'),
   clearHistoryBtn: $('#clearHistoryBtn'),
   settingsModal: $('#settingsModal'),
   settingsForm: $('#settingsForm'),
@@ -321,7 +327,9 @@ let connectionIssue = false;
 let currentReport = null;
 let currentReportTopic = '';
 let currentReportMeta = '';
+let currentReportRecord = null;
 let reportFromArchive = false;
+let replayReturnHistory = false;
 let openHistoryIds = new Set();
 let pad = null;
 let speech = null;
@@ -528,7 +536,7 @@ function renderPracticeUI() {
   if (refs.studentModeHint) {
     refs.studentModeHint.textContent =
       practice.mode === 'examiner'
-        ? '考官模式：按由浅入深的固定梯度追问，适合新手训练。'
+        ? '考官模式：会更认真地核对每一步依据，但仍然一次只问一个问题。'
         : '真实学生模式：疑问从你的讲解里自然生长，不按固定顺序。';
   }
   if (refs.studentIntensityHint) {
@@ -729,6 +737,7 @@ function syncChrome() {
 
   refs.endSessionBtn.hidden = !session;
   refs.topbarSession.hidden = !session;
+  if (refs.abandonSessionBtn) refs.abandonSessionBtn.hidden = !session;
 
   renderPracticeUI();
   renderConnection();
@@ -962,8 +971,18 @@ function finalizeMessageElement(id) {
   }
 }
 
-function appendNotice(text) {
-  const notice = el('div', 'system-notice', text);
+function appendNotice(text, { retry = null } = {}) {
+  const notice = el('div', 'system-notice');
+  notice.append(el('span', 'notice-text', text));
+  if (retry) {
+    const button = el('button', 'notice-retry', '重试');
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      notice.remove();
+      retry();
+    });
+    notice.append(button);
+  }
   refs.messageList.append(notice);
   scrollToBottom(true);
 }
@@ -1158,7 +1177,17 @@ async function requestStudent() {
     }
     if (!aborted) {
       handleApiError(error);
-      appendNotice(`小问这次没有回答：${error.message || '未知错误'}`);
+      const retry = () => {
+        if (assistant && store.session?.messages.some((item) => item.id === assistant.id)) {
+          store.removeMessage(assistant.id);
+          document.getElementById(`msg-${assistant.id}`)?.remove();
+        }
+        requestStudent();
+      };
+      appendNotice(
+        `小问这次没有接上话：${error.message || '未知错误'}。你的讲解已经保留，可以直接重试。`,
+        { retry }
+      );
     } else if (!received) {
       toast('已停止生成。', 'warm');
     }
@@ -1238,11 +1267,12 @@ function showReportError(message) {
   refs.reportModal.querySelector('.modal').scrollTop = 0;
 }
 
-function presentReport(report, { topic = '', archived = false, meta = '' } = {}) {
+function presentReport(report, { topic = '', archived = false, meta = '', record = null } = {}) {
   if (!report) return;
   currentReport = report;
   currentReportTopic = topic || store.session?.topic || '';
   currentReportMeta = meta || (store.session ? formatSessionMeta(store.session) : '');
+  currentReportRecord = record;
   reportFromArchive = archived;
   openModal('reportModal');
   refs.reportLoading.hidden = true;
@@ -1299,6 +1329,7 @@ function renderReport(report, topicOverride, meta = '') {
   refs.metricGrid.replaceChildren();
   for (const metric of METRICS) {
     const score = Math.max(0, Math.min(100, Math.round(report.scores?.[metric.key] || 0)));
+    const note = report.dimensions?.[metric.key] || {};
     const card = el('div', `metric-card${score < 60 ? ' is-low' : ''}`);
     const top = el('div', 'metric-top');
     const labels = el('div');
@@ -1311,6 +1342,16 @@ function renderReport(report, topicOverride, meta = '') {
     fill.style.width = `${score}%`;
     bar.append(fill);
     card.append(top, bar, el('p', 'metric-caption', metric.caption));
+    if (note.evidence) {
+      card.append(el('p', 'metric-evidence', `对话证据：“${note.evidence}”`));
+    } else {
+      card.append(el('p', 'metric-evidence is-empty', '对话证据：这次有效片段不足'));
+    }
+    if (note.advice) {
+      card.append(el('p', 'metric-advice', `改进建议：${note.advice}`));
+    } else {
+      card.append(el('p', 'metric-advice is-empty', `改进建议：${metric.caption}`));
+    }
     refs.metricGrid.append(card);
   }
 
@@ -1334,6 +1375,10 @@ function renderReport(report, topicOverride, meta = '') {
       row.append(el('b', '', '怎么补'), el('span', '', gap.fix));
       body.append(row);
     }
+    const restart = el('button', 'btn btn-outline btn-sm gap-restart', '针对缺口重新开课');
+    restart.type = 'button';
+    restart.addEventListener('click', () => handleRestartGap(gap));
+    body.append(restart);
     card.append(body);
     refs.misconceptionList.append(card);
   });
@@ -1361,35 +1406,21 @@ function renderReport(report, topicOverride, meta = '') {
 
 async function copyReport() {
   if (!currentReport) return;
-  const report = currentReport;
-  const topic = currentReportTopic || store.session?.topic || '';
-  const lines = [
-    '费曼小课堂 · 学习诊断报告',
-    `讲课主题：${topic}`,
-    ...(currentReportMeta ? [`题目信息：${currentReportMeta}`] : []),
-    `综合评分：${report.overallScore}%`,
-    ...METRICS.map((metric) => `${metric.label}：${report.scores?.[metric.key] ?? 0}%`),
-    '',
-    `陈老师总评：${report.verdict}`,
-    '',
-    '关键理解缺口：',
-    ...(report.misconceptions || []).map(
-      (gap, index) =>
-        `${index + 1}. ${gap.title}\n   证据：${gap.evidence || '—'}\n   原因：${gap.why || '—'}\n   怎么补：${gap.fix || '—'}`
-    ),
-    '',
-    '下一次可以这样讲：',
-    ...(report.nextSteps || []).map(
-      (step, index) =>
-        `${index + 1}. ${step.title}\n   动作：${step.action || '—'}\n   示范：${step.example || '—'}`
-    ),
-    '',
-    `陈老师想说：${report.encouragement}`
-  ];
-
-  const ok = await copyText(lines.join('\n'));
+  const session = store.session;
+  const record =
+    currentReportRecord ||
+    {
+      topic: currentReportTopic || session?.topic || '',
+      subject: session?.subject || null,
+      difficulty: session?.difficulty || null,
+      tags: session?.tags || [],
+      source: session?.source || '',
+      report: currentReport
+    };
+  const markdown = reportToText(record);
+  const ok = await copyText(markdown);
   if (ok) {
-    toast('报告已复制到剪贴板。', 'success');
+    toast('Markdown 报告已复制到剪贴板。', 'success');
   } else {
     toast('复制失败，请手动选择文字。', 'error');
   }
@@ -1821,6 +1852,8 @@ function renderHistoryEntry() {
 function openHistory() {
   openHistoryIds = new Set();
   reportFromArchive = false;
+  currentReportRecord = null;
+  replayReturnHistory = false;
   renderHistory();
   openModal('historyModal');
 }
@@ -2143,6 +2176,18 @@ function renderHistoryList(records) {
     if (record.model) meta.push(record.model.split('/').pop());
     body.append(el('p', 'history-item-meta', meta.join(' · ')));
 
+    const dimensionScores = el('div', 'history-item-dimensions');
+    for (const metric of METRICS) {
+      const value = Number(record.report?.scores?.[metric.key]);
+      const item = el('span', `history-dimension${Number.isFinite(value) ? '' : ' is-empty'}`);
+      item.append(
+        el('small', '', metric.label),
+        el('strong', '', Number.isFinite(value) ? `${value}%` : '—')
+      );
+      dimensionScores.append(item);
+    }
+    body.append(dimensionScores);
+
     const score = el(
       'span',
       `history-item-score${Number.isFinite(record.report?.overallScore) ? '' : ' is-empty'}`
@@ -2178,10 +2223,16 @@ function buildHistoryTranscript(record) {
   head.append(title);
   block.append(head);
 
+  const list = buildTranscriptList(messages);
+  block.append(list);
+  return block;
+}
+
+function buildTranscriptList(messages) {
   const list = el('div', 'history-transcript-list');
   const names = { user: '你', assistant: '小问' };
 
-  messages.forEach((message, index) => {
+  (Array.isArray(messages) ? messages : []).forEach((message, index) => {
     const role = message.role === 'assistant' ? 'assistant' : 'user';
     const row = el('div', `history-message history-message-${role}`);
     const meta = el('div', 'history-message-meta');
@@ -2192,8 +2243,24 @@ function buildHistoryTranscript(record) {
     list.append(row);
   });
 
-  block.append(list);
-  return block;
+  return list;
+}
+
+function openReplay(record) {
+  if (!record) return;
+  replayReturnHistory = Boolean(activeModalId === 'historyModal');
+  refs.replayTitle.textContent = record.topic || '课堂回放';
+  refs.replayMeta.textContent = formatRecordMeta(record);
+  refs.replayList.replaceChildren();
+  const messages = Array.isArray(record.messages) ? record.messages : [];
+  if (messages.length) {
+    refs.replayList.append(buildTranscriptList(messages));
+    if (refs.replayNote) refs.replayNote.hidden = true;
+  } else if (refs.replayNote) {
+    refs.replayNote.hidden = false;
+    refs.replayNote.textContent = '这节课的对话原文没有保存下来（可能是浏览器空间不足时被清理），但诊断报告仍然保留。';
+  }
+  openModal('replayModal');
 }
 
 function buildHistoryDetail(record) {
@@ -2236,6 +2303,10 @@ function buildHistoryDetail(record) {
   }
 
   const actions = el('div', 'history-detail-actions');
+  const replay = el('button', 'btn btn-outline btn-sm', '回放这节课');
+  replay.type = 'button';
+  replay.addEventListener('click', () => openReplay(record));
+
   if (record.report) {
     const open = el('button', 'btn btn-primary btn-sm', '查看完整报告');
     open.type = 'button';
@@ -2243,26 +2314,27 @@ function buildHistoryDetail(record) {
       presentReport(record.report, {
         topic: record.topic,
         archived: true,
-        meta: formatRecordMeta(record)
+        meta: formatRecordMeta(record),
+        record
       });
     });
 
-    const copy = el('button', 'btn btn-outline btn-sm', '复制报告');
+    const copy = el('button', 'btn btn-outline btn-sm', '复制 Markdown');
     copy.type = 'button';
     copy.addEventListener('click', async () => {
       const ok = await copyText(reportToText(record));
-      toast(ok ? '报告已复制到剪贴板。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
+      toast(ok ? 'Markdown 报告已复制到剪贴板。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
     });
 
     const del = el('button', 'btn btn-ghost btn-sm', '删除记录');
     del.type = 'button';
     del.addEventListener('click', () => handleDeleteRecord(record));
-    actions.append(open, copy, del);
+    actions.append(open, replay, copy, del);
   } else {
     const del = el('button', 'btn btn-ghost btn-sm', '删除记录');
     del.type = 'button';
     del.addEventListener('click', () => handleDeleteRecord(record));
-    actions.append(del);
+    actions.append(replay, del);
   }
 
   detail.append(actions);
@@ -2467,6 +2539,9 @@ function closeModal(id) {
   const layer = document.getElementById(id);
   if (!layer || layer.hidden) return;
 
+  const returnToHistory = id === 'replayModal' && replayReturnHistory;
+  if (returnToHistory) replayReturnHistory = false;
+
   if (id === 'reportModal') {
     if (store.state.status === STATUS.EVALUATING) {
       teacherAbort?.abort();
@@ -2484,6 +2559,10 @@ function closeModal(id) {
     activeModalId = null;
     document.body.style.overflow = '';
     lastFocused?.focus?.({ preventScroll: true });
+  }
+  if (returnToHistory) {
+    renderHistory();
+    openModal('historyModal');
   }
 }
 
@@ -2526,6 +2605,29 @@ function closeLightbox() {
 /* Ends, reset, toast                                                         */
 /* -------------------------------------------------------------------------- */
 
+function handleAbandonSession() {
+  if (!store.session) return;
+  if (
+    !window.confirm(
+      '放弃本次课堂？\n本次对话会被清空，不会存入学习档案。此操作无法恢复。'
+    )
+  ) {
+    return;
+  }
+  studentAbort?.abort();
+  teacherAbort?.abort();
+  if (activeModalId) closeModal(activeModalId);
+  // 清掉可能由旧版“关闭页面自动归档”留下的未诊断记录。
+  const abandonedId = store.session.id;
+  const stale = loadHistory().find((record) => record.id === abandonedId && !record.report);
+  if (stale) deleteRecord(stale.id);
+  store.end();
+  resetAfterSession();
+  renderHistoryEntry();
+  toast('本次课堂已放弃，没有存入学习档案。', 'warm');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function handleEndSession() {
   if (!store.session) return;
   if (!window.confirm('结束本次讲课？本次对话会存入学习档案，API Key 会保留。')) return;
@@ -2539,6 +2641,61 @@ function handleEndSession() {
   renderHistoryEntry();
   toast('本次讲课已结束，已存入学习档案。', 'success');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function handleRestartGap(gap) {
+  const title = String(gap?.title || '这个缺口').trim();
+  const sourceSession = store.session;
+  const record = currentReportRecord;
+  const liveSession = Boolean(sourceSession) && !reportFromArchive;
+
+  if (reportFromArchive && sourceSession) {
+    toast('当前还有一节未结束的课，请先结束或放弃它，再从档案里重新开课。', 'warm', 5200);
+    return;
+  }
+
+  const prompt = liveSession
+    ? `结束当前课堂，并针对「${title}」重新开课？\n当前对话会先存入学习档案。`
+    : `针对「${title}」重新开课？`;
+  if (!window.confirm(prompt)) {
+    return;
+  }
+
+  const baseTopic = currentReportTopic || record?.topic || sourceSession?.topic || '';
+  const subject = record?.subject || sourceSession?.subject || store.practice.subject;
+  const difficulty = record?.difficulty || sourceSession?.difficulty || store.practice.difficulty;
+  const tags = record?.tags || sourceSession?.tags || [];
+  const nextTopic = `补讲「${title}」：${baseTopic}`.slice(0, APP.limits.maxTopicChars);
+
+  if (liveSession) {
+    archiveCurrentLesson();
+    studentAbort?.abort();
+    teacherAbort?.abort();
+    closeModal('reportModal');
+    if (activeModalId) closeModal(activeModalId);
+    store.end();
+    resetAfterSession();
+  } else {
+    closeModal('reportModal');
+    if (activeModalId) closeModal(activeModalId);
+    currentReportRecord = null;
+    resetAfterSession();
+  }
+
+  store.updatePractice({ subject, difficulty });
+  refs.topicInput.value = nextTopic;
+  if (refs.tagInput) refs.tagInput.value = (tags || []).join('、');
+  if (refs.noteInput) {
+    refs.noteInput.value = baseTopic ? `针对缺口重新开课。原课题：${baseTopic}` : '针对缺口重新开课';
+  }
+  autoGrowTopic();
+  setHomeSource('custom');
+  renderPracticeUI();
+  renderHistoryEntry();
+  showScreen('home');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('新课题已准备好，确认后点「开始讲课」。', 'success', 3000);
+  setTimeout(() => refs.topicInput.focus(), 250);
 }
 
 function handleRestartFromReport() {
@@ -2565,6 +2722,8 @@ function resetAfterSession() {
   topicImage = null;
   currentReport = null;
   currentReportMeta = '';
+  currentReportRecord = null;
+  reportFromArchive = false;
   startAfterSettings = false;
   bankEditingId = '';
   refs.messageInput.value = '';
@@ -2584,18 +2743,31 @@ function resetAfterSession() {
   syncChrome();
 }
 
-function toast(message, type = 'info', duration = 4200) {
+function toast(message, type = 'info', duration = 3000) {
   if (!message) return;
   const node = el('div', `toast${type === 'error' ? ' is-error' : type === 'warm' ? ' is-warm' : ''}`);
   node.setAttribute('role', type === 'error' ? 'alert' : 'status');
-  node.append(el('span', '', message));
-  refs.toastStack.append(node);
-  setTimeout(() => {
+  node.append(el('span', 'toast-text', message));
+
+  let timer = null;
+  const dismiss = () => {
+    if (!node.isConnected) return;
+    if (timer) clearTimeout(timer);
     node.style.opacity = '0';
     node.style.transform = 'translateY(6px)';
     node.style.transition = 'opacity .2s, transform .2s';
     setTimeout(() => node.remove(), 240);
-  }, duration);
+  };
+
+  const close = el('button', 'toast-close', '×');
+  close.type = 'button';
+  close.setAttribute('aria-label', '关闭提示');
+  close.addEventListener('click', dismiss);
+  node.append(close);
+
+  refs.toastStack.append(node);
+  const ttl = Math.min(Math.max(Number(duration) || 3000, 1200), 3000);
+  timer = setTimeout(dismiss, ttl);
 }
 
 function handleApiError(error, { openSettingsOnAuth = true } = {}) {
@@ -2662,6 +2834,7 @@ function bindEvents() {
   refs.clearHistoryBtn?.addEventListener('click', handleClearHistory);
 
   refs.endSessionBtn.addEventListener('click', handleEndSession);
+  refs.abandonSessionBtn?.addEventListener('click', handleAbandonSession);
   refs.startBtn.addEventListener('click', handleStart);
   refs.topicInput.addEventListener('input', autoGrowTopic);
   refs.topicInput.addEventListener('keydown', (event) => {
@@ -2715,7 +2888,7 @@ function bindEvents() {
   refs.composer.addEventListener('submit', handleSend);
   refs.messageInput.addEventListener('input', autoGrowMessage);
   refs.messageInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing) {
       event.preventDefault();
       handleSend(event);
     }
@@ -2885,5 +3058,4 @@ function bindEvents() {
   });
 
   window.addEventListener('resize', () => updateTopicToggle());
-  window.addEventListener('pagehide', archiveCurrentLesson);
 }

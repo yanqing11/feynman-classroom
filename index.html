@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261110f">
+  <link rel="stylesheet" href="./styles.css?v=20261110g">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -130,6 +130,15 @@
             题目和档案只保存在本地；图片识题会把图片发给你配置的 AI 模型。
           </p>
         </div>
+
+        <button class="history-entry" id="homeHistoryBtn" type="button">
+          <span class="history-entry-mark" aria-hidden="true">档</span>
+          <span class="history-entry-text">
+            <strong>学习档案</strong>
+            <small id="homeHistoryMeta">还没有记录，讲完一课就会自动保存</small>
+          </span>
+          <span class="history-entry-arrow" aria-hidden="true">→</span>
+        </button>
       </section>
 
       <!-- ============ CHAT ============ -->
@@ -142,6 +151,7 @@
                 <p class="chat-sub" id="chatSub">小问会围绕顶部的题目追问</p>
               </div>
               <div class="chat-head-right">
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" id="abandonSessionBtn" type="button" title="放弃本次课堂，不存入学习档案">放弃本次课堂</button>
                 <span class="round-badge" id="roundBadge">第 0 轮</span>
                 <button class="btn btn-primary btn-sm mobile-teacher-btn" id="callTeacherMobile" type="button">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
@@ -196,7 +206,7 @@
                     </button>
                   </div>
                   <div class="composer-submit">
-                    <span class="send-hint">Enter 发送 · Shift+Enter 换行</span>
+                    <span class="send-hint">Ctrl+Enter 发送 · Enter 换行</span>
                     <button class="btn btn-primary btn-send" id="sendBtn" type="submit" aria-label="发送讲解">
                       <span>发送</span>
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>
@@ -364,7 +374,7 @@
         <footer class="report-actions">
           <button class="btn btn-outline" id="copyReportBtn" type="button">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            复制报告
+            复制 Markdown
           </button>
           <button class="btn btn-ghost" data-close="reportModal" type="button">继续讲一会儿</button>
           <button class="btn btn-primary" id="restartFromReportBtn" type="button">换个主题，重新开始</button>
@@ -546,6 +556,23 @@
     </div>
   </div>
 
+  <!-- ============ REPLAY MODAL ============ -->
+  <div class="modal-layer" id="replayModal" hidden>
+    <div class="modal-backdrop" data-close="replayModal"></div>
+    <div class="modal replay-modal" role="dialog" aria-modal="true" aria-labelledby="replayTitle" tabindex="-1">
+      <div class="history-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>LESSON REPLAY</p>
+          <h2 id="replayTitle">课堂回放</h2>
+          <p id="replayMeta"></p>
+        </div>
+        <button class="icon-btn modal-close" data-close="replayModal" type="button" aria-label="关闭课堂回放">×</button>
+      </div>
+      <div class="replay-body" id="replayList"></div>
+      <p class="history-note" id="replayNote" hidden>这节课的对话原文没有保存下来，但诊断报告仍然保留。</p>
+    </div>
+  </div>
+
   <!-- ============ MY QUESTION BANK ============ -->
   <div class="modal-layer" id="bankModal" hidden>
     <div class="modal-backdrop" data-close="bankModal"></div>
@@ -636,6 +663,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261110f"></script>
+  <script type="module" src="./app.js?v=20261110g"></script>
 </body>
 </html>
