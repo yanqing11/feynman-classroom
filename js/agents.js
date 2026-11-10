@@ -53,10 +53,20 @@ function visibleMessages(session) {
 
 const STUCK_PATTERN =
   /(我不会|不知道|卡住|卡壳|没思路|不会做|给点提示|提示一下|帮帮我|想不出来|教教我)/;
+const HINT_REQUEST_PATTERN = /(提示|给点提示|提示一下|翻书|看看书|书上)/;
+
+function lastUserMessage(session) {
+  return [...visibleMessages(session)].reverse().find((message) => message.role === 'user');
+}
 
 function teacherSeemsStuck(session) {
-  const lastUser = [...visibleMessages(session)].reverse().find((message) => message.role === 'user');
+  const lastUser = lastUserMessage(session);
   return Boolean(lastUser && STUCK_PATTERN.test(lastUser.content || ''));
+}
+
+function teacherAskedForHint(session) {
+  const lastUser = lastUserMessage(session);
+  return Boolean(lastUser && HINT_REQUEST_PATTERN.test(lastUser.content || ''));
 }
 
 function studentClassContext(session) {
@@ -136,6 +146,18 @@ export function buildStudentMessages(session) {
     trimmed = [{ role: 'user', content: kickoffMessage(session.topic) }, ...trimmed];
   }
 
+  const stuckPrompt = !teacherSeemsStuck(session)
+    ? ''
+    : teacherAskedForHint(session)
+      ? `
+
+【系统提示：老师要提示】
+老师已经明确要提示，视为老师已经同意，不用再问“要不要看”。你可以直接给一个半成品线索（类比、反例或某一步的起点），仍然不要说最终答案，也不要把剩余步骤推导完；说完停下来等老师接话。`
+      : `
+
+【系统提示：老师可能卡住了】
+老师刚刚在向你求助。你仍然不能替老师解题或给答案。先问老师要不要看你在书上找到的一个提示；只有老师同意后，才给一个半成品线索（类比、反例或某一步的起点），不要说最终答案，也不要把剩余步骤推导完。老师拒绝就不要再提。`;
+
   const system = `${STUDENT_PROMPT}
 
 【当前讲课主题】
@@ -146,14 +168,7 @@ ${studentClassContext(session)}
 【重要边界】
 - 你只能以「小问」这个学生的身份说话。
 - 你绝不能给出答案、解法或公式推导。
-- 你看不到评分报告；不要假装自己知道老师讲得对不对。${
-    teacherSeemsStuck(session)
-      ? `
-
-【系统提示：老师可能卡住了】
-老师刚刚在向你求助。请按“翻书找提示”的规则，只给一个半成品线索（类比、反例或某一步的起点），不要说最终答案，也不要把剩余步骤推导完。说完线索后，停下来等老师接话。`
-      : ''
-  }`;
+- 你看不到评分报告；不要假装自己知道老师讲得对不对。${stuckPrompt}`;
 
   return [{ role: 'system', content: system }, ...trimmed];
 }
