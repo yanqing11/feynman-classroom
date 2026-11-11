@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261110h">
+  <link rel="stylesheet" href="./styles.css?v=20261110i">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -396,15 +396,15 @@
     </div>
   </div>
 
-  <!-- ============ SETTINGS MODAL ============ -->
-  <div class="modal-layer" id="settingsModal" hidden>
+  <!-- ============ SETTINGS SIDE PANEL ============ -->
+  <div class="modal-layer settings-layer" id="settingsModal" hidden>
     <div class="modal-backdrop" data-close="settingsModal"></div>
-    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
+    <div class="modal settings-modal settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
       <div class="settings-head">
         <div>
-          <p class="eyebrow"><span class="eyebrow-line"></span>AI CONNECTION</p>
-          <h2 id="settingsTitle">连接你的 AI</h2>
-          <p>默认使用课堂共享代理，打开就能上课，不用填 Key。想用自己的额度时，也可以填自己的 API Key 直连服务商。</p>
+          <p class="eyebrow"><span class="eyebrow-line"></span>CLASSROOM SETTINGS</p>
+          <h2 id="settingsTitle">课堂设置</h2>
+          <p>连接你的模型、调整 AI 学生与外观。所有配置只保存在当前浏览器。</p>
         </div>
         <button class="icon-btn modal-close" data-close="settingsModal" type="button" aria-label="关闭设置">×</button>
       </div>
@@ -455,6 +455,35 @@
           </label>
         </fieldset>
 
+        <fieldset class="appearance-settings">
+          <legend>外观</legend>
+          <div class="field">
+            <span class="field-label">主题</span>
+            <div class="theme-switch" id="themeSwitch" role="radiogroup" aria-label="界面主题">
+              <button class="theme-option" type="button" role="radio" data-theme="light" aria-checked="true">
+                <span class="theme-swatch theme-swatch-light" aria-hidden="true"></span>
+                浅色
+              </button>
+              <button class="theme-option" type="button" role="radio" data-theme="dark" aria-checked="false">
+                <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
+                深色
+              </button>
+            </div>
+            <p class="field-hint">深色模式先覆盖课堂主界面，公式、图表与草稿板会在 P2 完整适配。</p>
+          </div>
+        </fieldset>
+
+        <fieldset class="data-settings">
+          <legend>数据管理</legend>
+          <p class="field-hint">所有配置、课堂与档案只保存在当前浏览器，不会上传服务器；无痕模式或清理浏览器缓存会丢失全部本地数据，请定期导出 JSON 备份。</p>
+          <div class="data-actions">
+            <button class="btn btn-outline btn-sm" id="exportDataBtn" type="button">导出全部 JSON</button>
+            <button class="btn btn-danger-ghost btn-sm" id="clearArchiveDataBtn" type="button">清空学习档案</button>
+          </div>
+          <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
+          <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。</p>
+        </fieldset>
+
         <details class="advanced">
           <summary>高级设置</summary>
           <div class="field">
@@ -486,7 +515,7 @@
 
         <p class="settings-note">
           <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
-          本站不上传、不收集、不记录你的 Key。清除浏览器数据会同时清除 Key。
+          本站不上传、不收集、不记录你的 Key。清除浏览器数据会同时清除 Key、课堂和全部学习档案。
         </p>
       </form>
     </div>
@@ -675,6 +704,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261110h"></script>
+  <script type="module" src="./app.js?v=20261110i"></script>
 </body>
 </html>

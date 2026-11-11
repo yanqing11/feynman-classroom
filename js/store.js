@@ -115,7 +115,8 @@ export function loadSettings() {
     accessCode:
       typeof stored.accessCode === 'string' && stored.accessCode.trim()
         ? stored.accessCode.trim()
-        : (APP.defaults.accessCode || '')
+        : (APP.defaults.accessCode || ''),
+    theme: stored.theme === 'dark' ? 'dark' : 'light'
   };
 
   if (proxyIsRetired) {
@@ -137,9 +138,14 @@ export function saveSettings(settings) {
     model: (settings.model || APP.defaults.model).trim(),
     temperature: Math.max(0, Math.min(1.2, Number(settings.temperature) || 0)),
     proxyUrl: (settings.proxyUrl || '').trim().replace(/\/+$/, ''),
-    accessCode: (settings.accessCode || '').trim()
+    accessCode: (settings.accessCode || '').trim(),
+    theme: settings.theme === 'dark' ? 'dark' : 'light'
   };
-  localStorage.setItem(APP.storage.settings, JSON.stringify(normalized));
+  try {
+    localStorage.setItem(APP.storage.settings, JSON.stringify(normalized));
+  } catch {
+    /* Storage may be full or blocked; the in-memory value is still correct. */
+  }
   return normalized;
 }
 

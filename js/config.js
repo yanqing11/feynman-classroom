@@ -266,8 +266,8 @@ export const STUDENT_MODES = [
 ];
 
 export const INTENSITIES = [
-  { key: 'gentle', label: '保守', hint: '追问少一点，节奏更温和' },
-  { key: 'normal', label: '正常', hint: '默认提问频率' },
+  { key: 'gentle', label: '温和', hint: '追问少一点，节奏更温和' },
+  { key: 'normal', label: '标准', hint: '默认提问频率' },
   { key: 'challenge', label: '挑战', hint: '追问更密，偶尔会遗忘或混淆' }
 ];
 

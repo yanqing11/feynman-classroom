@@ -36,6 +36,33 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111614;
+  --paper-deep: #161d1a;
+  --card: #1b2421;
+  --card-warm: #1f2a26;
+  --ink: #e9efe9;
+  --ink-soft: #c3cdc5;
+  --muted: #93a098;
+  --faint: #7b8880;
+  --line: #2c3833;
+  --line-strong: #3d4b44;
+  --green: #67bda1;
+  --green-deep: #92e0c4;
+  --green-dark: #c0f1dd;
+  --green-soft: #1e352e;
+  --green-pale: #172822;
+  --coral: #e59277;
+  --coral-soft: #3a251f;
+  --gold: #e6bf72;
+  --gold-soft: #3a311f;
+  --blue: #8eb9f2;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36), 0 4px 14px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.32), 0 18px 42px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4), 0 40px 90px rgba(0, 0, 0, 0.5);
+}
+
 *,
 *::before,
 *::after {
@@ -2403,9 +2430,40 @@ body.is-chat .footer {
 
 /* Settings */
 
+.settings-layer {
+  place-items: stretch end;
+  padding: 0;
+}
+
 .settings-modal {
   max-width: 630px;
   padding: 30px clamp(20px, 4vw, 38px) 26px;
+}
+
+.settings-layer .settings-panel {
+  width: min(456px, 100%);
+  max-width: 456px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 26px clamp(18px, 2.6vw, 30px) 22px;
+  border-radius: 22px 0 0 22px;
+  animation: settings-slide-in 0.34s var(--ease);
+}
+
+@keyframes settings-slide-in {
+  from {
+    opacity: 0.5;
+    transform: translateX(46px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.settings-panel .settings-form {
+  padding-bottom: 8px;
 }
 
 .settings-head {
@@ -2594,6 +2652,116 @@ input[type="range"] {
 
 .settings-note .icon {
   margin-top: 1px;
+}
+
+/* Settings: appearance and data management */
+
+.appearance-settings,
+.data-settings {
+  display: grid;
+  gap: 11px;
+  padding: 14px 15px 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--card-warm);
+}
+
+.appearance-settings legend,
+.data-settings legend {
+  padding: 0 7px;
+  color: var(--green-deep);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.theme-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-deep);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.theme-option:hover {
+  color: var(--ink-soft);
+}
+
+.theme-option.is-active {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(31, 42, 42, 0.12);
+}
+
+.theme-option:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.theme-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+}
+
+.theme-swatch-light {
+  background: linear-gradient(135deg, #fffdf8 50%, #efe9dc 50%);
+}
+
+.theme-swatch-dark {
+  background: linear-gradient(135deg, #1d2623 50%, #0f1412 50%);
+}
+
+.data-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.data-actions .btn {
+  flex: 1 1 135px;
+}
+
+.storage-usage {
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.storage-usage.is-warn {
+  color: var(--coral);
+  font-weight: 700;
 }
 
 /* Learning archive */
@@ -5212,5 +5380,100 @@ body.is-chat .topbar-tagline {
 
   .history-dimension small {
     font-size: 9px;
+  }
+}
+
+/* ==========================================================================
+   Dark theme (base pass; full chart/board adaptation lands in P2)
+   ========================================================================== */
+
+[data-theme="dark"] body::before {
+  opacity: 0.45;
+}
+
+[data-theme="dark"] body:not(.is-chat) {
+  background: var(--paper);
+}
+
+[data-theme="dark"] .topbar {
+  border-bottom-color: rgba(61, 75, 68, 0.72);
+  background: rgba(17, 22, 20, 0.88);
+}
+
+[data-theme="dark"] .home-card {
+  border-color: var(--line);
+  background: rgba(27, 36, 33, 0.9);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .home-input {
+  border-color: var(--line);
+  background: var(--card);
+}
+
+[data-theme="dark"] .home-card .example-chip,
+[data-theme="dark"] .quick-tag,
+[data-theme="dark"] .persona-option,
+[data-theme="dark"] .notice-retry,
+[data-theme="dark"] .history-message-assistant,
+[data-theme="dark"] .history-item.is-open {
+  border-color: var(--line);
+  background: var(--card-warm);
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .persona-option:hover {
+  border-color: var(--green);
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .chat-head {
+  background: rgba(27, 36, 33, 0.72);
+}
+
+[data-theme="dark"] .composer {
+  background: linear-gradient(180deg, rgba(17, 22, 20, 0.5), rgba(22, 29, 26, 0.96));
+}
+
+[data-theme="dark"] .message-row.user .bubble {
+  border-color: #2f7f69;
+  background: #2f7f69;
+  color: #f4f8f5;
+}
+
+[data-theme="dark"] .pending-thumb,
+[data-theme="dark"] .bubble-images img,
+[data-theme="dark"] .lightbox img {
+  background: var(--card);
+}
+
+[data-theme="dark"] .teacher-call-card .btn-primary:hover:not(:disabled) {
+  background: #f4f8f5;
+  color: var(--green-dark);
+}
+
+[data-theme="dark"] .modal {
+  background: var(--paper);
+}
+
+@media (max-width: 720px) {
+  .settings-layer .settings-panel {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: 22px 16px 18px;
+  }
+
+  .data-actions {
+    flex-direction: column;
+  }
+
+  .data-actions .btn {
+    flex-basis: auto;
+    width: 100%;
+    min-height: 42px;
   }
 }

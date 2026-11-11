@@ -284,6 +284,10 @@ const refs = {
   studentIntensitySelect: $('#studentIntensitySelect'),
   studentIntensityHint: $('#studentIntensityHint'),
   lockSubjectToggle: $('#lockSubjectToggle'),
+  themeSwitch: $('#themeSwitch'),
+  exportDataBtn: $('#exportDataBtn'),
+  clearArchiveDataBtn: $('#clearArchiveDataBtn'),
+  storageUsage: $('#storageUsage'),
   personaPicker: $('#personaPicker'),
   homePersonaHint: $('#homePersonaHint'),
   chatSubjectSelect: $('#chatSubjectSelect'),
@@ -351,6 +355,7 @@ let bankFilter = { subject: 'all', source: 'all', query: '' };
 init();
 
 function init() {
+  applyTheme(store.settings.theme);
   populateExamples();
   populateModelPresets();
   populatePracticeControls();
@@ -1528,7 +1533,88 @@ function fillSettingsForm() {
   refs.temperatureValue.textContent = Number(refs.temperatureInput.value).toFixed(2).replace(/0$/, '');
   refs.apiKeyInput.type = 'password';
   refs.toggleKeyBtn.textContent = '显示';
+  renderThemeSwitch();
+  updateStorageUsage();
   hideSettingsStatus();
+}
+
+function applyTheme(theme) {
+  const resolved = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.colorScheme = resolved;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#141a18' : '#fdfdfb');
+}
+
+function renderThemeSwitch() {
+  if (!refs.themeSwitch) return;
+  const current = store.settings.theme === 'dark' ? 'dark' : 'light';
+  for (const button of refs.themeSwitch.querySelectorAll('.theme-option')) {
+    const active = button.dataset.theme === current;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-checked', String(active));
+    button.tabIndex = active ? 0 : -1;
+  }
+}
+
+function handleThemeKeydown(event) {
+  const themes = ['light', 'dark'];
+  const current = themes.indexOf(store.settings.theme === 'dark' ? 'dark' : 'light');
+  let next = current;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    next = (current + 1) % themes.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    next = (current - 1 + themes.length) % themes.length;
+  } else if (event.key === 'Home') {
+    next = 0;
+  } else if (event.key === 'End') {
+    next = themes.length - 1;
+  } else {
+    return;
+  }
+  event.preventDefault();
+  handleThemeSelect(themes[next]);
+  refs.themeSwitch?.querySelector(`[data-theme="${themes[next]}"]`)?.focus();
+}
+
+function handleThemeSelect(theme) {
+  const resolved = theme === 'dark' ? 'dark' : 'light';
+  applyTheme(resolved);
+  if (store.settings.theme === resolved) {
+    renderThemeSwitch();
+    return;
+  }
+  store.updateSettings({ ...store.settings, theme: resolved });
+  renderThemeSwitch();
+  toast(`已切换为${resolved === 'dark' ? '深色' : '浅色'}模式。`, 'success', 2200);
+}
+
+function localStorageBytes() {
+  try {
+    let total = 0;
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index) || '';
+      const value = localStorage.getItem(key) || '';
+      total += (key.length + value.length) * 2;
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function updateStorageUsage() {
+  if (!refs.storageUsage) return;
+  const used = localStorageBytes();
+  const records = loadHistory().length;
+  refs.storageUsage.textContent = `本机已用约 ${formatBytes(used)}（浏览器通常上限 5 MB）· ${records} 条学习档案。`;
+  refs.storageUsage.classList.toggle('is-warn', used > 4 * 1024 * 1024);
 }
 
 function readSettingsForm() {
@@ -1538,7 +1624,8 @@ function readSettingsForm() {
     baseUrl: refs.baseUrlInput.value.trim(),
     proxyUrl: refs.proxyUrlInput.value.trim(),
     accessCode: refs.accessCodeInput.value.trim(),
-    temperature: Number(refs.temperatureInput.value)
+    temperature: Number(refs.temperatureInput.value),
+    theme: store.settings.theme === 'dark' ? 'dark' : 'light'
   };
 }
 
@@ -1646,6 +1733,71 @@ function handleClearKey() {
   renderConnection();
   showSettingsStatus('已清除本机保存的 API Key。', 'ok');
   toast('API Key 已清除。', 'success');
+}
+
+async function handleExportData() {
+  if (!refs.exportDataBtn) return;
+  refs.exportDataBtn.disabled = true;
+  refs.exportDataBtn.textContent = '正在打包…';
+  try {
+    let questions = [];
+    try {
+      questions = await listQuestions();
+    } catch {
+      questions = [];
+    }
+    const payload = {
+      app: 'Feynman Classroom',
+      schema: 1,
+      exportedAt: new Date().toISOString(),
+      settings: { ...store.settings, apiKey: '' },
+      practice: store.practice,
+      session: store.session,
+      history: loadHistory(),
+      questions
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `feynman-classroom-${stamp}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+    updateStorageUsage();
+    showSettingsStatus('已导出全部 JSON。API Key 已移除，其他数据都在文件里。', 'ok');
+    toast('数据已导出，请把 JSON 文件保存到安全位置。', 'success', 3200);
+  } catch {
+    showSettingsStatus('导出失败，可能是浏览器阻止了下载，请稍后再试。', 'error');
+    toast('导出失败，请稍后再试。', 'error');
+  } finally {
+    refs.exportDataBtn.disabled = false;
+    refs.exportDataBtn.textContent = '导出全部 JSON';
+  }
+}
+
+function handleClearArchiveData() {
+  const records = loadHistory();
+  if (!records.length) {
+    toast('学习档案已经是空的。', 'warm');
+    return;
+  }
+  if (
+    !window.confirm(
+      `清空全部学习档案？共 ${records.length} 条记录，包含诊断报告和回放，删除后无法恢复。建议先导出 JSON 备份。`
+    )
+  ) {
+    return;
+  }
+  clearHistory();
+  openHistoryIds = new Set();
+  renderHistory();
+  renderHistoryEntry();
+  updateStorageUsage();
+  showSettingsStatus('学习档案已清空，课堂设置和题库没有受影响。', 'ok');
+  toast('学习档案已清空。', 'success', 2600);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3023,6 +3175,14 @@ function bindEvents() {
   refs.settingsForm.addEventListener('submit', handleSaveSettings);
   refs.testKeyBtn.addEventListener('click', handleTestConnection);
   refs.clearKeyBtn.addEventListener('click', handleClearKey);
+  refs.themeSwitch?.addEventListener('click', (event) => {
+    const button = event.target.closest('.theme-option');
+    if (!button) return;
+    handleThemeSelect(button.dataset.theme);
+  });
+  refs.themeSwitch?.addEventListener('keydown', handleThemeKeydown);
+  refs.exportDataBtn?.addEventListener('click', handleExportData);
+  refs.clearArchiveDataBtn?.addEventListener('click', handleClearArchiveData);
   refs.studentPersonaSelect?.addEventListener('change', () => {
     store.updatePractice({ persona: refs.studentPersonaSelect.value });
     if (store.session) store.updateSessionMeta({ studentPersona: refs.studentPersonaSelect.value });
