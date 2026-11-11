@@ -940,6 +940,7 @@ body.is-chat .footer {
 }
 
 .chat-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1024,7 +1025,7 @@ body.is-chat .footer {
 .message-list {
   max-width: 860px;
   margin: 0 auto;
-  padding: 32px clamp(18px, 3.2vw, 36px) 20px;
+  padding: 32px clamp(18px, 3.2vw, 36px) 68px;
 }
 
 /* 本次题目：固定在对话顶部，不随消息滚走 */
@@ -1311,7 +1312,7 @@ body.is-chat .footer {
   gap: 11px;
   max-width: 800px;
   margin: 0 auto;
-  padding: 0 clamp(16px, 3vw, 32px) 20px;
+  padding: 0 clamp(16px, 3vw, 32px) 62px;
   animation: message-in 0.3s var(--ease);
 }
 
@@ -5440,6 +5441,203 @@ body.is-chat .topbar-tagline {
 }
 
 /* ==========================================================================
+   Classroom floating controls, stuck markers, copy and thinking state
+   ========================================================================== */
+
+.classroom-fab {
+  position: absolute;
+  right: clamp(14px, 2.5vw, 24px);
+  bottom: var(--fab-bottom, 132px);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.94);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px) saturate(1.05);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.fab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.fab-btn .icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.fab-btn:hover:not(:disabled) {
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+.fab-btn:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.fab-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.fab-btn-primary {
+  background: var(--green-deep);
+  color: #f4f8f5;
+}
+
+.fab-btn-primary:hover:not(:disabled) {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.stuck-badge {
+  padding: 5px 10px;
+  border: 1px solid rgba(217, 164, 65, 0.5);
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: #856a1d;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stuck-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 92%;
+  margin: -12px auto 20px;
+  padding: 5px 12px;
+  border: 1px dashed rgba(217, 164, 65, 0.62);
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: #7d631c;
+  font-size: 10.5px;
+  line-height: 1.5;
+  animation: message-in 0.3s var(--ease);
+}
+
+.stuck-marker-label {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.stuck-marker-text {
+  color: #8a7434;
+}
+
+.message-copy {
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.message-copy:hover,
+.message-copy:focus-visible {
+  border-color: rgba(31, 111, 92, 0.2);
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+.message-copy.is-done {
+  border-color: rgba(31, 111, 92, 0.24);
+  color: var(--green-deep);
+}
+
+.typing-skeleton {
+  width: 74px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--line) 0%,
+    var(--line-strong) 45%,
+    var(--line) 90%
+  );
+  background-size: 200% 100%;
+  animation: typing-shimmer 1.3s linear infinite;
+}
+
+@keyframes typing-shimmer {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .classroom-fab {
+    left: 10px;
+    right: 10px;
+    justify-content: space-between;
+    gap: 2px;
+  }
+
+  .fab-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 7px 6px;
+    font-size: 10px;
+  }
+
+  .fab-btn .icon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .message-list {
+    padding-bottom: 62px;
+  }
+
+  .stuck-marker {
+    max-width: 100%;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 460px) {
+  .fab-btn span {
+    font-size: 9.5px;
+  }
+
+  .fab-btn .icon {
+    display: none;
+  }
+}
+
+/* ==========================================================================
    Dark theme (base pass; full chart/board adaptation lands in P2)
    ========================================================================== */
 
@@ -5502,6 +5700,34 @@ body.is-chat .topbar-tagline {
 
 [data-theme="dark"] .composer {
   background: linear-gradient(180deg, rgba(17, 22, 20, 0.5), rgba(22, 29, 26, 0.96));
+}
+
+[data-theme="dark"] .classroom-fab {
+  border-color: var(--line-strong);
+  background: rgba(27, 36, 33, 0.94);
+}
+
+[data-theme="dark"] .stuck-badge,
+[data-theme="dark"] .stuck-marker {
+  border-color: rgba(230, 191, 114, 0.42);
+  background: rgba(58, 49, 31, 0.72);
+  color: #e6c98d;
+}
+
+[data-theme="dark"] .stuck-marker-text {
+  color: #c9b184;
+}
+
+[data-theme="dark"] .message-copy:hover,
+[data-theme="dark"] .message-copy:focus-visible,
+[data-theme="dark"] .message-copy.is-done {
+  border-color: rgba(146, 224, 196, 0.28);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .typing-skeleton {
+  background: linear-gradient(90deg, #2c3833 0%, #43524b 45%, #2c3833 90%);
+  background-size: 200% 100%;
 }
 
 [data-theme="dark"] .message-row.user .bubble {

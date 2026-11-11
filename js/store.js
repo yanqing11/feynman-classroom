@@ -37,6 +37,18 @@ function safeParse(value) {
   }
 }
 
+function normalizeStuckPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .filter((point) => point && typeof point === 'object')
+    .slice(-50)
+    .map((point) => ({
+      id: typeof point.id === 'string' ? point.id : newId(),
+      messageId: typeof point.messageId === 'string' ? point.messageId : '',
+      at: typeof point.at === 'string' ? point.at : new Date().toISOString(),
+      turn: Number.isFinite(Number(point.turn)) ? Number(point.turn) : 0
+    }));
+}
+
 const SUBJECT_KEYS_SET = new Set(SUBJECT_KEYS);
 const DIFFICULTY_KEYS = new Set(DIFFICULTIES.map((item) => item.key));
 const SOURCE_KEYS = new Set(Object.keys(SOURCES));
@@ -183,6 +195,7 @@ function createSession(topic, topicImage, meta = {}) {
     updatedAt: now,
     hasTeacherSpeak: false,
     messages: [kickoff],
+    stuckPoints: [],
     report: null
   };
 }
@@ -221,6 +234,7 @@ function restoreSession() {
     updatedAt: stored.updatedAt || new Date().toISOString(),
     hasTeacherSpeak: Boolean(stored.hasTeacherSpeak) || hasVisibleTeacherMessage,
     messages,
+    stuckPoints: normalizeStuckPoints(stored.stuckPoints),
     report: stored.report && typeof stored.report === 'object' ? stored.report : null
   };
 }
@@ -351,6 +365,46 @@ export class ClassroomStore {
     if (!this.session) return;
     this.session.messages = this.session.messages.filter((message) => message.id !== id);
     this.touch();
+  }
+
+  undoLastTurn() {
+    if (!this.session) return null;
+    const messages = this.session.messages;
+    let index = -1;
+    for (let cursor = messages.length - 1; cursor >= 0; cursor -= 1) {
+      const message = messages[cursor];
+      if (message.role === 'user' && !message.hidden) {
+        index = cursor;
+        break;
+      }
+    }
+    if (index < 0) return null;
+
+    const removed = messages.splice(index);
+    const removedIds = new Set(removed.map((message) => message.id));
+    this.session.stuckPoints = (this.session.stuckPoints || []).filter(
+      (point) => !removedIds.has(point.messageId)
+    );
+    this.session.hasTeacherSpeak = messages.some(
+      (message) => message.role === 'user' && !message.hidden
+    );
+    this.touch();
+    return removed;
+  }
+
+  addStuckPoint(messageId = '') {
+    if (!this.session) return null;
+    const point = {
+      id: newId(),
+      messageId: typeof messageId === 'string' ? messageId : '',
+      at: new Date().toISOString(),
+      turn: this.session.messages.filter(
+        (message) => message.role === 'user' && !message.hidden
+      ).length
+    };
+    this.session.stuckPoints = [...(this.session.stuckPoints || []), point].slice(-50);
+    this.touch();
+    return point;
   }
 
   setReport(report) {

@@ -213,6 +213,12 @@ const refs = {
   topicToggleBtn: $('#topicToggleBtn'),
   messageList: $('#messageList'),
   typingIndicator: $('#typingIndicator'),
+  chatPanel: $('.chat-panel'),
+  classroomFab: $('#classroomFab'),
+  undoTurnBtn: $('#undoTurnBtn'),
+  markStuckBtn: $('#markStuckBtn'),
+  endAndReportBtn: $('#endAndReportBtn'),
+  stuckBadge: $('#stuckBadge'),
   composer: $('#composer'),
   pendingImages: $('#pendingImages'),
   messageInput: $('#messageInput'),
@@ -348,6 +354,7 @@ let speech = null;
 let speechBase = '';
 let renderedSessionId = null;
 let lastPersistenceWarning = '';
+let composerObserver = null;
 let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
@@ -368,6 +375,7 @@ function init() {
   fillSettingsForm();
   setupSpeech();
   bindEvents();
+  setupComposerObserver();
   renderHistoryEntry();
   setHomeSource('custom');
 
@@ -755,6 +763,24 @@ function onStoreChange() {
   if (!store.persistenceWarning) lastPersistenceWarning = '';
 }
 
+function syncFabOffset() {
+  if (!refs.chatPanel || !refs.composer) return;
+  const height = refs.composer.offsetHeight;
+  if (!height) return;
+  refs.chatPanel.style.setProperty('--fab-bottom', `${height + 10}px`);
+}
+
+function setupComposerObserver() {
+  syncFabOffset();
+  if (!refs.composer) return;
+  if ('ResizeObserver' in window) {
+    composerObserver?.disconnect();
+    composerObserver = new ResizeObserver(() => syncFabOffset());
+    composerObserver.observe(refs.composer);
+  }
+  window.addEventListener('resize', syncFabOffset);
+}
+
 function showScreen(name) {
   const isChat = name === 'chat';
   refs.homeScreen.hidden = isChat;
@@ -765,6 +791,7 @@ function showScreen(name) {
   if (isChat) {
     refs.topbarTopic.textContent = store.session?.topic || '';
     document.title = store.session ? `${store.session.topic} · 费曼小课堂` : '费曼小课堂';
+    requestAnimationFrame(syncFabOffset);
   } else {
     document.title = '费曼小课堂 · 讲给一个会追问的学生听';
   }
@@ -772,8 +799,8 @@ function showScreen(name) {
 
 function syncChrome() {
   const session = store.session;
-  const evaluating = store.state.status === STATUS.EVALUATING;
   const busy = store.busy;
+  const evaluating = store.state.status === STATUS.EVALUATING;
   const hasReport = Boolean(session?.report);
 
   refs.topbarTopic.textContent = session?.topic || '';
@@ -816,6 +843,17 @@ function syncChrome() {
   refs.endSessionBtn.hidden = !session;
   refs.topbarSession.hidden = !session;
   if (refs.abandonSessionBtn) refs.abandonSessionBtn.hidden = !session;
+
+  const stuckCount = session?.stuckPoints?.length || 0;
+  if (refs.stuckBadge) {
+    refs.stuckBadge.hidden = stuckCount === 0;
+    refs.stuckBadge.textContent = `卡点 ${stuckCount}`;
+  }
+  if (refs.undoTurnBtn) refs.undoTurnBtn.disabled = !session || busy || turns < 1;
+  if (refs.markStuckBtn) refs.markStuckBtn.disabled = !session || turns < 1;
+  if (refs.endAndReportBtn) {
+    refs.endAndReportBtn.disabled = !session || busy || evaluating || turns < 1;
+  }
 
   renderPracticeUI();
   renderConnection();
@@ -972,6 +1010,8 @@ function renderSession() {
     refs.messageList.append(renderMessage(message));
   }
 
+  renderStuckMarkers(session.stuckPoints || []);
+
   refs.typingIndicator.hidden = true;
   syncChrome();
   requestAnimationFrame(() => scrollToBottom(true));
@@ -992,6 +1032,8 @@ function renderMessage(message) {
     el('span', 'message-name', isUser ? '我 · 老师' : '小问 · AI 学生'),
     el('span', 'message-time', formatTime(message.createdAt))
   );
+  const copyButton = renderMessageCopy(message);
+  if (copyButton) meta.append(copyButton);
 
   const bubble = el('div', 'bubble');
 
@@ -1023,6 +1065,60 @@ function renderMessage(message) {
   main.append(meta, bubble);
   row.append(avatar, main);
   return row;
+}
+
+function renderMessageCopy(message) {
+  const text = String(message.content || '').trim();
+  if (!text || message.streaming) return null;
+  const button = el('button', 'message-copy', '复制');
+  button.type = 'button';
+  button.title = '复制这条消息';
+  button.setAttribute('aria-label', `复制${message.role === 'user' ? '你的讲解' : '小问的回复'}`);
+  button.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    const ok = await copyText(text);
+    button.textContent = ok ? '已复制' : '复制失败';
+    button.classList.toggle('is-done', ok);
+    setTimeout(() => {
+      button.textContent = '复制';
+      button.classList.remove('is-done');
+    }, 1500);
+    toast(ok ? '这条消息已复制。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error', 2000);
+  });
+  return button;
+}
+
+function renderStuckMarker(point, number) {
+  const marker = el('div', 'stuck-marker');
+  marker.dataset.stuckId = point.id;
+  const label = el('span', 'stuck-marker-label', `卡点 ${number}`);
+  const text = el('span', 'stuck-marker-text', '已标记，AI 老师写报告时会重点看这里');
+  marker.append(label, text);
+  return marker;
+}
+
+function renderStuckMarkers(points) {
+  const lastByAnchor = new Map();
+  (points || []).forEach((point, index) => {
+    const marker = renderStuckMarker(point, index + 1);
+    const anchor = point.messageId ? document.getElementById(`msg-${point.messageId}`) : null;
+    const target = anchor ? lastByAnchor.get(anchor) || anchor : null;
+    if (target) target.after(marker);
+    else refs.messageList.append(marker);
+    if (anchor) lastByAnchor.set(anchor, marker);
+  });
+}
+
+function appendStuckMarker(point, number) {
+  const last = visibleMessages().slice(-1)[0];
+  const marker = renderStuckMarker(point, number);
+  let target = last ? document.getElementById(`msg-${last.id}`) : null;
+  while (target?.nextElementSibling?.classList.contains('stuck-marker')) {
+    target = target.nextElementSibling;
+  }
+  if (target) target.after(marker);
+  else refs.messageList.append(marker);
+  return marker;
 }
 
 function appendMessageElement(message) {
@@ -2960,6 +3056,65 @@ function handleEndSession() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function handleUndoTurn() {
+  if (!store.session) return;
+  if (store.busy) {
+    toast('小问还在回复，等它说完再回退这一轮。', 'warm');
+    return;
+  }
+  const removed = store.undoLastTurn();
+  if (!removed?.length) {
+    toast('还没有可以回退的讲解。', 'warm');
+    return;
+  }
+  const userMessage = removed.find((message) => message.role === 'user');
+  if (userMessage) {
+    refs.messageInput.value = userMessage.content || '';
+    pendingImages = Array.isArray(userMessage.images)
+      ? userMessage.images.slice(0, APP.limits.maxImages)
+      : [];
+    renderPendingImages();
+    autoGrowMessage();
+    refs.messageInput.focus();
+  }
+  renderSession();
+  toast('已回退上一轮，讲解放回输入框，可以修改后重新发送。', 'success', 4600);
+}
+
+function handleMarkStuck() {
+  if (!store.session) return;
+  if (!visibleMessages().length) {
+    toast('先讲一段，再标记卡点。', 'warm');
+    return;
+  }
+  const last = visibleMessages().slice(-1)[0];
+  const point = store.addStuckPoint(last?.id || '');
+  if (!point) return;
+  const count = store.session.stuckPoints.length;
+  appendStuckMarker(point, count);
+  syncChrome();
+  scrollToBottom(true);
+  toast(`已标记卡点 ${count}，AI 老师写报告时会重点看这里。`, 'success', 4200);
+}
+
+function handleEndAndReport() {
+  if (!store.session) return;
+  if (store.busy || store.state.status === STATUS.EVALUATING) return;
+  if (humanTurnCount(store.session) < 1) {
+    toast('先向小问讲一段，再生成诊断报告。', 'warm');
+    refs.messageInput.focus();
+    return;
+  }
+  if (
+    !window.confirm(
+      '结束本次课堂并生成诊断报告？生成后本次对话会存入学习档案，你可以在报告里针对缺口重新开课。'
+    )
+  ) {
+    return;
+  }
+  handleCallTeacher();
+}
+
 function handleRestartGap(gap) {
   const title = String(gap?.title || '这个缺口').trim();
   const sourceSession = store.session;
@@ -3152,6 +3307,9 @@ function bindEvents() {
 
   refs.endSessionBtn.addEventListener('click', handleEndSession);
   refs.abandonSessionBtn?.addEventListener('click', handleAbandonSession);
+  refs.undoTurnBtn?.addEventListener('click', handleUndoTurn);
+  refs.markStuckBtn?.addEventListener('click', handleMarkStuck);
+  refs.endAndReportBtn?.addEventListener('click', handleEndAndReport);
   refs.startBtn.addEventListener('click', handleStart);
   refs.topicInput.addEventListener('input', autoGrowTopic);
   refs.topicInput.addEventListener('keydown', (event) => {
