@@ -3944,6 +3944,7 @@ body.is-chat .topbar-tagline {
 }
 
 .home-card {
+  position: relative;
   width: min(100%, 920px);
   margin: clamp(30px, 4vw, 46px) auto 0;
   padding: 16px;
@@ -4026,6 +4027,61 @@ body.is-chat .topbar-tagline {
 
 .home-card .remove-image {
   background: rgba(255, 255, 255, 0.94);
+}
+
+.home-card.is-dragover {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(31, 111, 92, 0.14), 0 20px 54px rgba(31, 42, 42, 0.08);
+}
+
+.home-card.is-dragover::after {
+  content: "松开鼠标，把题目图片放到这里";
+  position: absolute;
+  inset: 8px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--green);
+  border-radius: 16px;
+  background: rgba(240, 246, 242, 0.92);
+  color: var(--green-deep);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.ocr-status {
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.ocr-status.is-info {
+  border-color: rgba(31, 111, 92, 0.2);
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+.ocr-status.is-ok {
+  border-color: rgba(31, 111, 92, 0.24);
+  background: var(--green-soft);
+  color: var(--green-deep);
+}
+
+.ocr-status.is-error {
+  border-color: rgba(193, 91, 63, 0.24);
+  background: var(--coral-soft);
+  color: #8c3d28;
+}
+
+.ocr-status.is-busy {
+  border-style: dashed;
+  color: var(--muted);
 }
 
 .btn-start {
@@ -5409,6 +5465,18 @@ body.is-chat .topbar-tagline {
 [data-theme="dark"] .home-input {
   border-color: var(--line);
   background: var(--card);
+}
+
+[data-theme="dark"] .home-card.is-dragover::after {
+  background: rgba(23, 40, 34, 0.94);
+}
+
+[data-theme="dark"] .home-card .topic-image-preview {
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .ocr-status.is-error {
+  color: #f0b3a0;
 }
 
 [data-theme="dark"] .home-card .example-chip,

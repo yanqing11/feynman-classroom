@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261110i">
+  <link rel="stylesheet" href="./styles.css?v=20261110j">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -109,6 +109,7 @@
               <img id="topicImageThumb" alt="题目图片预览">
               <button class="icon-btn remove-image" id="removeTopicImage" type="button" aria-label="移除题目图片">×</button>
             </div>
+            <p class="ocr-status" id="ocrStatus" hidden role="status"></p>
 
             <div class="home-input-foot">
               <div class="topic-image-row">
@@ -123,7 +124,7 @@
                   拍照
                 </button>
                 <button class="btn btn-ghost btn-sm" id="recognizeBtn" type="button" hidden>识别文字</button>
-                <span class="image-hint" id="topicImageHint">支持 JPG / PNG，可手写拍照</span>
+                <span class="image-hint" id="topicImageHint">支持截图粘贴、拖拽上传；原图保存在本机，识别或发送时会交给你配置的 AI 模型；手写识别效果有限，识别后请校对文字</span>
               </div>
               <button class="btn btn-primary btn-start" id="startBtn" type="button">开始讲课</button>
             </div>
@@ -704,6 +705,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261110i"></script>
+  <script type="module" src="./app.js?v=20261110j"></script>
 </body>
 </html>

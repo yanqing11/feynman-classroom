@@ -46,6 +46,10 @@ import { deleteQuestion, listQuestions, saveQuestion } from './js/bank.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 
+const TOPIC_IMAGE_HINT =
+  '支持截图粘贴、拖拽上传；原图保存在本机，识别或发送时会交给你配置的 AI 模型；手写识别效果有限，识别后请校对文字';
+const TOPIC_IMAGE_READY_HINT = '已添加题目图片，可点「识别文字」自动转写，或直接开始讲课';
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -193,6 +197,8 @@ const refs = {
   topicImagePreview: $('#topicImagePreview'),
   topicImageThumb: $('#topicImageThumb'),
   removeTopicImage: $('#removeTopicImage'),
+  ocrStatus: $('#ocrStatus'),
+  homeCard: $('.home-card'),
   startBtn: $('#startBtn'),
   chatSub: $('#chatSub'),
   roundBadge: $('#roundBadge'),
@@ -1851,6 +1857,76 @@ async function compressImageFile(file) {
   }
 }
 
+function setOcrStatus(message, type = '') {
+  if (!refs.ocrStatus) return;
+  const text = String(message || '').trim();
+  if (!text) {
+    refs.ocrStatus.hidden = true;
+    refs.ocrStatus.textContent = '';
+    refs.ocrStatus.className = 'ocr-status';
+    return;
+  }
+  refs.ocrStatus.hidden = false;
+  refs.ocrStatus.textContent = text;
+  refs.ocrStatus.className = `ocr-status${type ? ` is-${type}` : ''}`;
+}
+
+function firstImageFile(fileList) {
+  for (const file of Array.from(fileList || [])) {
+    if (file && typeof file.type === 'string' && file.type.startsWith('image/')) return file;
+  }
+  return null;
+}
+
+function imageFileFromClipboard(clipboardData) {
+  if (!clipboardData) return null;
+  for (const item of Array.from(clipboardData.items || [])) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) return item.getAsFile();
+  }
+  return firstImageFile(clipboardData.files);
+}
+
+function isHomeVisible() {
+  return Boolean(refs.homeScreen && !refs.homeScreen.hidden);
+}
+
+function handleHomePaste(event) {
+  if (!isHomeVisible()) return;
+  const file = imageFileFromClipboard(event.clipboardData);
+  if (!file) return;
+  event.preventDefault();
+  handleTopicImage(file);
+}
+
+function handleHomeDragOver(event) {
+  if (!isHomeVisible()) return;
+  const types = Array.from(event.dataTransfer?.types || []);
+  if (!types.includes('Files')) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  refs.homeCard?.classList.add('is-dragover');
+}
+
+function handleHomeDragLeave(event) {
+  if (!refs.homeCard) return;
+  if (event.relatedTarget && refs.homeCard.contains(event.relatedTarget)) return;
+  refs.homeCard.classList.remove('is-dragover');
+}
+
+function handleHomeDrop(event) {
+  if (!isHomeVisible()) return;
+  const files = event.dataTransfer?.files;
+  if (!files || !files.length) return;
+  event.preventDefault();
+  refs.homeCard?.classList.remove('is-dragover');
+  const file = firstImageFile(files);
+  if (!file) {
+    toast('请拖入图片文件（JPG、PNG、WebP 等）。', 'warm');
+    return;
+  }
+  handleTopicImage(file);
+}
+
 async function handleTopicImage(file) {
   if (!file) return;
   try {
@@ -1858,7 +1934,8 @@ async function handleTopicImage(file) {
     topicImage = dataUrl;
     refs.topicImageThumb.src = dataUrl;
     refs.topicImagePreview.hidden = false;
-    refs.topicImageHint.textContent = '已添加题目图片，可点「识别文字」校对后开课';
+    refs.topicImageHint.textContent = TOPIC_IMAGE_READY_HINT;
+    setOcrStatus('图片已添加，原图会保留在预览里。可以点「识别文字」，也可以直接开始讲课。', 'info');
     setHomeSource('ocr');
     if (isTextOnlyModel(store.settings.model)) {
       warnTextOnlyModel();
@@ -1874,16 +1951,26 @@ function clearTopicImage() {
   topicImage = null;
   refs.topicImageThumb.removeAttribute('src');
   refs.topicImagePreview.hidden = true;
-  refs.topicImageHint.textContent = '支持 JPG / PNG，可手写拍照';
+  refs.topicImageHint.textContent = TOPIC_IMAGE_HINT;
+  setOcrStatus('');
   refs.topicImageInput.value = '';
   if (refs.topicCameraInput) refs.topicCameraInput.value = '';
   if (refs.recognizeBtn) refs.recognizeBtn.hidden = true;
   if (homeSource === 'ocr') setHomeSource('custom');
 }
 
+function describeOcrError(error) {
+  const status = error instanceof ApiError ? error.status : 0;
+  if (status === 401 || status === 403) return '连接没有通过，请检查 API Key 或模型权限。';
+  if (status === 402) return '模型额度不足，或当前模型不支持图片识别。';
+  if (status === 429) return '请求太频繁了，稍等一会儿再试。';
+  if (/无法连接到模型服务/.test(error?.message || '')) return '暂时连不上模型服务，请检查网络。';
+  return error?.message || '没有识别出文字，请换一张更清晰的图片。';
+}
+
 async function recognizeTopicImage() {
   if (!topicImage) {
-    toast('先上传或拍一张题目图片。', 'warm');
+    toast('先上传、粘贴或拖入一张题目图片。', 'warm');
     return;
   }
   if (!ensureKey()) return;
@@ -1896,15 +1983,26 @@ async function recognizeTopicImage() {
   const original = label.textContent;
   label.disabled = true;
   label.textContent = '识别中…';
+  setOcrStatus('正在识别图片里的题目，请稍等……', 'busy');
   try {
     const text = await recognizeProblem({ settings: store.settings, image: topicImage });
     refs.topicInput.value = text;
     autoGrowTopic();
     setHomeSource('ocr');
+    setOcrStatus('识别完成，题干已填入下方主题，可直接修改；原图保留在预览里。', 'ok');
     toast('识别完成，请先校对题干和公式，再开始讲课。', 'success', 6000);
     refs.topicInput.focus();
+    refs.topicInput.setSelectionRange(text.length, text.length);
   } catch (error) {
-    handleApiError(error, { openSettingsOnAuth: false });
+    if (isAbortError(error)) return;
+    const status = error instanceof ApiError ? error.status : 0;
+    if ([401, 402, 403, 429].includes(status) || /无法连接到模型服务/.test(error?.message || '')) {
+      connectionIssue = true;
+      renderConnection();
+    }
+    const message = describeOcrError(error);
+    setOcrStatus(`识别失败：${message} 原图已保留，你仍然可以手动输入题目，或换一张更清晰的图片再试。`, 'error');
+    toast('识别没有成功，不影响手动输入题目。', 'warm', 5000);
   } finally {
     label.disabled = false;
     label.textContent = original;
@@ -2704,7 +2802,7 @@ function loadBankQuestion(item, editing) {
     topicImage = null;
     refs.topicImageThumb.removeAttribute('src');
     refs.topicImagePreview.hidden = true;
-    refs.topicImageHint.textContent = '支持 JPG / PNG，可手写拍照';
+    refs.topicImageHint.textContent = TOPIC_IMAGE_HINT;
   }
   setHomeSource(item.source);
   autoGrowTopic();
@@ -3084,6 +3182,11 @@ function bindEvents() {
   });
   refs.recognizeBtn?.addEventListener('click', recognizeTopicImage);
   refs.removeTopicImage.addEventListener('click', clearTopicImage);
+
+  document.addEventListener('paste', handleHomePaste);
+  refs.homeCard?.addEventListener('dragover', handleHomeDragOver);
+  refs.homeCard?.addEventListener('dragleave', handleHomeDragLeave);
+  refs.homeCard?.addEventListener('drop', handleHomeDrop);
 
   refs.saveBankBtn?.addEventListener('click', handleSaveBank);
   refs.openBankBtn?.addEventListener('click', openBank);
