@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261112b">
+  <link rel="stylesheet" href="./styles.css?v=20261112c">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -240,6 +240,10 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M12 4h8l-2.5 4L20 12h-8"/></svg>
                 <span>标记卡点</span>
               </button>
+              <button class="fab-btn fab-btn-draft" id="draftMobileBtn" type="button" title="打开草稿板" aria-expanded="false" aria-controls="draftCard">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+                <span>草稿板</span>
+              </button>
               <button class="fab-btn fab-btn-primary" id="endAndReportBtn" type="button" title="结束课堂并生成诊断报告">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6"/><path d="M9 13h6"/><path d="M9 17h3"/></svg>
                 <span>结束并生成报告</span>
@@ -248,6 +252,28 @@
           </section>
 
           <aside class="side-panel">
+            <div class="side-card draft-card" id="draftCard">
+              <div class="side-card-head draft-head">
+                <div>
+                  <span class="side-kicker">DRAFT BOARD</span>
+                  <h3>草稿板</h3>
+                </div>
+                <button class="draft-toggle" id="draftToggleBtn" type="button" aria-expanded="true" aria-controls="draftBody" title="收起草稿板" aria-label="收起草稿板">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+              <div class="draft-body" id="draftBody">
+                <div class="draft-tabs" role="tablist" aria-label="草稿板模式">
+                  <button class="draft-tab is-active" id="draftEditTab" type="button" role="tab" aria-selected="true" aria-controls="draftInput" data-mode="edit">编辑</button>
+                  <button class="draft-tab" id="draftPreviewTab" type="button" role="tab" aria-selected="false" aria-controls="draftPreview" data-mode="preview">预览</button>
+                </div>
+                <label class="sr-only" for="draftInput">草稿内容</label>
+                <textarea id="draftInput" rows="4" maxlength="4000" placeholder="先把思路写在这里，比如：&#10;x^2 - 6x = -5&#10;两边加上 $9$，配成 $(x-3)^2 = 4$"></textarea>
+                <div class="draft-preview" id="draftPreview" role="tabpanel" aria-live="polite" hidden></div>
+                <p class="draft-hint" id="draftHint">支持 $x^2$、\frac{a}{b}、\sqrt{x} 等常见 LaTeX，切换「预览」查看排版。草稿只保存在本机。</p>
+              </div>
+            </div>
+
             <div class="side-card progress-card">
               <div class="side-card-head">
                 <span class="side-kicker">TEACHING CHECKLIST</span>
@@ -314,6 +340,7 @@
             </div>
           </aside>
         </div>
+        <button class="draft-scrim" id="draftScrim" type="button" aria-label="关闭草稿板" hidden></button>
       </section>
     </main>
 
@@ -734,6 +761,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261112b"></script>
+  <script type="module" src="./app.js?v=20261112c"></script>
 </body>
 </html>

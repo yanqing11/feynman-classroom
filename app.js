@@ -221,6 +221,16 @@ const refs = {
   endAndReportBtn: $('#endAndReportBtn'),
   stuckBadge: $('#stuckBadge'),
   composer: $('#composer'),
+  draftCard: $('#draftCard'),
+  draftToggleBtn: $('#draftToggleBtn'),
+  draftBody: $('#draftBody'),
+  draftInput: $('#draftInput'),
+  draftPreview: $('#draftPreview'),
+  draftEditTab: $('#draftEditTab'),
+  draftPreviewTab: $('#draftPreviewTab'),
+  draftHint: $('#draftHint'),
+  draftMobileBtn: $('#draftMobileBtn'),
+  draftScrim: $('#draftScrim'),
   pendingImages: $('#pendingImages'),
   messageInput: $('#messageInput'),
   chatImageInput: $('#chatImageInput'),
@@ -363,6 +373,9 @@ let speechBase = '';
 let renderedSessionId = null;
 let lastPersistenceWarning = '';
 let composerObserver = null;
+let draftState = { sessionId: '', text: '', open: true, mode: 'edit' };
+let draftSaveTimer = null;
+let draftDrawerOpen = false;
 let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
@@ -370,6 +383,43 @@ let historyFilter = { subject: 'all', source: 'all' };
 let historySelectMode = false;
 let historySelection = new Set();
 let bankFilter = { subject: 'all', source: 'all', query: '' };
+
+const DRAFT_SYMBOLS = {
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  theta: 'θ',
+  lambda: 'λ',
+  mu: 'μ',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  phi: 'φ',
+  omega: 'ω',
+  times: '×',
+  cdot: '·',
+  div: '÷',
+  pm: '±',
+  mp: '∓',
+  le: '≤',
+  leq: '≤',
+  ge: '≥',
+  geq: '≥',
+  neq: '≠',
+  approx: '≈',
+  infty: '∞',
+  to: '→',
+  rightarrow: '→',
+  leftarrow: '←',
+  angle: '∠',
+  triangle: '△',
+  degree: '°',
+  sum: '∑',
+  int: '∫'
+};
 
 /* -------------------------------------------------------------------------- */
 /* Bootstrap                                                                  */
@@ -386,6 +436,7 @@ function init() {
   setupSpeech();
   bindEvents();
   setupComposerObserver();
+  loadDraft();
   renderHistoryEntry();
   setHomeSource('custom');
 
@@ -755,6 +806,7 @@ function onStoreChange() {
 
   if (sessionId !== renderedSessionId) {
     renderedSessionId = sessionId;
+    syncDraftSession(sessionId);
     if (session) renderSession();
   }
 
@@ -791,8 +843,146 @@ function setupComposerObserver() {
   window.addEventListener('resize', syncFabOffset);
 }
 
+function readDraftRecord() {
+  try {
+    const raw = localStorage.getItem(APP.storage.draft);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function syncDraftSession(sessionId = store.session?.id || '') {
+  if (draftSaveTimer) {
+    clearTimeout(draftSaveTimer);
+    saveDraft();
+  }
+  const saved = readDraftRecord();
+  const same = saved && saved.sessionId === sessionId;
+  draftState = {
+    sessionId,
+    text: same && typeof saved.text === 'string' ? saved.text.slice(0, APP.limits.maxMessageChars) : '',
+    open: same ? saved.open !== false : true,
+    mode: same && saved.mode === 'preview' ? 'preview' : 'edit'
+  };
+  if (refs.draftInput) refs.draftInput.value = draftState.text;
+  applyDraftUI();
+}
+
+function loadDraft() {
+  syncDraftSession(store.session?.id || '');
+}
+
+function queueDraftSave() {
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveDraft, 220);
+}
+
+function saveDraft() {
+  draftSaveTimer = null;
+  try {
+    localStorage.setItem(APP.storage.draft, JSON.stringify(draftState));
+  } catch {
+    /* Draft is best-effort; never block teaching when storage is full. */
+  }
+}
+
+function applyDraftUI() {
+  if (!refs.draftCard) return;
+  const preview = draftState.mode === 'preview';
+  refs.draftCard.classList.toggle('is-collapsed', !draftState.open);
+  refs.draftBody.hidden = !draftState.open;
+  refs.draftToggleBtn.setAttribute('aria-expanded', String(draftState.open));
+  const toggleLabel = draftState.open ? '收起草稿板' : '展开草稿板';
+  refs.draftToggleBtn.title = toggleLabel;
+  refs.draftToggleBtn.setAttribute('aria-label', toggleLabel);
+  refs.draftToggleBtn.classList.toggle('is-collapsed', !draftState.open);
+
+  refs.draftInput.hidden = preview;
+  refs.draftPreview.hidden = !preview;
+  refs.draftEditTab.classList.toggle('is-active', !preview);
+  refs.draftPreviewTab.classList.toggle('is-active', preview);
+  refs.draftEditTab.setAttribute('aria-selected', String(!preview));
+  refs.draftPreviewTab.setAttribute('aria-selected', String(preview));
+  if (preview) renderDraftPreview();
+}
+
+function setDraftDrawer(open) {
+  const next = Boolean(open);
+  if (draftDrawerOpen === next) return;
+  draftDrawerOpen = next;
+  document.body.classList.toggle('draft-drawer-open', next);
+  refs.draftMobileBtn?.setAttribute('aria-expanded', String(next));
+  refs.draftMobileBtn?.setAttribute('title', next ? '收起草稿板' : '打开草稿板');
+  if (refs.draftScrim) refs.draftScrim.hidden = !next;
+  if (next) {
+    refs.draftInput?.focus({ preventScroll: true });
+  } else {
+    refs.draftMobileBtn?.focus({ preventScroll: true });
+  }
+}
+
+function escapeDraftHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function draftMathToHtml(raw) {
+  let text = escapeDraftHtml(raw).replace(/\\[()[\]]/g, '').replace(/\$/g, '');
+
+  text = text.replace(
+    /\\sqrt\s*\{([^{}]*)\}/g,
+    '<span class="math-sqrt"><span class="math-sqrt-symbol">√</span><span class="math-sqrt-body">$1</span></span>'
+  );
+
+  for (let round = 0; round < 4; round += 1) {
+    const before = text;
+    text = text.replace(/\^\{([^{}]*)\}/g, '<sup>$1</sup>');
+    text = text.replace(/_\{([^{}]*)\}/g, '<sub>$1</sub>');
+    if (before === text) break;
+  }
+
+  for (let round = 0; round < 6; round += 1) {
+    const before = text;
+    text = text.replace(
+      /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g,
+      '<span class="math-frac"><span class="math-frac-num">$1</span><span class="math-frac-den">$2</span></span>'
+    );
+    if (before === text) break;
+  }
+
+  text = text.replace(/\^([0-9a-zA-Z+\-])/g, '<sup>$1</sup>');
+  text = text.replace(/_([0-9a-zA-Z+\-])/g, '<sub>$1</sub>');
+  text = text.replace(/\\([a-zA-Z]+)/g, (match, name) => DRAFT_SYMBOLS[name] || match);
+  text = text.replace(/\\(left|right)/g, '');
+  text = text.replace(/\\[,;:!]/g, ' ');
+  return text;
+}
+
+function renderDraftPreview() {
+  if (!refs.draftPreview) return;
+  const source = refs.draftInput.value;
+  refs.draftPreview.replaceChildren();
+  if (!source.trim()) {
+    refs.draftPreview.append(el('p', 'draft-preview-empty', '草稿还是空的。先在「编辑」里写几行，再回来预览。'));
+    return;
+  }
+  const sheet = el('div', 'draft-sheet');
+  const lines = source.split('\n');
+  for (const line of lines) {
+    const row = el('p', `draft-line${line.trim() ? '' : ' is-empty'}`);
+    if (line.trim()) row.innerHTML = draftMathToHtml(line);
+    else row.append(document.createTextNode(' '));
+    sheet.append(row);
+  }
+  refs.draftPreview.append(sheet);
+}
+
 function showScreen(name) {
   const isChat = name === 'chat';
+  if (!isChat) setDraftDrawer(false);
   refs.homeScreen.hidden = isChat;
   refs.chatScreen.hidden = !isChat;
   document.body.classList.toggle('is-chat', isChat);
@@ -3614,6 +3804,43 @@ function bindEvents() {
     }
   });
 
+  refs.draftInput?.addEventListener('input', () => {
+    draftState.text = refs.draftInput.value.slice(0, APP.limits.maxMessageChars);
+    queueDraftSave();
+    if (draftState.mode === 'preview') renderDraftPreview();
+  });
+  refs.draftToggleBtn?.addEventListener('click', () => {
+    draftState.open = !draftState.open;
+    applyDraftUI();
+    queueDraftSave();
+  });
+  refs.draftMobileBtn?.addEventListener('click', () => {
+    setDraftDrawer(!draftDrawerOpen);
+  });
+  refs.draftScrim?.addEventListener('click', () => setDraftDrawer(false));
+  window.addEventListener('pagehide', saveDraft);
+  refs.draftEditTab?.addEventListener('click', () => {
+    draftState.mode = 'edit';
+    applyDraftUI();
+    queueDraftSave();
+    refs.draftInput?.focus({ preventScroll: true });
+  });
+  refs.draftPreviewTab?.addEventListener('click', () => {
+    draftState.text = refs.draftInput?.value || '';
+    draftState.mode = 'preview';
+    applyDraftUI();
+    queueDraftSave();
+  });
+  for (const tab of [refs.draftEditTab, refs.draftPreviewTab]) {
+    tab?.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      const next = draftState.mode === 'preview' ? refs.draftEditTab : refs.draftPreviewTab;
+      next?.click();
+      next?.focus({ preventScroll: true });
+    });
+  }
+
   refs.attachBtn.addEventListener('click', () => {
     if (!refs.attachBtn.disabled) refs.chatImageInput.click();
   });
@@ -3776,6 +4003,8 @@ function bindEvents() {
         closeLightbox();
       } else if (activeModalId) {
         closeModal(activeModalId);
+      } else if (draftDrawerOpen) {
+        setDraftDrawer(false);
       }
     }
     trapFocus(event);
@@ -3791,5 +4020,8 @@ function bindEvents() {
     renderConnection();
   });
 
-  window.addEventListener('resize', () => updateTopicToggle());
+  window.addEventListener('resize', () => {
+    updateTopicToggle();
+    if (draftDrawerOpen && window.innerWidth > 980) setDraftDrawer(false);
+  });
 }
