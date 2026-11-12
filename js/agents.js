@@ -301,7 +301,7 @@ export function normalizeReport(raw, session) {
   }
 
   const misconceptions = (Array.isArray(object.misconceptions) ? object.misconceptions : [])
-    .map((item) => normalizeItem(item, ['title', 'evidence', 'why', 'fix']))
+    .map((item) => normalizeItem(item, ['title', 'evidence', 'why', 'fix', 'exercise', 'nextGoal']))
     .filter(Boolean)
     .slice(0, 5);
 
@@ -322,6 +322,16 @@ export function normalizeReport(raw, session) {
       why: '对话轮数少时，很难判断是表达省略，还是理解上真的断了。',
       fix: '再讲 2–3 轮，把每一步的“为什么”说出来，再让老师看一次。'
     });
+  }
+
+  for (const gap of misconceptions) {
+    const title = gap.title || '这个缺口';
+    if (!gap.exercise) {
+      gap.exercise = `用 1 分钟把「${title}」重新讲一遍，并补上每一步的依据。`;
+    }
+    if (!gap.nextGoal) {
+      gap.nextGoal = `下一次讲课先补上「${title}」的依据，再进入新题。`;
+    }
   }
 
   if (!nextSteps.length) {

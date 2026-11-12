@@ -340,6 +340,7 @@ let studentAbort = null;
 let teacherAbort = null;
 let activeModalId = null;
 let lastFocused = null;
+let modalStack = [];
 let startAfterSettings = false;
 let connectionIssue = false;
 let currentReport = null;
@@ -1478,6 +1479,56 @@ function formatRecordMeta(record) {
   return parts.join(' · ');
 }
 
+function normalizeEvidence(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[\s“”"'‘’、，。；：！？,.!?;:（）()【】\[\]…—\-]/g, '');
+}
+
+function findEvidenceIndex(messages, evidence) {
+  const target = normalizeEvidence(evidence);
+  if (!target) return -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || message.role !== 'user') continue;
+    const text = normalizeEvidence(message.content);
+    if (!text) continue;
+    if (text.includes(target)) return index;
+    if (target.length >= 8) {
+      for (let start = 0; start + 8 <= target.length; start += 4) {
+        if (text.includes(target.slice(start, start + 8))) return index;
+      }
+    }
+  }
+  return -1;
+}
+
+function reportReplayRecord() {
+  if (currentReportRecord) return currentReportRecord;
+  if (!store.session) return null;
+  return {
+    topic: store.session.topic,
+    subject: store.session.subject,
+    difficulty: store.session.difficulty,
+    tags: store.session.tags,
+    source: store.session.source,
+    messages: store.session.messages
+      .filter((message) => !message.hidden && (message.role === 'user' || message.role === 'assistant'))
+      .map((message) => ({ role: message.role, content: message.content }))
+  };
+}
+
+function gapExerciseText(gap) {
+  if (gap.exercise) return gap.exercise;
+  if (gap.fix) return `照着「${gap.fix}」做一遍，再用自己的话复述这一步的依据。`;
+  return `用 1 分钟把「${gap.title || '这个缺口'}」重新讲一遍，并补上每一步的依据。`;
+}
+
+function gapNextGoalText(gap) {
+  if (gap.nextGoal) return gap.nextGoal;
+  return `下一次讲课先补上「${gap.title || '这个缺口'}」的依据，再进入新题。`;
+}
+
 function renderReport(report, topicOverride, meta = '') {
   const topic = topicOverride ?? store.session?.topic ?? '';
   refs.reportTopic.replaceChildren(document.createTextNode(topic));
@@ -1530,6 +1581,8 @@ function renderReport(report, topicOverride, meta = '') {
   }
 
   refs.misconceptionList.replaceChildren();
+  const replayRecord = reportReplayRecord();
+  const replayMessages = Array.isArray(replayRecord?.messages) ? replayRecord.messages : [];
   (report.misconceptions || []).forEach((gap, index) => {
     const card = el('article', 'misconception-card');
     card.append(el('span', 'gap-index', String(index + 1).padStart(2, '0')));
@@ -1549,10 +1602,39 @@ function renderReport(report, topicOverride, meta = '') {
       row.append(el('b', '', '怎么补'), el('span', '', gap.fix));
       body.append(row);
     }
+
+    const exercise = el('div', 'gap-action-box gap-exercise');
+    exercise.append(
+      el('span', 'gap-action-label', '1 分钟微练习'),
+      el('p', 'gap-action-text', gapExerciseText(gap))
+    );
+    body.append(exercise);
+
+    const goal = el('div', 'gap-action-box gap-goal');
+    goal.append(
+      el('span', 'gap-action-label', '下次讲课目标'),
+      el('p', 'gap-action-text', gapNextGoalText(gap))
+    );
+    body.append(goal);
+
+    const actions = el('div', 'gap-actions');
+    if (replayMessages.length) {
+      const focusIndex = findEvidenceIndex(replayMessages, gap.evidence);
+      const replay = el(
+        'button',
+        'btn btn-ghost btn-sm gap-replay',
+        focusIndex >= 0 ? '定位原对话' : '查看课堂回放'
+      );
+      replay.type = 'button';
+      replay.title = focusIndex >= 0 ? '跳到这条证据对应的对话位置' : '打开课堂回放查看完整对话';
+      replay.addEventListener('click', () => openReplay(replayRecord, { focusIndex }));
+      actions.append(replay);
+    }
     const restart = el('button', 'btn btn-outline btn-sm gap-restart', '针对缺口重新开课');
     restart.type = 'button';
     restart.addEventListener('click', () => handleRestartGap(gap));
-    body.append(restart);
+    actions.append(restart);
+    body.append(actions);
     card.append(body);
     refs.misconceptionList.append(card);
   });
@@ -2641,13 +2723,17 @@ function buildHistoryTranscript(record) {
   return block;
 }
 
-function buildTranscriptList(messages) {
+function buildTranscriptList(messages, { focusIndex = -1 } = {}) {
   const list = el('div', 'history-transcript-list');
   const names = { user: '你', assistant: '小问' };
 
   (Array.isArray(messages) ? messages : []).forEach((message, index) => {
     const role = message.role === 'assistant' ? 'assistant' : 'user';
     const row = el('div', `history-message history-message-${role}`);
+    if (index === focusIndex) {
+      row.classList.add('is-focus');
+      row.setAttribute('data-focus', 'true');
+    }
     const meta = el('div', 'history-message-meta');
     meta.append(el('span', 'history-message-name', names[role]));
     meta.append(el('span', 'history-message-index', String(index + 1)));
@@ -2659,21 +2745,35 @@ function buildTranscriptList(messages) {
   return list;
 }
 
-function openReplay(record) {
+function openReplay(record, { focusIndex = -1 } = {}) {
   if (!record) return;
   replayReturnHistory = Boolean(activeModalId === 'historyModal');
+  const stackOverReport = activeModalId === 'reportModal';
   refs.replayTitle.textContent = record.topic || '课堂回放';
   refs.replayMeta.textContent = formatRecordMeta(record);
   refs.replayList.replaceChildren();
   const messages = Array.isArray(record.messages) ? record.messages : [];
+  let focusRow = null;
   if (messages.length) {
-    refs.replayList.append(buildTranscriptList(messages));
+    const list = buildTranscriptList(messages, { focusIndex });
+    refs.replayList.append(list);
+    focusRow = list.querySelector('.history-message.is-focus');
     if (refs.replayNote) refs.replayNote.hidden = true;
   } else if (refs.replayNote) {
     refs.replayNote.hidden = false;
     refs.replayNote.textContent = '这节课的对话原文没有保存下来（可能是浏览器空间不足时被清理），但诊断报告仍然保留。';
   }
-  openModal('replayModal');
+  openModal('replayModal', { stack: stackOverReport });
+  if (focusRow) {
+    const list = focusRow.parentElement;
+    if (list && list.scrollHeight > list.clientHeight) {
+      list.scrollTop = Math.max(
+        0,
+        focusRow.offsetTop - list.clientHeight / 2 + focusRow.offsetHeight / 2
+      );
+    }
+    focusRow.classList.add('is-pulse');
+  }
 }
 
 function buildHistoryDetail(record) {
@@ -2928,7 +3028,7 @@ async function handleDeleteBankQuestion(item) {
 /* Modals & focus                                                             */
 /* -------------------------------------------------------------------------- */
 
-function openModal(id) {
+function openModal(id, { stack = false } = {}) {
   const layer = document.getElementById(id);
   if (!layer) return;
   if (activeModalId === id) {
@@ -2936,7 +3036,16 @@ function openModal(id) {
     return;
   }
   if (activeModalId && activeModalId !== id) {
-    closeModal(activeModalId);
+    if (stack) {
+      modalStack.push({
+        id: activeModalId,
+        focus: document.activeElement,
+        lastFocused
+      });
+    } else {
+      modalStack = [];
+      closeModal(activeModalId);
+    }
   }
   lastFocused = document.activeElement;
   layer.hidden = false;
@@ -2969,9 +3078,25 @@ function closeModal(id) {
 
   layer.hidden = true;
   if (activeModalId === id) {
-    activeModalId = null;
-    document.body.style.overflow = '';
-    lastFocused?.focus?.({ preventScroll: true });
+    const previous = modalStack.pop();
+    if (previous) {
+      activeModalId = previous.id;
+      lastFocused = previous.lastFocused || previous.focus || null;
+      document.body.style.overflow = 'hidden';
+      const previousLayer = document.getElementById(previous.id);
+      const previousModal = previousLayer?.querySelector('.modal');
+      requestAnimationFrame(() => {
+        if (previous.focus && previous.focus.isConnected && previous.focus.offsetParent !== null) {
+          previous.focus.focus({ preventScroll: true });
+        } else {
+          previousModal?.focus({ preventScroll: true });
+        }
+      });
+    } else {
+      activeModalId = null;
+      document.body.style.overflow = '';
+      lastFocused?.focus?.({ preventScroll: true });
+    }
   }
   if (returnToHistory) {
     renderHistory();

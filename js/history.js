@@ -304,6 +304,8 @@ export function reportToText(record) {
       if (item.evidence) lines.push(`   - 证据：${item.evidence}`);
       if (item.why) lines.push(`   - 为什么：${item.why}`);
       if (item.fix) lines.push(`   - 怎么补：${item.fix}`);
+      if (item.exercise) lines.push(`   - 1 分钟微练习：${item.exercise}`);
+      if (item.nextGoal) lines.push(`   - 下次讲课目标：${item.nextGoal}`);
     });
     lines.push('');
   }
