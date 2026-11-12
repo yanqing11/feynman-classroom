@@ -32,6 +32,7 @@ import {
   archiveSession,
   clearHistory,
   deleteRecord,
+  deleteRecords,
   loadHistory,
   reportToText,
   summarizeBySubject,
@@ -268,6 +269,12 @@ const refs = {
   historyTrendMeta: $('#historyTrendMeta'),
   historyDimensions: $('#historyDimensions'),
   historyList: $('#historyList'),
+  historySelectBtn: $('#historySelectBtn'),
+  historyBulkBar: $('#historyBulkBar'),
+  historyBulkCount: $('#historyBulkCount'),
+  historySelectAllBtn: $('#historySelectAllBtn'),
+  historyBulkDeleteBtn: $('#historyBulkDeleteBtn'),
+  historyBulkCancelBtn: $('#historyBulkCancelBtn'),
   replayModal: $('#replayModal'),
   replayTitle: $('#replayTitle'),
   replayMeta: $('#replayMeta'),
@@ -360,6 +367,8 @@ let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
 let historyFilter = { subject: 'all', source: 'all' };
+let historySelectMode = false;
+let historySelection = new Set();
 let bankFilter = { subject: 'all', source: 'all', query: '' };
 
 /* -------------------------------------------------------------------------- */
@@ -2346,6 +2355,8 @@ function renderHistoryEntry() {
 
 function openHistory() {
   openHistoryIds = new Set();
+  historySelectMode = false;
+  historySelection = new Set();
   reportFromArchive = false;
   currentReportRecord = null;
   replayReturnHistory = false;
@@ -2369,6 +2380,7 @@ function renderHistory() {
   renderTagStats(visible);
   renderHistoryTrend(visible, summary);
   renderHistoryDimensions(summary);
+  renderHistoryBulkBar(visible);
   renderHistoryList(visible);
 }
 
@@ -2635,6 +2647,73 @@ function formatArchiveDate(value) {
   )}:${pad(date.getMinutes())}`;
 }
 
+function renderHistoryBulkBar(records) {
+  if (!refs.historyBulkBar) return;
+  refs.historyBulkBar.hidden = !historySelectMode;
+  if (refs.historySelectBtn) {
+    refs.historySelectBtn.textContent = historySelectMode ? '退出选择' : '批量选择';
+    refs.historySelectBtn.setAttribute('aria-pressed', String(historySelectMode));
+  }
+  if (!historySelectMode) return;
+
+  const visibleIds = new Set(records.map((record) => record.id));
+  for (const id of [...historySelection]) {
+    if (!visibleIds.has(id)) historySelection.delete(id);
+  }
+  const count = historySelection.size;
+  if (refs.historyBulkCount) {
+    refs.historyBulkCount.textContent = count ? `已选 ${count} 条` : '还没有选择记录';
+  }
+  if (refs.historyBulkDeleteBtn) refs.historyBulkDeleteBtn.disabled = count === 0;
+  if (refs.historySelectAllBtn) {
+    const allSelected = records.length > 0 && count === records.length;
+    refs.historySelectAllBtn.textContent = allSelected ? '取消全选' : '全选本页';
+    refs.historySelectAllBtn.disabled = records.length === 0;
+  }
+}
+
+function setHistorySelectMode(on) {
+  historySelectMode = Boolean(on);
+  historySelection = new Set();
+  if (historySelectMode) openHistoryIds = new Set();
+  renderHistory();
+}
+
+function toggleHistorySelection(id) {
+  if (!id) return;
+  if (historySelection.has(id)) historySelection.delete(id);
+  else historySelection.add(id);
+  renderHistory();
+}
+
+function handleHistorySelectAll() {
+  const visible = filterHistoryRecords(loadHistory());
+  const allSelected = visible.length > 0 && visible.every((record) => historySelection.has(record.id));
+  historySelection = allSelected ? new Set() : new Set(visible.map((record) => record.id));
+  renderHistory();
+}
+
+function handleBulkDeleteHistory() {
+  const ids = [...historySelection];
+  if (!ids.length) {
+    toast('先选择要删除的记录。', 'warm');
+    return;
+  }
+  if (
+    !window.confirm(
+      `删除选中的 ${ids.length} 条学习记录？对应的诊断报告和对话回放也会一起删除，无法恢复。`
+    )
+  ) {
+    return;
+  }
+  const removed = deleteRecords(ids);
+  historySelection = new Set();
+  for (const id of ids) openHistoryIds.delete(id);
+  renderHistory();
+  renderHistoryEntry();
+  toast(`已删除 ${removed} 条学习记录。`, 'success', 2600);
+}
+
 function renderHistoryList(records) {
   refs.historyList.replaceChildren();
 
@@ -2646,10 +2725,21 @@ function renderHistoryList(records) {
   }
 
   for (const record of records) {
-    const item = el('article', `history-item${openHistoryIds.has(record.id) ? ' is-open' : ''}`);
+    const selected = historySelection.has(record.id);
+    const item = el(
+      'article',
+      `history-item${openHistoryIds.has(record.id) ? ' is-open' : ''}${
+        historySelectMode ? ' is-selectable' : ''
+      }${selected ? ' is-selected' : ''}`
+    );
+    const row = el('div', 'history-item-row');
     const main = el('button', 'history-item-main');
     main.type = 'button';
-    main.setAttribute('aria-expanded', String(openHistoryIds.has(record.id)));
+    if (historySelectMode) {
+      main.setAttribute('aria-pressed', String(selected));
+    } else {
+      main.setAttribute('aria-expanded', String(openHistoryIds.has(record.id)));
+    }
 
     const date = el('span', 'history-item-date', formatArchiveDate(record.endedAt));
     const body = el('div', 'history-item-body');
@@ -2658,10 +2748,16 @@ function renderHistoryList(records) {
     const subject = subjectInfo(record.subject);
     const difficulty = difficultyInfo(record.difficulty);
     const source = sourceInfo(record.source);
+    const persona = personaInfo(record.studentPersona);
     const chips = el('div', 'history-item-chips');
     if (subject) chips.append(el('span', 'topic-chip topic-chip-subject', subject.label));
     if (difficulty) chips.append(el('span', 'topic-chip topic-chip-difficulty', difficulty.label));
     if (record.source) chips.append(el('span', 'topic-chip topic-chip-source', source.label));
+    if (record.studentPersona) {
+      const chip = el('span', 'topic-chip topic-chip-persona', persona.label);
+      chip.title = `学生人设：${persona.label} · ${persona.prompt}`;
+      chips.append(chip);
+    }
     for (const tag of normalizeTags(record.tags)) {
       chips.append(el('span', 'topic-chip topic-chip-tag', tag));
     }
@@ -2694,13 +2790,29 @@ function renderHistoryList(records) {
 
     main.append(date, body, score);
     main.addEventListener('click', () => {
+      if (historySelectMode) {
+        toggleHistorySelection(record.id);
+        return;
+      }
       if (openHistoryIds.has(record.id)) openHistoryIds.delete(record.id);
       else openHistoryIds.add(record.id);
       renderHistoryList(filterHistoryRecords(loadHistory()));
     });
 
-    item.append(main);
-    if (openHistoryIds.has(record.id)) item.append(buildHistoryDetail(record));
+    row.append(main);
+    if (historySelectMode) {
+      const check = el('label', 'history-check');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = selected;
+      box.setAttribute('aria-label', `选择「${record.topic}」`);
+      box.addEventListener('change', () => toggleHistorySelection(record.id));
+      check.append(box);
+      row.prepend(check);
+    }
+
+    item.append(row);
+    if (!historySelectMode && openHistoryIds.has(record.id)) item.append(buildHistoryDetail(record));
     refs.historyList.append(item);
   }
 }
@@ -2858,6 +2970,7 @@ function handleDeleteRecord(record) {
   if (!window.confirm(`删除「${record.topic}」的学习记录？删除后无法恢复。`)) return;
   deleteRecord(record.id);
   openHistoryIds.delete(record.id);
+  historySelection.delete(record.id);
   renderHistory();
   renderHistoryEntry();
   toast('记录已删除。', 'success', 2400);
@@ -2868,6 +2981,8 @@ function handleClearHistory() {
   if (!window.confirm('清空全部学习档案？所有历史课时和诊断报告都会被删除，无法恢复。')) return;
   clearHistory();
   openHistoryIds = new Set();
+  historySelectMode = false;
+  historySelection = new Set();
   renderHistory();
   renderHistoryEntry();
   toast('学习档案已清空。', 'success', 2600);
@@ -3619,13 +3734,19 @@ function bindEvents() {
     if (!button) return;
     historyFilter.subject = button.dataset.subject || 'all';
     openHistoryIds = new Set();
+    historySelection = new Set();
     renderHistory();
   });
   refs.historySourceFilter?.addEventListener('change', () => {
     historyFilter.source = refs.historySourceFilter.value;
     openHistoryIds = new Set();
+    historySelection = new Set();
     renderHistory();
   });
+  refs.historySelectBtn?.addEventListener('click', () => setHistorySelectMode(!historySelectMode));
+  refs.historyBulkCancelBtn?.addEventListener('click', () => setHistorySelectMode(false));
+  refs.historySelectAllBtn?.addEventListener('click', handleHistorySelectAll);
+  refs.historyBulkDeleteBtn?.addEventListener('click', handleBulkDeleteHistory);
 
   refs.toggleKeyBtn.addEventListener('click', () => {
     const showing = refs.apiKeyInput.type === 'text';

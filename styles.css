@@ -3094,6 +3094,74 @@ input[type="range"] {
   scrollbar-color: var(--line-strong) transparent;
 }
 
+.history-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border: 1px dashed rgba(31, 111, 92, 0.32);
+  border-radius: 12px;
+  background: var(--green-pale);
+}
+
+.history-bulk-count {
+  color: var(--green-deep);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.history-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.history-bulk-actions .btn {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.history-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.history-item-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.history-check {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding-left: 14px;
+}
+
+.history-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.history-item.is-selectable .history-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-item.is-selected {
+  border-color: rgba(31, 111, 92, 0.46);
+  background: var(--green-pale);
+  box-shadow: 0 0 0 2px rgba(31, 111, 92, 0.1);
+}
+
 .history-item {
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -4748,6 +4816,12 @@ body.is-chat .topbar-tagline {
   border: 1px solid var(--line);
 }
 
+.topic-chip-persona {
+  border: 1px dashed rgba(31, 111, 92, 0.28);
+  background: rgba(31, 111, 92, 0.07);
+  color: var(--green-deep);
+}
+
 .topic-chip-tag {
   background: #eef2f7;
   color: #455a78;
@@ -5766,6 +5840,27 @@ body.is-chat .topbar-tagline {
   border-color: var(--line);
   background: var(--card-warm);
   color: var(--ink-soft);
+}
+
+[data-theme="dark"] .history-bulk-bar {
+  border-color: rgba(146, 224, 196, 0.3);
+  background: rgba(31, 111, 92, 0.14);
+}
+
+[data-theme="dark"] .history-bulk-count {
+  color: #8fd8bd;
+}
+
+[data-theme="dark"] .history-item.is-selected {
+  border-color: rgba(146, 224, 196, 0.44);
+  background: rgba(31, 111, 92, 0.2);
+  box-shadow: 0 0 0 2px rgba(146, 224, 196, 0.12);
+}
+
+[data-theme="dark"] .topic-chip-persona {
+  border-color: rgba(146, 224, 196, 0.26);
+  background: rgba(31, 111, 92, 0.18);
+  color: #8fd8bd;
 }
 
 [data-theme="dark"] .persona-option:hover {

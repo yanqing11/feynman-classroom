@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261112a">
+  <link rel="stylesheet" href="./styles.css?v=20261112b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -568,6 +568,15 @@
           </label>
         </div>
 
+        <div class="history-bulk-bar" id="historyBulkBar" hidden>
+          <span class="history-bulk-count" id="historyBulkCount" aria-live="polite">还没有选择记录</span>
+          <div class="history-bulk-actions">
+            <button class="btn btn-ghost btn-sm" id="historySelectAllBtn" type="button">全选本页</button>
+            <button class="btn btn-danger-ghost btn-sm" id="historyBulkDeleteBtn" type="button" disabled>删除所选</button>
+            <button class="btn btn-ghost btn-sm" id="historyBulkCancelBtn" type="button">退出选择</button>
+          </div>
+        </div>
+
         <section class="history-summary" id="historySummary"></section>
 
         <section class="history-block">
@@ -605,7 +614,10 @@
         <section class="history-block">
           <div class="history-section-head">
             <h3>历史课时</h3>
-            <button class="text-link" id="clearHistoryBtn" type="button">清空档案</button>
+            <div class="history-section-actions">
+              <button class="text-link" id="historySelectBtn" type="button" aria-pressed="false">批量选择</button>
+              <button class="text-link" id="clearHistoryBtn" type="button">清空档案</button>
+            </div>
           </div>
           <div class="history-list" id="historyList"></div>
         </section>
@@ -722,6 +734,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261112a"></script>
+  <script type="module" src="./app.js?v=20261112b"></script>
 </body>
 </html>

@@ -168,6 +168,15 @@ export function deleteRecord(id) {
   persist(loadHistory().filter((record) => record.id !== id));
 }
 
+export function deleteRecords(ids) {
+  const remove = new Set(Array.isArray(ids) ? ids : []);
+  if (!remove.size) return 0;
+  const history = loadHistory();
+  const kept = history.filter((record) => !remove.has(record.id));
+  persist(kept);
+  return history.length - kept.length;
+}
+
 export function clearHistory() {
   try {
     localStorage.removeItem(APP.storage.history);
