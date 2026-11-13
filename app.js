@@ -335,6 +335,14 @@ const refs = {
   exportDataBtn: $('#exportDataBtn'),
   clearArchiveDataBtn: $('#clearArchiveDataBtn'),
   storageUsage: $('#storageUsage'),
+  replayOnboardingBtn: $('#replayOnboardingBtn'),
+  onboardingModal: $('#onboardingModal'),
+  onboardingDots: $('#onboardingDots'),
+  onboardingSteps: $('#onboardingSteps'),
+  onboardingStatus: $('#onboardingStatus'),
+  onboardingPrevBtn: $('#onboardingPrevBtn'),
+  onboardingNextBtn: $('#onboardingNextBtn'),
+  onboardingSkipBtn: $('#onboardingSkipBtn'),
   personaPicker: $('#personaPicker'),
   homePersonaHint: $('#homePersonaHint'),
   chatSubjectSelect: $('#chatSubjectSelect'),
@@ -399,6 +407,8 @@ let currentReportRecord = null;
 let reportFromArchive = false;
 let replayReturnHistory = false;
 let openHistoryIds = new Set();
+let onboardingStep = 0;
+let onboardingStacked = false;
 let pad = null;
 let speech = null;
 let speechBase = '';
@@ -488,7 +498,7 @@ function init() {
 
   renderConnection();
   store.subscribe(onStoreChange);
-  maybeWelcome();
+  maybeOnboard();
 }
 
 function populateExamples() {
@@ -836,6 +846,109 @@ function maybeWelcome() {
   setTimeout(() => {
     toast('第一次来？点右上角「设置」填入 API Key，就可以开课了。', 'warm', 8500);
   }, 1400);
+}
+
+function onboardingSeen() {
+  try {
+    return Boolean(localStorage.getItem(APP.storage.onboarding));
+  } catch {
+    return false;
+  }
+}
+
+function markOnboardingSeen() {
+  try {
+    localStorage.setItem(APP.storage.onboarding, '1');
+  } catch {
+    /* Storage may be unavailable. */
+  }
+}
+
+function buildOnboardingDots() {
+  if (!refs.onboardingDots || refs.onboardingDots.childElementCount) return;
+  for (let index = 0; index < 4; index += 1) {
+    const dot = el('span', 'onboarding-dot');
+    dot.setAttribute('aria-hidden', 'true');
+    refs.onboardingDots.append(dot);
+  }
+}
+
+function renderOnboardingStep() {
+  buildOnboardingDots();
+  const steps = refs.onboardingSteps
+    ? Array.from(refs.onboardingSteps.querySelectorAll('.onboarding-step'))
+    : [];
+  const total = steps.length || 4;
+  onboardingStep = Math.max(0, Math.min(total - 1, onboardingStep));
+
+  steps.forEach((step, index) => {
+    const active = index === onboardingStep;
+    step.hidden = !active;
+    step.classList.toggle('is-active', active);
+  });
+
+  if (refs.onboardingDots) {
+    Array.from(refs.onboardingDots.children).forEach((dot, index) => {
+      dot.classList.toggle('is-active', index === onboardingStep);
+      dot.classList.toggle('is-done', index < onboardingStep);
+    });
+  }
+  if (refs.onboardingStatus) {
+    refs.onboardingStatus.textContent = `第 ${onboardingStep + 1} 步，共 ${total} 步`;
+  }
+  if (refs.onboardingPrevBtn) refs.onboardingPrevBtn.disabled = onboardingStep === 0;
+  if (refs.onboardingNextBtn) {
+    const last = onboardingStep === total - 1;
+    refs.onboardingNextBtn.textContent = last
+      ? onboardingStacked
+        ? '完成'
+        : '开始第一课'
+      : '下一步';
+  }
+}
+
+function openOnboarding({ stack = false } = {}) {
+  onboardingStep = 0;
+  onboardingStacked = stack;
+  renderOnboardingStep();
+  openModal('onboardingModal', { stack });
+}
+
+function handleOnboardingStep(delta) {
+  onboardingStep += delta;
+  renderOnboardingStep();
+}
+
+function finishOnboarding() {
+  markOnboardingSeen();
+  const stacked = onboardingStacked;
+  closeModal('onboardingModal');
+  onboardingStacked = false;
+  if (stacked) {
+    toast('新手引导看完了，随时可以在设置里重看。', 'success', 3000);
+    return;
+  }
+  showScreen('home');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => {
+    refs.topicInput?.focus({ preventScroll: true });
+    toast('先写一个想讲的知识点，再点「开始讲课」。', 'warm', 4200);
+  }, 260);
+}
+
+function maybeOnboard() {
+  if (store.session) {
+    maybeWelcome();
+    return;
+  }
+  if (onboardingSeen()) {
+    maybeWelcome();
+    return;
+  }
+  setTimeout(() => {
+    if (activeModalId || store.session) return;
+    openOnboarding();
+  }, 700);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3866,6 +3979,10 @@ function closeModal(id) {
   if (id === 'settingsModal') {
     startAfterSettings = false;
   }
+  if (id === 'onboardingModal') {
+    markOnboardingSeen();
+    setTimeout(() => maybeWelcome(), 600);
+  }
 
   layer.hidden = true;
   if (activeModalId === id) {
@@ -4215,6 +4332,20 @@ function bindEvents() {
     fillSettingsForm();
     openModal('settingsModal');
   });
+
+  refs.replayOnboardingBtn?.addEventListener('click', () => {
+    openOnboarding({ stack: true });
+  });
+  refs.onboardingPrevBtn?.addEventListener('click', () => handleOnboardingStep(-1));
+  refs.onboardingNextBtn?.addEventListener('click', () => {
+    const total = refs.onboardingSteps?.querySelectorAll('.onboarding-step').length || 4;
+    if (onboardingStep >= total - 1) {
+      finishOnboarding();
+      return;
+    }
+    handleOnboardingStep(1);
+  });
+  refs.onboardingSkipBtn?.addEventListener('click', () => closeModal('onboardingModal'));
 
   refs.historyBtn?.addEventListener('click', openHistory);
   refs.homeHistoryBtn?.addEventListener('click', openHistory);

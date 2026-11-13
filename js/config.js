@@ -11,6 +11,7 @@ export const APP = {
     session: 'feynman.session.v1',
     history: 'feynman.history.v1',
     welcomed: 'feynman.welcomed.v1',
+    onboarding: 'feynman.onboarding.v1',
     practice: 'feynman.practice.v1',
     bank: 'feynman.bank.v1',
     draft: 'feynman.draft.v1'

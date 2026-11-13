@@ -2975,6 +2975,7 @@ input[type="range"] {
 /* Settings: appearance and data management */
 
 .appearance-settings,
+.guide-settings,
 .data-settings {
   display: grid;
   gap: 11px;
@@ -2985,6 +2986,7 @@ input[type="range"] {
 }
 
 .appearance-settings legend,
+.guide-settings legend,
 .data-settings legend {
   padding: 0 7px;
   color: var(--green-deep);
@@ -6844,5 +6846,240 @@ body.is-chat .topbar-tagline {
     flex-basis: auto;
     width: 100%;
     min-height: 42px;
+  }
+
+  .guide-settings .btn {
+    width: 100%;
+    min-height: 42px;
+  }
+}
+
+/* ==========================================================================
+   P2-4 first-use onboarding
+   ========================================================================== */
+
+.guide-settings .btn {
+  justify-self: start;
+}
+
+.onboarding-modal {
+  width: min(620px, 100%);
+  max-width: 620px;
+  max-height: calc(100dvh - clamp(24px, 6vw, 56px));
+  padding: 30px clamp(20px, 4vw, 36px) 24px;
+}
+
+.onboarding-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.onboarding-head h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(25px, 4vw, 33px);
+  font-weight: 600;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+
+.onboarding-head > div > p:last-child {
+  margin: 8px 0 0;
+  max-width: 470px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.onboarding-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 18px;
+}
+
+.onboarding-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: width 0.2s var(--ease), background 0.2s ease, opacity 0.2s ease;
+}
+
+.onboarding-dot.is-done {
+  background: var(--green);
+  opacity: 0.48;
+}
+
+.onboarding-dot.is-active {
+  width: 24px;
+  background: var(--green);
+  opacity: 1;
+}
+
+.onboarding-steps {
+  min-height: 214px;
+}
+
+.onboarding-step {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  animation: onboarding-step-in 0.28s var(--ease);
+}
+
+.onboarding-step[hidden] {
+  display: none;
+}
+
+@keyframes onboarding-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  background: var(--green-pale);
+  color: var(--green-deep);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.onboarding-copy h3 {
+  margin: 0 0 7px;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.onboarding-copy p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.onboarding-copy .onboarding-tip {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.onboarding-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.onboarding-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding-note {
+  margin: 12px 0 0;
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+[data-theme="dark"] .onboarding-step {
+  border-color: var(--line);
+  background: var(--card);
+}
+
+[data-theme="dark"] .onboarding-mark {
+  background: rgba(146, 224, 196, 0.12);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .onboarding-dot {
+  background: var(--line-strong);
+}
+
+[data-theme="dark"] .onboarding-dot.is-done {
+  background: var(--green);
+}
+
+[data-theme="dark"] .onboarding-dot.is-active {
+  background: var(--green);
+}
+
+@media (max-width: 520px) {
+  .onboarding-modal {
+    padding: 22px 16px 18px;
+  }
+
+  .onboarding-head h2 {
+    font-size: 24px;
+  }
+
+  .onboarding-head > div > p:last-child {
+    font-size: 11.5px;
+  }
+
+  .onboarding-steps {
+    min-height: 0;
+  }
+
+  .onboarding-step {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 15px;
+  }
+
+  .onboarding-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+
+  .onboarding-copy h3 {
+    font-size: 17px;
+  }
+
+  .onboarding-copy p {
+    font-size: 12.5px;
+  }
+
+  .onboarding-actions {
+    flex-wrap: wrap;
+  }
+
+  .onboarding-actions-right {
+    flex: 1;
+  }
+
+  .onboarding-actions-right .btn {
+    flex: 1;
+  }
+
+  .onboarding-note {
+    text-align: left;
   }
 }

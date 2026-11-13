@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261113a">
+  <link rel="stylesheet" href="./styles.css?v=20261113b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -519,6 +519,12 @@
           </div>
         </fieldset>
 
+        <fieldset class="guide-settings">
+          <legend>新手引导</legend>
+          <p class="field-hint">第一次来？四步弄清这间教室怎么用。以后想复习也可以随时重看。</p>
+          <button class="btn btn-outline btn-sm" id="replayOnboardingBtn" type="button">再看一次新手引导</button>
+        </fieldset>
+
         <fieldset class="data-settings">
           <legend>数据管理</legend>
           <p class="field-hint">所有配置、课堂与档案只保存在当前浏览器，不会上传服务器；无痕模式或清理浏览器缓存会丢失全部本地数据，请定期导出 JSON 备份。</p>
@@ -564,6 +570,68 @@
           本站不上传、不收集、不记录你的 Key。清除浏览器数据会同时清除 Key、课堂和全部学习档案。
         </p>
       </form>
+    </div>
+  </div>
+
+  <!-- ============ FIRST-USE ONBOARDING ============ -->
+  <div class="modal-layer" id="onboardingModal" hidden>
+    <div class="modal-backdrop" data-close="onboardingModal"></div>
+    <div class="modal onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle" tabindex="-1">
+      <div class="onboarding-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>FIRST CLASS</p>
+          <h2 id="onboardingTitle">先花 30 秒，弄清这间教室</h2>
+          <p>这里的老师是你，AI 是学生。讲得越清楚，课后诊断越准确。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="onboardingModal" type="button" aria-label="关闭新手引导">×</button>
+      </div>
+
+      <div class="onboarding-progress" id="onboardingDots" aria-hidden="true"></div>
+      <p class="sr-only" id="onboardingStatus" aria-live="polite">第 1 步，共 4 步</p>
+
+      <div class="onboarding-steps" id="onboardingSteps">
+        <section class="onboarding-step is-active" data-step="0">
+          <span class="onboarding-mark" aria-hidden="true">讲</span>
+          <div class="onboarding-copy">
+            <h3>你来当老师</h3>
+            <p>选一个数学知识点，像给同学讲题一样，把思路一步步说清楚。不需要写得很正式，讲人话就行。</p>
+            <p class="onboarding-tip">支持文字、图片、手写板和语音输入。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="1" hidden>
+          <span class="onboarding-mark" aria-hidden="true">问</span>
+          <div class="onboarding-copy">
+            <h3>AI 学生只提问，不替你算</h3>
+            <p>它会追问「为什么」「这一步怎么来的」，但不会给答案、不会判断对错，也不会自己推理。所有解释都得由你给出。</p>
+            <p class="onboarding-tip">默认是刨根问底型，可以在首页切换人设和追问强度。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="2" hidden>
+          <span class="onboarding-mark" aria-hidden="true">停</span>
+          <div class="onboarding-copy">
+            <h3>卡住时别硬撑</h3>
+            <p>课堂右下角有悬浮控制条：可以点「我卡住了」留下卡点，也可以复制某条消息、打开草稿板，把思路先写下来。</p>
+            <p class="onboarding-tip">草稿板支持 LaTeX 预览，手机上也能从侧边抽屉打开。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="3" hidden>
+          <span class="onboarding-mark" aria-hidden="true">评</span>
+          <div class="onboarding-copy">
+            <h3>下课后，拿一份诊断报告</h3>
+            <p>结束课堂会生成五维评分、薄弱点和下一步练习建议，并自动存进学习档案。每一课都能回放，也能看到长期变化。</p>
+            <p class="onboarding-tip">开课前可以在右上角「设置」里填入自己的 API Key。</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="onboarding-actions">
+        <button class="btn btn-ghost btn-sm" id="onboardingSkipBtn" type="button">跳过引导</button>
+        <div class="onboarding-actions-right">
+          <button class="btn btn-outline btn-sm" id="onboardingPrevBtn" type="button">上一步</button>
+          <button class="btn btn-primary btn-sm" id="onboardingNextBtn" type="button">下一步</button>
+        </div>
+      </div>
+      <p class="onboarding-note">以后可以在「设置 → 新手引导」里再看一次。</p>
     </div>
   </div>
 
@@ -808,6 +876,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261113a"></script>
+  <script type="module" src="./app.js?v=20261113b"></script>
 </body>
 </html>
