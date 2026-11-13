@@ -5386,6 +5386,69 @@ body.is-chat .topbar-tagline {
   line-height: 1.65;
 }
 
+.bank-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-deep);
+}
+
+.bank-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.16s var(--ease),
+    color 0.16s var(--ease);
+}
+
+.bank-tab:hover {
+  color: var(--ink);
+}
+
+.bank-tab.is-active {
+  background: var(--card);
+  color: var(--green-deep);
+  box-shadow: var(--shadow-sm);
+}
+
+.bank-tab:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.bank-tab-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.bank-tab:not(.is-active) .bank-tab-count {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--faint);
+}
+
 .bank-toolbar {
   display: flex;
   gap: 8px;
@@ -5412,6 +5475,19 @@ body.is-chat .topbar-tagline {
   border-radius: 10px;
   background: var(--card);
   color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.bank-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bank-actions .btn {
+  min-height: 36px;
+  padding: 7px 11px;
   font-size: 11.5px;
 }
 
@@ -5515,6 +5591,16 @@ body.is-chat .topbar-tagline {
   margin-top: 9px;
 }
 
+.bank-item-actions .btn:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.bank-item-actions .btn.is-saved {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
 .bank-empty {
   padding: 30px 16px 26px;
   text-align: center;
@@ -5541,6 +5627,47 @@ body.is-chat .topbar-tagline {
   font-size: 10.5px;
   line-height: 1.6;
   text-align: center;
+}
+
+@media (max-width: 760px) {
+  .bank-modal {
+    padding: 24px 16px 22px;
+  }
+
+  .bank-head h2 {
+    font-size: 25px;
+  }
+
+  .bank-head p {
+    font-size: 11.5px;
+  }
+
+  .bank-list {
+    max-height: 46vh;
+  }
+
+  .bank-actions {
+    width: 100%;
+  }
+
+  .bank-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .bank-tab {
+    padding: 8px 6px;
+    font-size: 11.5px;
+  }
+
+  .bank-tab-count {
+    padding: 1px 5px;
+  }
+
+  .bank-item {
+    padding: 12px;
+  }
 }
 
 @media (max-width: 760px) {
@@ -5604,7 +5731,9 @@ body.is-chat .topbar-tagline {
   }
 
   .bank-toolbar select,
-  .bank-search {
+  .bank-search,
+  .bank-actions {
+    flex: 0 0 auto;
     width: 100%;
   }
 }
@@ -6215,6 +6344,35 @@ body.is-chat .topbar-tagline {
 
 [data-theme="dark"] .draft-scrim {
   background: rgba(4, 8, 7, 0.62);
+}
+
+[data-theme="dark"] .bank-tabs {
+  background: rgba(17, 22, 20, 0.72);
+}
+
+[data-theme="dark"] .bank-tab.is-active {
+  background: var(--card-warm);
+  color: var(--green-deep);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .bank-tab-count {
+  background: var(--green-soft);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .bank-tab:not(.is-active) .bank-tab-count {
+  border-color: var(--line-strong);
+  background: transparent;
+}
+
+[data-theme="dark"] .bank-item-difficulty {
+  color: var(--gold);
+}
+
+[data-theme="dark"] .bank-item-source {
+  background: var(--paper-deep);
+  color: var(--muted);
 }
 
 [data-theme="dark"] .classroom-fab {

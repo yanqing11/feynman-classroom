@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261112c">
+  <link rel="stylesheet" href="./styles.css?v=20261112f">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -130,6 +130,7 @@
             </div>
 
             <div class="home-bank-row">
+              <button class="text-link" id="openBankSquareBtn" type="button">题库广场</button>
               <button class="text-link" id="saveBankBtn" type="button">存入我的题库</button>
               <button class="text-link" id="openBankBtn" type="button">我的题库</button>
               <span class="home-source-note" id="sourceNote"></span>
@@ -671,17 +672,26 @@
     </div>
   </div>
 
-  <!-- ============ MY QUESTION BANK ============ -->
+  <!-- ============ QUESTION SQUARE / MY BANK ============ -->
   <div class="modal-layer" id="bankModal" hidden>
     <div class="modal-backdrop" data-close="bankModal"></div>
     <div class="modal bank-modal" role="dialog" aria-modal="true" aria-labelledby="bankTitle" tabindex="-1">
       <div class="bank-head">
         <div>
-          <p class="eyebrow"><span class="eyebrow-line"></span>MY QUESTION BANK</p>
-          <h2 id="bankTitle">我的题库</h2>
-          <p>手动录入和拍照识别的题目都存在本机，可以随时找回、修改或删除。</p>
+          <p class="eyebrow"><span class="eyebrow-line"></span>QUESTION SQUARE</p>
+          <h2 id="bankTitle">题库广场</h2>
+          <p id="bankIntro">按学科挑一道现成的数学题，直接开讲；也可以先存进自己的题库再改。</p>
         </div>
-        <button class="icon-btn modal-close" data-close="bankModal" type="button" aria-label="关闭我的题库">×</button>
+        <button class="icon-btn modal-close" data-close="bankModal" type="button" aria-label="关闭题库">×</button>
+      </div>
+
+      <div class="bank-tabs" role="tablist" aria-label="题库视图">
+        <button class="bank-tab is-active" id="bankTabSquare" type="button" role="tab" aria-selected="true" aria-controls="bankList">
+          题库广场<span class="bank-tab-count" id="bankSquareCount">0</span>
+        </button>
+        <button class="bank-tab" id="bankTabMine" type="button" role="tab" aria-selected="false" aria-controls="bankList">
+          我的题库<span class="bank-tab-count" id="bankMineCount">0</span>
+        </button>
       </div>
 
       <div class="bank-toolbar">
@@ -691,17 +701,23 @@
         </label>
         <select id="bankSubjectFilter" aria-label="按学科筛选"></select>
         <select id="bankSourceFilter" aria-label="按来源筛选"></select>
+        <div class="bank-actions" id="bankMineActions" hidden>
+          <button class="btn btn-ghost btn-sm" id="bankImportBtn" type="button">导入备份</button>
+          <button class="btn btn-ghost btn-sm" id="bankExportBtn" type="button">导出题库</button>
+          <input id="bankImportInput" type="file" accept="application/json,.json" hidden>
+        </div>
       </div>
 
       <div class="bank-empty" id="bankEmpty" hidden>
         <div class="history-empty-mark" aria-hidden="true">题</div>
-        <h3>题库还是空的</h3>
-        <p>在首页输入题目后点「存入我的题库」，或拍一张题目照片识别后保存。</p>
+        <h3 id="bankEmptyTitle">题库还是空的</h3>
+        <p id="bankEmptyText">在首页输入题目后点「存入我的题库」，或拍一张题目照片识别后保存。</p>
+        <button class="btn btn-outline btn-sm" id="bankEmptyAction" type="button">去题库广场挑一道</button>
       </div>
 
-      <div class="bank-list" id="bankList"></div>
+      <div class="bank-list" id="bankList" role="tabpanel" aria-labelledby="bankTabSquare"></div>
 
-      <p class="bank-note">题库和图片只保存在当前浏览器。清除浏览器数据会同时清除题库。</p>
+      <p class="bank-note" id="bankNote">题库和图片只保存在当前浏览器。清除浏览器数据会同时清除题库。</p>
     </div>
   </div>
 
@@ -761,6 +777,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261112c"></script>
+  <script type="module" src="./app.js?v=20261112f"></script>
 </body>
 </html>

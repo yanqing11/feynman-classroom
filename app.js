@@ -1,5 +1,6 @@
 import {
   APP,
+  BUILTIN_QUESTIONS,
   DIFFICULTIES,
   INTENSITIES,
   METRICS,
@@ -39,7 +40,14 @@ import {
   summarizeHistory,
   summarizeTags
 } from './js/history.js';
-import { deleteQuestion, listQuestions, saveQuestion } from './js/bank.js';
+import {
+  buildQuestionsExport,
+  deleteQuestion,
+  importQuestions,
+  listQuestions,
+  questionKey,
+  saveQuestion
+} from './js/bank.js';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -194,6 +202,7 @@ const refs = {
   recognizeBtn: $('#recognizeBtn'),
   saveBankBtn: $('#saveBankBtn'),
   openBankBtn: $('#openBankBtn'),
+  openBankSquareBtn: $('#openBankSquareBtn'),
   topicImageHint: $('#topicImageHint'),
   topicImagePreview: $('#topicImagePreview'),
   topicImageThumb: $('#topicImageThumb'),
@@ -325,11 +334,25 @@ const refs = {
   chatModeSelect: $('#chatModeSelect'),
   practiceLockHint: $('#practiceLockHint'),
   bankModal: $('#bankModal'),
+  bankTitle: $('#bankTitle'),
+  bankIntro: $('#bankIntro'),
+  bankTabSquare: $('#bankTabSquare'),
+  bankTabMine: $('#bankTabMine'),
+  bankSquareCount: $('#bankSquareCount'),
+  bankMineCount: $('#bankMineCount'),
   bankSearch: $('#bankSearch'),
   bankSubjectFilter: $('#bankSubjectFilter'),
   bankSourceFilter: $('#bankSourceFilter'),
+  bankMineActions: $('#bankMineActions'),
+  bankImportBtn: $('#bankImportBtn'),
+  bankExportBtn: $('#bankExportBtn'),
+  bankImportInput: $('#bankImportInput'),
   bankEmpty: $('#bankEmpty'),
+  bankEmptyTitle: $('#bankEmptyTitle'),
+  bankEmptyText: $('#bankEmptyText'),
+  bankEmptyAction: $('#bankEmptyAction'),
   bankList: $('#bankList'),
+  bankNote: $('#bankNote'),
   handwritingModal: $('#handwritingModal'),
   handwritingCanvas: $('#handwritingCanvas'),
   padPlaceholder: $('#padPlaceholder'),
@@ -383,6 +406,7 @@ let historyFilter = { subject: 'all', source: 'all' };
 let historySelectMode = false;
 let historySelection = new Set();
 let bankFilter = { subject: 'all', source: 'all', query: '' };
+let bankView = 'square';
 
 const DRAFT_SYMBOLS = {
   alpha: 'α',
@@ -3182,6 +3206,23 @@ function handleClearHistory() {
 /* Custom question bank                                                       */
 /* -------------------------------------------------------------------------- */
 
+const BANK_COPY = {
+  square: {
+    title: '题库广场',
+    intro: '按学科挑一道现成的数学题，直接开讲；也可以先存进自己的题库再改。',
+    note: '广场题目来自内置精选题库，不占用你的题库空间。点「用这道题」即可载入首页。',
+    placeholder: '搜索题干或知识点',
+    panel: 'bankTabSquare'
+  },
+  mine: {
+    title: '我的题库',
+    intro: '手动录入、拍照识别和从广场保存的题目都存在本机，可以随时找回、修改或删除。',
+    note: '题库和图片只保存在当前浏览器。建议定期导出 JSON 备份；清除浏览器数据会同时清除题库。',
+    placeholder: '搜索题干、知识点或备注',
+    panel: 'bankTabMine'
+  }
+};
+
 async function handleSaveBank() {
   const topic = refs.topicInput.value.trim();
   if (!topic) {
@@ -3191,15 +3232,23 @@ async function handleSaveBank() {
   }
   try {
     const wasEditing = Boolean(bankEditingId);
+    const subject = store.practice.subject;
+    if (!wasEditing) {
+      bankCache = await listQuestions();
+      if (bankCache.some((entry) => questionKey(entry) === questionKey({ topic, subject }))) {
+        toast('这道题已经在我的题库里了，去「我的题库」可以编辑。', 'warm', 3600);
+        return;
+      }
+    }
     const item = await saveQuestion({
       id: bankEditingId || undefined,
       topic,
-      subject: store.practice.subject,
+      subject,
       difficulty: refs.difficultySelect?.value || store.practice.difficulty,
       tags: parseTags(refs.tagInput?.value),
       note: refs.noteInput?.value.trim() || '',
       image: topicImage || '',
-      source: homeSource === 'ocr' ? 'ocr' : 'custom'
+      source: homeSource === 'ocr' ? 'ocr' : homeSource === 'builtin' ? 'builtin' : 'custom'
     });
     bankEditingId = wasEditing ? item.id : '';
     setHomeSource(item.source);
@@ -3210,58 +3259,173 @@ async function handleSaveBank() {
   }
 }
 
-async function openBank() {
+function syncBankFilterInputs() {
+  if (refs.bankSearch) refs.bankSearch.value = bankFilter.query;
+  if (refs.bankSubjectFilter) refs.bankSubjectFilter.value = bankFilter.subject;
+  if (refs.bankSourceFilter) refs.bankSourceFilter.value = bankFilter.source;
+}
+
+async function openBank(view = 'mine') {
+  bankView = view === 'square' ? 'square' : 'mine';
   bankFilter = { ...bankFilter, query: '' };
-  if (refs.bankSearch) refs.bankSearch.value = '';
-  refs.bankSubjectFilter.value = bankFilter.subject;
-  refs.bankSourceFilter.value = bankFilter.source;
+  syncBankFilterInputs();
   try {
     bankCache = await listQuestions();
   } catch (error) {
     toast(error.message || '题库读取失败。', 'error');
     bankCache = [];
   }
-  renderBankList();
+  renderBank();
   openModal('bankModal');
+  requestAnimationFrame(() => refs.bankSearch?.focus({ preventScroll: true }));
+}
+
+function switchBankView(view, { focus = false } = {}) {
+  if (!BANK_COPY[view]) return;
+  bankView = view;
+  renderBank();
+  if (focus) {
+    (view === 'mine' ? refs.bankTabMine : refs.bankTabSquare)?.focus({ preventScroll: true });
+  }
+}
+
+function handleBankTabKeydown(event) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  switchBankView(bankView === 'square' ? 'mine' : 'square', { focus: true });
+}
+
+function renderBankChrome() {
+  const copy = BANK_COPY[bankView] || BANK_COPY.mine;
+  const isMine = bankView === 'mine';
+  if (refs.bankTitle) refs.bankTitle.textContent = copy.title;
+  if (refs.bankIntro) refs.bankIntro.textContent = copy.intro;
+  if (refs.bankNote) refs.bankNote.textContent = copy.note;
+  if (refs.bankSearch) refs.bankSearch.placeholder = copy.placeholder;
+  if (refs.bankSquareCount) refs.bankSquareCount.textContent = String(BUILTIN_QUESTIONS.length);
+  if (refs.bankMineCount) refs.bankMineCount.textContent = String(bankCache.length);
+
+  if (refs.bankTabSquare) {
+    refs.bankTabSquare.classList.toggle('is-active', !isMine);
+    refs.bankTabSquare.setAttribute('aria-selected', String(!isMine));
+    refs.bankTabSquare.tabIndex = isMine ? -1 : 0;
+  }
+  if (refs.bankTabMine) {
+    refs.bankTabMine.classList.toggle('is-active', isMine);
+    refs.bankTabMine.setAttribute('aria-selected', String(isMine));
+    refs.bankTabMine.tabIndex = isMine ? 0 : -1;
+  }
+  if (refs.bankSourceFilter) refs.bankSourceFilter.hidden = !isMine;
+  if (refs.bankMineActions) refs.bankMineActions.hidden = !isMine;
+  if (refs.bankList) refs.bankList.setAttribute('aria-labelledby', copy.panel);
+}
+
+function renderBank() {
+  renderBankChrome();
+  renderBankList();
+}
+
+function renderBankEmptyState(count) {
+  if (!refs.bankEmpty) return;
+  refs.bankEmpty.hidden = count > 0;
+  if (count > 0) return;
+
+  const hasFilter =
+    Boolean(bankFilter.query.trim()) ||
+    bankFilter.subject !== 'all' ||
+    (bankView === 'mine' && bankFilter.source !== 'all');
+
+  if (bankView === 'square') {
+    if (refs.bankEmptyTitle) refs.bankEmptyTitle.textContent = '没有找到匹配的题';
+    if (refs.bankEmptyText) refs.bankEmptyText.textContent = '换个关键词或学科，或者清空筛选看看全部题目。';
+    if (refs.bankEmptyAction) refs.bankEmptyAction.textContent = '清空筛选';
+  } else if (!bankCache.length) {
+    if (refs.bankEmptyTitle) refs.bankEmptyTitle.textContent = '题库还是空的';
+    if (refs.bankEmptyText) {
+      refs.bankEmptyText.textContent = '在首页输入题目后点「存入我的题库」，也可以先去题库广场挑一道。';
+    }
+    if (refs.bankEmptyAction) refs.bankEmptyAction.textContent = '去题库广场挑一道';
+  } else {
+    if (refs.bankEmptyTitle) refs.bankEmptyTitle.textContent = '没有找到匹配的题';
+    if (refs.bankEmptyText) refs.bankEmptyText.textContent = '换个关键词、学科或来源，或者清空筛选。';
+    if (refs.bankEmptyAction) refs.bankEmptyAction.textContent = '清空筛选';
+  }
+  if (refs.bankEmptyAction) refs.bankEmptyAction.hidden = !hasFilter && bankView === 'square';
 }
 
 function renderBankList() {
   if (!refs.bankList) return;
   refs.bankList.replaceChildren();
+
+  const base =
+    bankView === 'square'
+      ? BUILTIN_QUESTIONS.map((item) => ({ ...item, source: 'builtin' }))
+      : bankCache;
   const query = bankFilter.query.trim().toLowerCase();
-  const items = bankCache.filter((item) => {
+  const items = base.filter((item) => {
     if (bankFilter.subject !== 'all' && item.subject !== bankFilter.subject) return false;
-    if (bankFilter.source !== 'all' && item.source !== bankFilter.source) return false;
+    if (bankView === 'mine' && bankFilter.source !== 'all' && item.source !== bankFilter.source) {
+      return false;
+    }
     if (!query) return true;
     return `${item.topic} ${(item.tags || []).join(' ')} ${item.note || ''}`
       .toLowerCase()
       .includes(query);
   });
 
-  if (refs.bankEmpty) refs.bankEmpty.hidden = items.length > 0;
+  renderBankEmptyState(items.length);
 
+  const mineKeys = new Set(bankCache.map((item) => questionKey(item)));
   for (const item of items) {
-    const card = el('article', 'bank-item');
-    if (bankEditingId === item.id) card.classList.add('is-editing');
+    refs.bankList.append(buildBankItemCard(item, mineKeys));
+  }
+}
 
-    const head = el('div', 'bank-item-head');
-    head.append(el('span', 'bank-item-subject', subjectInfo(item.subject)?.short || '未分科'));
-    head.append(el('span', 'bank-item-difficulty', difficultyInfo(item.difficulty).label));
-    head.append(el('span', 'bank-item-source', sourceInfo(item.source).label));
+function buildBankItemCard(item, mineKeys) {
+  const card = el('article', 'bank-item');
+  if (bankView === 'mine' && bankEditingId === item.id) card.classList.add('is-editing');
 
-    const body = el('div', 'bank-item-body');
-    body.append(el('p', 'bank-item-topic', item.topic));
+  const head = el('div', 'bank-item-head');
+  head.append(el('span', 'bank-item-subject', subjectInfo(item.subject)?.short || '未分科'));
+  head.append(el('span', 'bank-item-difficulty', difficultyInfo(item.difficulty).label));
+  head.append(el('span', 'bank-item-source', sourceInfo(item.source).label));
 
-    const chips = el('div', 'bank-item-tags');
-    (item.tags || []).forEach((tag) => chips.append(el('span', 'topic-chip topic-chip-tag', tag)));
-    if (chips.childElementCount) body.append(chips);
-    if (item.note) body.append(el('p', 'bank-item-note', item.note));
+  if (item.image) {
+    const thumb = document.createElement('img');
+    thumb.className = 'bank-item-image';
+    thumb.src = item.image;
+    thumb.alt = '题目图片';
+    thumb.loading = 'lazy';
+    thumb.dataset.zoom = 'true';
+    head.append(thumb);
+  }
 
-    const actions = el('div', 'bank-item-actions');
-    const use = el('button', 'btn btn-primary btn-sm', '用这道题');
-    use.type = 'button';
-    use.addEventListener('click', () => loadBankQuestion(item, false));
+  const body = el('div', 'bank-item-body');
+  body.append(el('p', 'bank-item-topic', item.topic));
 
+  const chips = el('div', 'bank-item-tags');
+  (item.tags || []).forEach((tag) => chips.append(el('span', 'topic-chip topic-chip-tag', tag)));
+  if (chips.childElementCount) body.append(chips);
+  if (item.note) body.append(el('p', 'bank-item-note', item.note));
+
+  const actions = el('div', 'bank-item-actions');
+  const use = el('button', 'btn btn-primary btn-sm', '用这道题');
+  use.type = 'button';
+  use.addEventListener('click', () => loadBankQuestion(item, false));
+  actions.append(use);
+
+  if (bankView === 'square') {
+    const inBank = mineKeys.has(questionKey(item));
+    const save = el(
+      'button',
+      `btn btn-outline btn-sm${inBank ? ' is-saved' : ''}`,
+      inBank ? '已在我的题库' : '存入我的题库'
+    );
+    save.type = 'button';
+    save.disabled = inBank;
+    if (!inBank) save.addEventListener('click', () => saveBuiltinToBank(item));
+    actions.append(save);
+  } else {
     const edit = el('button', 'btn btn-outline btn-sm', '编辑');
     edit.type = 'button';
     edit.addEventListener('click', () => loadBankQuestion(item, true));
@@ -3270,21 +3434,110 @@ function renderBankList() {
     del.type = 'button';
     del.addEventListener('click', () => handleDeleteBankQuestion(item));
 
-    actions.append(use, edit, del);
-    body.append(actions);
+    actions.append(edit, del);
+  }
 
-    if (item.image) {
-      const thumb = document.createElement('img');
-      thumb.className = 'bank-item-image';
-      thumb.src = item.image;
-      thumb.alt = '题目图片';
-      thumb.loading = 'lazy';
-      thumb.dataset.zoom = 'true';
-      head.append(thumb);
+  body.append(actions);
+  card.append(head, body);
+  return card;
+}
+
+async function saveBuiltinToBank(item) {
+  if (bankCache.some((entry) => questionKey(entry) === questionKey(item))) {
+    toast('这道题已经在我的题库里了。', 'warm', 2600);
+    return;
+  }
+  try {
+    await saveQuestion({
+      topic: item.topic,
+      subject: item.subject,
+      difficulty: item.difficulty,
+      tags: item.tags,
+      note: item.note,
+      image: '',
+      source: 'builtin'
+    });
+    bankCache = await listQuestions();
+    renderBank();
+    toast('已存入我的题库，可以切到「我的题库」修改。', 'success', 3200);
+  } catch (error) {
+    toast(error.message || '保存失败，请再试一次。', 'error');
+  }
+}
+
+function resetBankFilters() {
+  bankFilter = { subject: 'all', source: 'all', query: '' };
+  syncBankFilterInputs();
+  renderBank();
+}
+
+function handleBankEmptyAction() {
+  if (bankView === 'mine' && !bankCache.length) {
+    switchBankView('square');
+    return;
+  }
+  resetBankFilters();
+}
+
+async function handleBankImportFile(file) {
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    toast('备份文件超过 8 MB，请先拆分再导入。', 'error', 4200);
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    toast('这个文件不是有效的 JSON 备份。', 'error', 4200);
+    return;
+  }
+
+  try {
+    const result = await importQuestions(payload);
+    bankCache = await listQuestions();
+    renderBank();
+    if (result.added) {
+      let message = `已导入 ${result.added} 道题`;
+      if (result.skipped) message += `，跳过 ${result.skipped} 道重复题`;
+      if (result.invalid) message += `，忽略 ${result.invalid} 道无效题`;
+      if (result.limited) message += `；题库最多 ${result.max} 道，还有 ${result.limited} 道没导入`;
+      toast(`${message}。`, result.limited ? 'warm' : 'success', 5200);
+    } else if (result.skipped) {
+      toast(`没有新增题目，${result.skipped} 道题已经在题库里了。`, 'warm', 4600);
+    } else if (result.limited) {
+      toast(`我的题库已满（${result.max} 道），先删除一些再导入。`, 'warm', 5200);
+    } else {
+      toast('这个备份里没有可导入的题目。', 'warm', 3600);
     }
+  } catch (error) {
+    toast(error.message || '导入失败，请检查文件格式。', 'error', 4800);
+  }
+}
 
-    card.append(head, body);
-    refs.bankList.append(card);
+function handleBankExport() {
+  if (!bankCache.length) {
+    toast('我的题库还是空的，先存几道题再导出。', 'warm');
+    return;
+  }
+  try {
+    const payload = buildQuestionsExport(bankCache);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date();
+    const stamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(
+      date.getDate()
+    ).padStart(2, '0')}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `feynman-question-bank-${stamp}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    toast(`已导出 ${payload.count} 道题，文件只保存在你的设备上。`, 'success', 4600);
+  } catch {
+    toast('导出失败，可能是浏览器限制了下载。', 'error', 4200);
   }
 }
 
@@ -3310,7 +3563,7 @@ function loadBankQuestion(item, editing) {
   closeModal('bankModal');
   showScreen('home');
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  renderBankList();
+  renderBank();
   setTimeout(() => refs.topicInput.focus(), 220);
   toast(
     editing
@@ -3322,11 +3575,15 @@ function loadBankQuestion(item, editing) {
 
 async function handleDeleteBankQuestion(item) {
   if (!window.confirm(`从题库删除「${item.topic}」？删除后无法恢复。`)) return;
-  await deleteQuestion(item.id);
-  if (bankEditingId === item.id) bankEditingId = '';
-  bankCache = await listQuestions();
-  renderBankList();
-  toast('题目已从题库删除。', 'success', 2400);
+  try {
+    await deleteQuestion(item.id);
+    if (bankEditingId === item.id) bankEditingId = '';
+    bankCache = await listQuestions();
+    renderBank();
+    toast('题目已从题库删除。', 'success', 2400);
+  } catch (error) {
+    toast(error.message || '删除失败，请再试一次。', 'error');
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3777,19 +4034,32 @@ function bindEvents() {
   refs.homeCard?.addEventListener('drop', handleHomeDrop);
 
   refs.saveBankBtn?.addEventListener('click', handleSaveBank);
-  refs.openBankBtn?.addEventListener('click', openBank);
+  refs.openBankBtn?.addEventListener('click', () => openBank('mine'));
+  refs.openBankSquareBtn?.addEventListener('click', () => openBank('square'));
+  refs.bankTabSquare?.addEventListener('click', () => switchBankView('square'));
+  refs.bankTabMine?.addEventListener('click', () => switchBankView('mine'));
+  refs.bankTabSquare?.addEventListener('keydown', handleBankTabKeydown);
+  refs.bankTabMine?.addEventListener('keydown', handleBankTabKeydown);
   refs.bankSearch?.addEventListener('input', () => {
     bankFilter.query = refs.bankSearch.value;
-    renderBankList();
+    renderBank();
   });
   refs.bankSubjectFilter?.addEventListener('change', () => {
     bankFilter.subject = refs.bankSubjectFilter.value;
-    renderBankList();
+    renderBank();
   });
   refs.bankSourceFilter?.addEventListener('change', () => {
     bankFilter.source = refs.bankSourceFilter.value;
-    renderBankList();
+    renderBank();
   });
+  refs.bankEmptyAction?.addEventListener('click', handleBankEmptyAction);
+  refs.bankImportBtn?.addEventListener('click', () => refs.bankImportInput?.click());
+  refs.bankImportInput?.addEventListener('change', async () => {
+    const file = refs.bankImportInput.files?.[0];
+    refs.bankImportInput.value = '';
+    if (file) await handleBankImportFile(file);
+  });
+  refs.bankExportBtn?.addEventListener('click', handleBankExport);
   refs.bankList?.addEventListener('click', (event) => {
     const image = event.target.closest('img[data-zoom]');
     if (image) openLightbox(image.src);

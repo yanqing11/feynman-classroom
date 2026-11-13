@@ -52,12 +52,23 @@ function readFallback() {
 }
 
 function writeFallback(items) {
-  localStorage.setItem(APP.storage.bank, JSON.stringify(items));
+  try {
+    localStorage.setItem(APP.storage.bank, JSON.stringify(items));
+  } catch {
+    throw new Error('本机存储空间不足，题库没有保存成功。可以先导出备份，再删除一些题目。');
+  }
+}
+
+function sanitizeImage(value) {
+  if (typeof value !== 'string') return '';
+  const image = value.trim();
+  if (!image) return '';
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(image) ? image : '';
 }
 
 function normalizeQuestion(input) {
   const now = new Date().toISOString();
-  const topic = typeof input?.topic === 'string' ? input.topic.trim() : '';
+  const topic = typeof input?.topic === 'string' ? input.topic.trim().slice(0, APP.limits.maxTopicChars) : '';
   return {
     id: input?.id || newId(),
     topic,
@@ -65,11 +76,17 @@ function normalizeQuestion(input) {
     difficulty: ['basic', 'medium', 'hard'].includes(input?.difficulty) ? input.difficulty : 'medium',
     tags: normalizeTags(input?.tags),
     note: typeof input?.note === 'string' ? input.note.trim().slice(0, 1200) : '',
-    image: typeof input?.image === 'string' ? input.image : '',
-    source: input?.source === 'ocr' ? 'ocr' : 'custom',
+    image: sanitizeImage(input?.image),
+    source: ['builtin', 'ocr'].includes(input?.source) ? input.source : 'custom',
     createdAt: input?.createdAt || now,
     updatedAt: now
   };
+}
+
+export function questionKey(item) {
+  const subject = subjectInfo(item?.subject) ? item.subject : 'junior';
+  const topic = typeof item?.topic === 'string' ? item.topic : '';
+  return `${subject}|${topic.replace(/\s+/g, '').replace(/[，。！？、；：,.!?;:]/g, '').toLowerCase()}`;
 }
 
 function sortItems(items) {
@@ -147,4 +164,76 @@ export async function deleteQuestion(id) {
     const items = readFallback().filter((entry) => entry.id !== id);
     writeFallback(items);
   }
+}
+
+export function buildQuestionsExport(items) {
+  const questions = (Array.isArray(items) ? items : []).map((item) => ({
+    key: questionKey(item),
+    topic: typeof item?.topic === 'string' ? item.topic : '',
+    subject: subjectInfo(item?.subject) ? item.subject : 'junior',
+    difficulty: ['basic', 'medium', 'hard'].includes(item?.difficulty) ? item.difficulty : 'medium',
+    tags: normalizeTags(item?.tags),
+    note: typeof item?.note === 'string' ? item.note : '',
+    image: sanitizeImage(item?.image),
+    source: ['builtin', 'ocr'].includes(item?.source) ? item.source : 'custom',
+    createdAt: item?.createdAt || new Date().toISOString()
+  }));
+  return {
+    app: 'feynman-classroom',
+    kind: 'question-bank',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    count: questions.length,
+    questions
+  };
+}
+
+export async function importQuestions(payload) {
+  const rawList = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.questions)
+      ? payload.questions
+      : null;
+  if (!rawList) throw new Error('文件格式不对：需要包含 questions 数组。');
+
+  const existing = await listQuestions();
+  const seen = new Set(existing.map((item) => questionKey(item)));
+  const room = Math.max(0, MAX_QUESTIONS - existing.length);
+  let added = 0;
+  let skipped = 0;
+  let invalid = 0;
+  let limited = 0;
+
+  for (const raw of rawList) {
+    if (!raw || typeof raw.topic !== 'string' || !raw.topic.trim()) {
+      invalid += 1;
+      continue;
+    }
+    const key = questionKey(raw);
+    if (seen.has(key)) {
+      skipped += 1;
+      continue;
+    }
+    if (added >= room) {
+      limited += 1;
+      continue;
+    }
+    const item = normalizeQuestion({ ...raw, id: undefined });
+    if (!item.topic) {
+      invalid += 1;
+      continue;
+    }
+    await saveQuestion(item);
+    seen.add(key);
+    added += 1;
+  }
+
+  return {
+    added,
+    skipped,
+    invalid,
+    limited,
+    total: existing.length + added,
+    max: MAX_QUESTIONS
+  };
 }
