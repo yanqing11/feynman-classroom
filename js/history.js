@@ -37,6 +37,22 @@ function average(values) {
   return round(numbers.reduce((total, value) => total + value, 0) / numbers.length);
 }
 
+function pad(number) {
+  return String(number).padStart(2, '0');
+}
+
+/** 用本地日期做聚合键，避免跨时区时“今天”被算到另一天。 */
+function dayKey(value) {
+  const date = value instanceof Date ? value : new Date(value || 0);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function validDate(value) {
+  const date = new Date(value || 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function trimMessages(messages) {
   const visible = (Array.isArray(messages) ? messages : [])
     .filter((message) => message && !message.hidden && (message.role === 'user' || message.role === 'assistant'))
@@ -209,11 +225,7 @@ export function summarizeHistory(records) {
   const delta = Number.isFinite(recent) && Number.isFinite(previous) ? recent - previous : null;
 
   const last7 = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const activeDays = new Set(
-    records
-      .map((record) => String(record.endedAt || '').slice(0, 10))
-      .filter(Boolean)
-  );
+  const activeDays = new Set(records.map((record) => dayKey(record.endedAt)).filter(Boolean));
 
   return {
     sessions: records.length,
@@ -231,6 +243,117 @@ export function summarizeHistory(records) {
       return Number.isFinite(time) && time >= last7;
     }).length,
     generatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * 学习节奏：按周排布最近三个月，并计算连续学习天数。
+ * current 允许“今天还没练”时沿用昨天的连续记录，避免一天没结束就归零。
+ */
+export function summarizeActivity(records, { days = 84, now = Date.now() } = {}) {
+  const weeks = Math.max(1, Math.min(52, Math.round(Number(days) / 7) || 12));
+  const counts = new Map();
+  for (const record of records) {
+    const date = validDate(record?.endedAt);
+    if (!date) continue;
+    const key = dayKey(date);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const weekday = (today.getDay() + 6) % 7; // 周一 = 0
+  const start = new Date(today);
+  start.setDate(today.getDate() - weekday - (weeks - 1) * 7);
+
+  const series = [];
+  for (let index = 0; index < weeks * 7; index += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const key = dayKey(date);
+    series.push({
+      key,
+      label: `${date.getMonth() + 1} 月 ${date.getDate()} 日`,
+      count: counts.get(key) || 0,
+      future: date.getTime() > today.getTime()
+    });
+  }
+
+  let cursor = new Date(today);
+  if (!counts.get(dayKey(cursor))) {
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (counts.get(dayKey(yesterday))) cursor = yesterday;
+  }
+  let current = 0;
+  while (counts.get(dayKey(cursor))) {
+    current += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  const sorted = [...counts.keys()].sort();
+  let longest = 0;
+  let run = 0;
+  let previous = null;
+  for (const key of sorted) {
+    const date = new Date(`${key}T00:00:00`);
+    if (!Number.isNaN(date.getTime())) {
+      run = previous !== null && Math.round((date.getTime() - previous) / 86400000) === 1
+        ? run + 1
+        : 1;
+      longest = Math.max(longest, run);
+      previous = date.getTime();
+    }
+  }
+
+  const total = series.reduce((sum, day) => sum + day.count, 0);
+  const activeDays = series.filter((day) => day.count > 0).length;
+  const peak = series.reduce(
+    (best, day) => (day.count > best.count ? day : best),
+    { key: '', label: '', count: 0 }
+  );
+
+  return { weeks, series, current, longest, total, activeDays, peak };
+}
+
+/** 课堂互动习惯：平均轮数、追问数，以及人设/强度的使用分布。 */
+export function summarizeInteractions(records) {
+  const personas = new Map();
+  const intensities = new Map();
+  let turns = 0;
+  let questions = 0;
+
+  for (const record of records) {
+    const recordTurns = Number(record?.turns);
+    if (Number.isFinite(recordTurns)) turns += Math.max(0, recordTurns);
+    const recordQuestions = Number(record?.questions);
+    if (Number.isFinite(recordQuestions)) questions += Math.max(0, recordQuestions);
+
+    const persona = record?.studentPersona || 'unknown';
+    personas.set(persona, (personas.get(persona) || 0) + 1);
+    const intensity = record?.studentIntensity || 'unknown';
+    intensities.set(intensity, (intensities.get(intensity) || 0) + 1);
+  }
+
+  const sessions = records.length;
+  const toList = (map) =>
+    [...map.entries()]
+      .map(([key, count]) => ({
+        key,
+        count,
+        share: sessions ? Math.round((count / sessions) * 100) : 0
+      }))
+      .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+
+  return {
+    sessions,
+    turns,
+    questions,
+    avgTurns: sessions ? Math.round(turns / sessions) : null,
+    avgQuestions: sessions ? Math.round(questions / sessions) : null,
+    questionsPerTurn: turns ? Math.round((questions / turns) * 10) / 10 : null,
+    personas: toList(personas),
+    intensities: toList(intensities)
   };
 }
 

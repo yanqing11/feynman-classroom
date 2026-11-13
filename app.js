@@ -36,8 +36,10 @@ import {
   deleteRecords,
   loadHistory,
   reportToText,
+  summarizeActivity,
   summarizeBySubject,
   summarizeHistory,
+  summarizeInteractions,
   summarizeTags
 } from './js/history.js';
 import {
@@ -280,8 +282,15 @@ const refs = {
   historyContent: $('#historyContent'),
   historySummary: $('#historySummary'),
   historySubjectFilter: $('#historySubjectFilter'),
+  historyRangeFilter: $('#historyRangeFilter'),
   historySourceFilter: $('#historySourceFilter'),
+  historyActivity: $('#historyActivity'),
+  historyActivityMeta: $('#historyActivityMeta'),
   historySubjectOverview: $('#historySubjectOverview'),
+  historyHabits: $('#historyHabits'),
+  historyHabitMeta: $('#historyHabitMeta'),
+  historyAdviceBlock: $('#historyAdviceBlock'),
+  historyAdvice: $('#historyAdvice'),
   historyTagStats: $('#historyTagStats'),
   historyTagMeta: $('#historyTagMeta'),
   historyTrendChart: $('#historyTrendChart'),
@@ -402,7 +411,8 @@ let draftDrawerOpen = false;
 let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
-let historyFilter = { subject: 'all', source: 'all' };
+let historyFilter = { subject: 'all', source: 'all', range: 'all' };
+const HISTORY_RANGE_DAYS = { all: 0, 30: 30, 7: 7 };
 let historySelectMode = false;
 let historySelection = new Set();
 let bankFilter = { subject: 'all', source: 'all', query: '' };
@@ -762,11 +772,19 @@ function syncQuickTagState() {
 }
 
 function renderHistoryFilterState() {
-  if (!refs.historySubjectFilter) return;
-  for (const button of refs.historySubjectFilter.querySelectorAll('.filter-tab')) {
-    const active = button.dataset.subject === historyFilter.subject;
-    button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', String(active));
+  if (refs.historySubjectFilter) {
+    for (const button of refs.historySubjectFilter.querySelectorAll('.filter-tab')) {
+      const active = button.dataset.subject === historyFilter.subject;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+  if (refs.historyRangeFilter) {
+    for (const button of refs.historyRangeFilter.querySelectorAll('.filter-tab')) {
+      const active = button.dataset.range === historyFilter.range;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
   }
 }
 
@@ -2590,16 +2608,25 @@ function renderHistory() {
   const visible = filterHistoryRecords(records);
   const summary = summarizeHistory(visible);
   renderHistorySummary(summary);
-  renderSubjectOverview(records);
+  renderActivity(visible);
+  renderSubjectOverview(visible);
+  renderHabits(visible);
   renderTagStats(visible);
   renderHistoryTrend(visible, summary);
   renderHistoryDimensions(summary);
+  renderHistoryAdvice(visible);
   renderHistoryBulkBar(visible);
   renderHistoryList(visible);
 }
 
 function filterHistoryRecords(records) {
+  const days = HISTORY_RANGE_DAYS[historyFilter.range] || 0;
+  const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : 0;
   return records.filter((record) => {
+    if (cutoff) {
+      const time = new Date(record.endedAt || 0).getTime();
+      if (!Number.isFinite(time) || time < cutoff) return false;
+    }
     if (historyFilter.subject !== 'all' && record.subject !== historyFilter.subject) return false;
     if (historyFilter.source !== 'all' && record.source !== historyFilter.source) return false;
     return true;
@@ -2643,6 +2670,208 @@ function renderSubjectOverview(records) {
     );
     card.append(stats);
     refs.historySubjectOverview.append(card);
+  }
+}
+
+function activityStat(value, unit, label) {
+  const card = el('div', 'activity-stat');
+  const strong = el('strong');
+  strong.append(document.createTextNode(Number.isFinite(value) ? String(value) : '—'));
+  if (unit && Number.isFinite(value)) strong.append(el('em', '', unit));
+  card.append(strong, el('small', '', label));
+  return card;
+}
+
+function renderActivity(records) {
+  if (!refs.historyActivity) return;
+  refs.historyActivity.replaceChildren();
+  const activity = summarizeActivity(records);
+
+  if (refs.historyActivityMeta) {
+    refs.historyActivityMeta.textContent = activity.total
+      ? `最近 ${activity.weeks} 周 · 有记录 ${activity.activeDays} 天`
+      : `最近 ${activity.weeks} 周还没有练习记录`;
+  }
+
+  const stats = el('div', 'activity-stats');
+  stats.append(
+    activityStat(activity.current, '天', '连续学习'),
+    activityStat(activity.longest, '天', '最长连续'),
+    activityStat(activity.total, '课', `近 ${activity.weeks} 周`),
+    activityStat(
+      activity.peak.count,
+      '课',
+      activity.peak.count ? `单日最多 · ${activity.peak.label}` : '单日最多'
+    )
+  );
+
+  const heatmap = el('div', 'activity-heatmap');
+  heatmap.setAttribute('role', 'img');
+  heatmap.setAttribute(
+    'aria-label',
+    `最近 ${activity.weeks} 周学习热力图，有记录 ${activity.activeDays} 天，共 ${activity.total} 课。`
+  );
+  const grid = el('div', 'heatmap-grid');
+  grid.style.gridTemplateColumns = `repeat(${activity.weeks}, minmax(0, 1fr))`;
+  const max = Math.max(1, ...activity.series.map((day) => day.count));
+  for (const day of activity.series) {
+    const cell = el('span', 'heatmap-cell');
+    const level = day.count
+      ? Math.min(4, 1 + Math.floor(((day.count - 1) / max) * 3.999))
+      : 0;
+    cell.classList.add(`is-level-${level}`);
+    if (day.future) cell.classList.add('is-future');
+    cell.title = day.future
+      ? `${day.label} · 还没到`
+      : `${day.label} · ${day.count ? `${day.count} 课` : '没有练习'}`;
+    cell.setAttribute('aria-hidden', 'true');
+    grid.append(cell);
+  }
+
+  const legend = el('div', 'heatmap-legend');
+  legend.append(el('span', '', '少'));
+  for (let level = 0; level <= 4; level += 1) {
+    const dot = el('span', `heatmap-cell is-level-${level}`);
+    dot.setAttribute('aria-hidden', 'true');
+    legend.append(dot);
+  }
+  legend.append(el('span', '', '多'));
+
+  heatmap.append(grid, legend);
+  refs.historyActivity.append(stats, heatmap);
+}
+
+function habitLabel(key, list) {
+  return list.find((item) => item.key === key)?.label || '未记录';
+}
+
+function buildHabitList(items, labels) {
+  const list = el('div', 'habit-list');
+  if (!items.length) {
+    list.append(el('p', 'habit-empty', '还没有可统计的课堂。'));
+    return list;
+  }
+  for (const item of items) {
+    const row = el('div', 'habit-row');
+    const head = el('div', 'habit-head');
+    head.append(
+      el('span', 'habit-name', habitLabel(item.key, labels)),
+      el('span', 'habit-count', `${item.count} 课 · ${item.share}%`)
+    );
+    const track = el('div', 'habit-track');
+    const fill = el('div', 'habit-fill');
+    fill.style.width = `${item.share}%`;
+    track.append(fill);
+    row.append(head, track);
+    list.append(row);
+  }
+  return list;
+}
+
+function renderHabits(records) {
+  if (!refs.historyHabits) return;
+  refs.historyHabits.replaceChildren();
+  const habits = summarizeInteractions(records);
+
+  if (refs.historyHabitMeta) {
+    refs.historyHabitMeta.textContent = habits.sessions
+      ? `${habits.sessions} 课 · 平均每课 ${habits.avgQuestions ?? 0} 个追问`
+      : '还没有可统计的课堂';
+  }
+
+  const overview = el('article', 'habit-card');
+  overview.append(el('h4', '', '每课互动'));
+  const metrics = el('div', 'habit-metrics');
+  const metric = (value, unit, label) => {
+    const item = el('div', 'habit-metric');
+    const strong = el('strong');
+    strong.append(document.createTextNode(Number.isFinite(value) ? String(value) : '—'));
+    if (unit && Number.isFinite(value)) strong.append(el('em', '', unit));
+    item.append(strong, el('small', '', label));
+    return item;
+  };
+  metrics.append(
+    metric(habits.avgTurns, '轮', '平均讲解'),
+    metric(habits.avgQuestions, '个', '平均追问'),
+    metric(habits.questionsPerTurn, '个/轮', '追问密度')
+  );
+  overview.append(metrics);
+  overview.append(
+    el(
+      'p',
+      'habit-note',
+      habits.turns
+        ? `累计 ${habits.turns} 轮讲解、${habits.questions} 个追问。`
+        : '完成一节课后，这里会出现互动统计。'
+    )
+  );
+
+  const personaCard = el('article', 'habit-card');
+  personaCard.append(el('h4', '', 'AI 学生人设'));
+  personaCard.append(buildHabitList(habits.personas, PERSONAS));
+  personaCard.append(el('p', 'habit-note', '人设来自每节课开课时的选择。'));
+
+  const intensityCard = el('article', 'habit-card');
+  intensityCard.append(el('h4', '', '追问强度'));
+  intensityCard.append(buildHabitList(habits.intensities, INTENSITIES));
+  intensityCard.append(el('p', 'habit-note', '强度越高，AI 学生追问得越紧。'));
+
+  refs.historyHabits.append(overview, personaCard, intensityCard);
+}
+
+function renderHistoryAdvice(records) {
+  if (!refs.historyAdvice || !refs.historyAdviceBlock) return;
+  refs.historyAdvice.replaceChildren();
+
+  const items = [];
+  for (const record of records) {
+    if (!Array.isArray(record.report?.nextSteps)) continue;
+    const step = record.report.nextSteps.find((entry) => {
+      const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+      const action = typeof entry?.action === 'string' ? entry.action.trim() : '';
+      return Boolean(title || action);
+    });
+    if (!step) continue;
+    const title = typeof step.title === 'string' ? step.title.trim() : '';
+    const action = typeof step.action === 'string' ? step.action.trim() : '';
+    items.push({
+      record,
+      title: title || action,
+      action,
+      example: typeof step.example === 'string' ? step.example.trim() : ''
+    });
+    if (items.length >= 4) break;
+  }
+
+  refs.historyAdviceBlock.hidden = items.length === 0;
+  if (!items.length) return;
+
+  for (const item of items) {
+    const card = el('button', 'advice-card');
+    card.type = 'button';
+    const head = el('span', 'advice-head');
+    head.append(el('strong', '', item.title), el('span', 'advice-arrow', '查看报告'));
+    card.append(head);
+    if (item.action && item.action !== item.title) {
+      card.append(el('span', 'advice-action', item.action));
+    }
+    if (item.example) card.append(el('span', 'advice-example', `示范：${item.example}`));
+    card.append(
+      el(
+        'span',
+        'advice-from',
+        `${item.record.topic} · ${formatArchiveDate(item.record.endedAt).replace('\n', ' ')}`
+      )
+    );
+    card.addEventListener('click', () => {
+      presentReport(item.record.report, {
+        topic: item.record.topic,
+        archived: true,
+        meta: formatRecordMeta(item.record),
+        record: item.record
+      });
+    });
+    refs.historyAdvice.append(card);
   }
 }
 
@@ -4230,6 +4459,16 @@ function bindEvents() {
     const button = event.target.closest('.filter-tab');
     if (!button) return;
     historyFilter.subject = button.dataset.subject || 'all';
+    openHistoryIds = new Set();
+    historySelection = new Set();
+    renderHistory();
+  });
+  refs.historyRangeFilter?.addEventListener('click', (event) => {
+    const button = event.target.closest('.filter-tab');
+    if (!button) return;
+    const range = button.dataset.range;
+    if (!(range in HISTORY_RANGE_DAYS)) return;
+    historyFilter.range = range;
     openHistoryIds = new Set();
     historySelection = new Set();
     renderHistory();

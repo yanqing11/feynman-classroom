@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261112f">
+  <link rel="stylesheet" href="./styles.css?v=20261113a">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -575,7 +575,7 @@
         <div>
           <p class="eyebrow"><span class="eyebrow-line"></span>LEARNING ARCHIVE</p>
           <h2 id="historyTitle">学习档案</h2>
-          <p>每讲完一课，主题、轮数、当时的回答和诊断报告都会留在这里，用来看清自己的长期变化。</p>
+          <p>每讲完一课，主题、轮数、当时的回答和诊断报告都会留在这里；上方的数据看板帮你看清长期变化。</p>
         </div>
         <button class="icon-btn modal-close" data-close="historyModal" type="button" aria-label="关闭学习档案">×</button>
       </div>
@@ -589,11 +589,18 @@
 
       <div class="history-content" id="historyContent" hidden>
         <div class="history-filters">
-          <div class="filter-tabs" id="historySubjectFilter" role="tablist" aria-label="按学科筛选"></div>
-          <label class="history-source-filter">
-            <span class="sr-only">按题目来源筛选</span>
-            <select id="historySourceFilter"></select>
-          </label>
+          <div class="filter-tabs history-subject-filter" id="historySubjectFilter" role="tablist" aria-label="按学科筛选"></div>
+          <div class="history-filter-tools">
+            <div class="filter-tabs history-range" id="historyRangeFilter" role="group" aria-label="按时间范围筛选">
+              <button class="filter-tab is-active" type="button" data-range="all" aria-pressed="true">全部</button>
+              <button class="filter-tab" type="button" data-range="30" aria-pressed="false">近 30 天</button>
+              <button class="filter-tab" type="button" data-range="7" aria-pressed="false">近 7 天</button>
+            </div>
+            <label class="history-source-filter">
+              <span class="sr-only">按题目来源筛选</span>
+              <select id="historySourceFilter"></select>
+            </label>
+          </div>
         </div>
 
         <div class="history-bulk-bar" id="historyBulkBar" hidden>
@@ -609,10 +616,26 @@
 
         <section class="history-block">
           <div class="history-section-head">
+            <h3>学习节奏</h3>
+            <span class="history-section-meta" id="historyActivityMeta"></span>
+          </div>
+          <div class="activity-panel" id="historyActivity"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
             <h3>分学科总览</h3>
             <span class="history-section-meta">三科独立统计，不混算</span>
           </div>
           <div class="subject-overview" id="historySubjectOverview"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>课堂互动习惯</h3>
+            <span class="history-section-meta" id="historyHabitMeta"></span>
+          </div>
+          <div class="habit-grid" id="historyHabits"></div>
         </section>
 
         <section class="history-block">
@@ -637,6 +660,14 @@
             <span class="history-section-meta">只统计有诊断报告的课时</span>
           </div>
           <div class="history-dimensions" id="historyDimensions"></div>
+        </section>
+
+        <section class="history-block" id="historyAdviceBlock" hidden>
+          <div class="history-section-head">
+            <h3>下一步可以这样补</h3>
+            <span class="history-section-meta">从最近的诊断报告里汇总</span>
+          </div>
+          <div class="advice-list" id="historyAdvice"></div>
         </section>
 
         <section class="history-block">
@@ -777,6 +808,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261112f"></script>
+  <script type="module" src="./app.js?v=20261113a"></script>
 </body>
 </html>
