@@ -7752,3 +7752,167 @@ body.is-chat .storage-banner {
     padding-right: 42px;
   }
 }
+
+/* ==========================================================================
+   P2-7 complete dark-mode polish
+   ========================================================================== */
+
+/* Home shell: `body:not(.is-chat)` selectors outrank the base dark rules,
+   so re-scope the overrides with the body state included. */
+[data-theme="dark"] body:not(.is-chat) .topbar {
+  border-bottom-color: rgba(61, 75, 68, 0.72);
+  background: rgba(17, 22, 20, 0.88);
+}
+
+[data-theme="dark"] .history-entry {
+  border-color: var(--line);
+  background: rgba(27, 36, 33, 0.9);
+}
+
+[data-theme="dark"] .history-entry:hover {
+  border-color: rgba(146, 224, 196, 0.4);
+  background: var(--green-pale);
+}
+
+[data-theme="dark"] .connection-pill {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+[data-theme="dark"] .connection-pill.is-connected {
+  border-color: rgba(146, 224, 196, 0.28);
+  background: var(--green-pale);
+}
+
+[data-theme="dark"] .mini-bubble {
+  border-color: var(--line);
+  background: var(--card-warm);
+}
+
+[data-theme="dark"] .side-card:not(.teacher-call-card) {
+  border-color: var(--line);
+  background: rgba(27, 36, 33, 0.9);
+}
+
+[data-theme="dark"] .home-teacher-hint {
+  border-color: rgba(230, 191, 114, 0.3);
+  background: rgba(58, 49, 31, 0.55);
+  color: #e6c98d;
+}
+
+[data-theme="dark"] .home-card .remove-image,
+[data-theme="dark"] .remove-image {
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .home-card .example-chip:hover {
+  border-color: rgba(146, 224, 196, 0.4);
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .quick-tag:hover {
+  border-color: rgba(146, 224, 196, 0.4);
+  background: var(--green-pale);
+  color: var(--green-deep);
+}
+
+/* The dark palette maps --green-deep to a light mint, so elements that use it
+   as a filled background need dark foreground text instead of cream. */
+[data-theme="dark"] .brand-mark,
+[data-theme="dark"] .skip-link,
+[data-theme="dark"] .student-avatar,
+[data-theme="dark"] .mini-teacher .mini-avatar,
+[data-theme="dark"] .next-index,
+[data-theme="dark"] .teacher-sign,
+[data-theme="dark"] .fab-btn-primary {
+  color: #0e1512;
+}
+
+[data-theme="dark"] .fab-btn-primary:hover:not(:disabled) {
+  background: var(--green-dark);
+  color: #0e1512;
+}
+
+[data-theme="dark"] .user-avatar {
+  border-color: rgba(230, 191, 114, 0.4);
+  color: #f0cd8c;
+}
+
+[data-theme="dark"] .btn-primary {
+  background: var(--green-deep);
+  color: #0e1512;
+}
+
+[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+  background: var(--green-dark);
+  color: #0e1512;
+}
+
+[data-theme="dark"] .teacher-call-card .btn-primary {
+  background: #f4f8f5;
+  color: #103c33;
+}
+
+[data-theme="dark"] .teacher-call-card .btn-primary:hover:not(:disabled) {
+  background: #ffffff;
+  color: #103c33;
+}
+
+[data-theme="dark"] .teacher-call-card .tiny-note {
+  color: rgba(237, 244, 240, 0.64);
+}
+
+[data-theme="dark"] .btn-danger-ghost {
+  background: transparent;
+}
+
+[data-theme="dark"] .btn-danger-ghost:hover:not(:disabled) {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+[data-theme="dark"] .topic-chip-tag {
+  background: rgba(142, 185, 242, 0.14);
+  color: var(--blue);
+}
+
+[data-theme="dark"] .topic-chip-difficulty {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+[data-theme="dark"] .topic-chip-source {
+  border-color: var(--line);
+  background: var(--card-warm);
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .history-dimension {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+[data-theme="dark"] .history-dimension small {
+  color: var(--muted);
+}
+
+[data-theme="dark"] .history-dimension strong {
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .next-example {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .evidence-note {
+  color: var(--gold);
+}
+
+[data-theme="dark"] input[type="range"] {
+  background: transparent;
+  accent-color: var(--green);
+}
