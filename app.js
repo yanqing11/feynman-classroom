@@ -343,6 +343,15 @@ const refs = {
   onboardingPrevBtn: $('#onboardingPrevBtn'),
   onboardingNextBtn: $('#onboardingNextBtn'),
   onboardingSkipBtn: $('#onboardingSkipBtn'),
+  helpBtn: $('#helpBtn'),
+  helpModal: $('#helpModal'),
+  helpSearch: $('#helpSearch'),
+  helpSearchMeta: $('#helpSearchMeta'),
+  helpGroups: $('#helpGroups'),
+  helpEmpty: $('#helpEmpty'),
+  helpReplayOnboarding: $('#helpReplayOnboarding'),
+  helpOpenSettings: $('#helpOpenSettings'),
+  helpOpenHistory: $('#helpOpenHistory'),
   personaPicker: $('#personaPicker'),
   homePersonaHint: $('#homePersonaHint'),
   chatSubjectSelect: $('#chatSubjectSelect'),
@@ -949,6 +958,59 @@ function maybeOnboard() {
     if (activeModalId || store.session) return;
     openOnboarding();
   }, 700);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Help center                                                                */
+/* -------------------------------------------------------------------------- */
+
+function helpItems() {
+  if (!refs.helpGroups) return [];
+  return Array.from(refs.helpGroups.querySelectorAll('.help-item'));
+}
+
+function applyHelpFilter(rawQuery) {
+  const query = String(rawQuery || '').trim().toLowerCase();
+  const items = helpItems();
+  const groups = refs.helpGroups
+    ? Array.from(refs.helpGroups.querySelectorAll('.help-group'))
+    : [];
+  let matches = 0;
+
+  for (const item of items) {
+    const text = String(item.textContent || '').toLowerCase();
+    const hit = !query || text.includes(query);
+    item.hidden = !hit;
+    if (hit) {
+      matches += 1;
+      if (query) item.open = true;
+    }
+    if (!query) item.open = false;
+  }
+
+  for (const group of groups) {
+    const visible = Array.from(group.querySelectorAll('.help-item')).some((item) => !item.hidden);
+    group.hidden = !visible;
+  }
+
+  if (refs.helpEmpty) refs.helpEmpty.hidden = matches > 0;
+  if (refs.helpSearchMeta) {
+    if (!query) {
+      refs.helpSearchMeta.textContent = `共 ${items.length} 个问题`;
+    } else {
+      refs.helpSearchMeta.textContent = matches
+        ? `找到 ${matches} 个相关问题`
+        : '没有找到相关问题';
+    }
+  }
+}
+
+function openHelp() {
+  openModal('helpModal');
+  if (refs.helpSearch) {
+    refs.helpSearch.value = '';
+  }
+  applyHelpFilter('');
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3981,6 +4043,7 @@ function closeModal(id) {
   }
   if (id === 'onboardingModal') {
     markOnboardingSeen();
+    onboardingStacked = false;
     setTimeout(() => maybeWelcome(), 600);
   }
 
@@ -4332,6 +4395,15 @@ function bindEvents() {
     fillSettingsForm();
     openModal('settingsModal');
   });
+
+  refs.helpBtn?.addEventListener('click', openHelp);
+  refs.helpSearch?.addEventListener('input', () => applyHelpFilter(refs.helpSearch.value));
+  refs.helpReplayOnboarding?.addEventListener('click', () => openOnboarding({ stack: true }));
+  refs.helpOpenSettings?.addEventListener('click', () => {
+    fillSettingsForm();
+    openModal('settingsModal');
+  });
+  refs.helpOpenHistory?.addEventListener('click', openHistory);
 
   refs.replayOnboardingBtn?.addEventListener('click', () => {
     openOnboarding({ stack: true });

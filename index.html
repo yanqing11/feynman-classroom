@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261113b">
+  <link rel="stylesheet" href="./styles.css?v=20261113c">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -35,13 +35,17 @@
           <span class="status-dot" aria-hidden="true"></span>
           <span id="connectionLabel">未连接</span>
         </span>
+        <button class="btn btn-ghost btn-sm" id="helpBtn" type="button" title="查看帮助与快捷键">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2-2.3 3.6"/><path d="M12 17h.01"/></svg>
+          <span class="btn-label">帮助</span>
+        </button>
         <button class="btn btn-ghost btn-sm" id="historyBtn" type="button" title="查看学习档案">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M7 4v13a3 3 0 0 0 3 3"/><path d="M11 9h5"/><path d="M11 13h5"/></svg>
           <span class="btn-label">学习档案</span>
         </button>
         <button class="btn btn-ghost btn-sm" id="settingsBtn" type="button">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.54h.01A1.7 1.7 0 0 0 10.04 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
-          设置
+          <span class="btn-label">设置</span>
         </button>
         <button class="btn btn-ghost btn-sm btn-danger-ghost" id="endSessionBtn" type="button" hidden>结束讲课</button>
       </div>
@@ -635,6 +639,188 @@
     </div>
   </div>
 
+  <!-- ============ HELP CENTER ============ -->
+  <div class="modal-layer" id="helpModal" hidden>
+    <div class="modal-backdrop" data-close="helpModal"></div>
+    <div class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1">
+      <div class="help-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>HELP CENTER</p>
+          <h2 id="helpTitle">帮助中心</h2>
+          <p>从开课、追问到诊断报告，常遇到的问题都收在这里。搜关键词会更快。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="helpModal" type="button" aria-label="关闭帮助中心">×</button>
+      </div>
+
+      <div class="help-quick-actions">
+        <button class="help-quick" id="helpReplayOnboarding" type="button">
+          <span aria-hidden="true">◎</span>
+          重看新手引导
+        </button>
+        <button class="help-quick" id="helpOpenSettings" type="button">
+          <span aria-hidden="true">⚙</span>
+          连接模型 / 打开设置
+        </button>
+        <button class="help-quick" id="helpOpenHistory" type="button">
+          <span aria-hidden="true">▤</span>
+          查看学习档案
+        </button>
+      </div>
+
+      <label class="help-search">
+        <span class="sr-only">搜索帮助内容</span>
+        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="helpSearch" type="search" autocomplete="off" placeholder="搜索问题，例如：API Key、卡住、报告、数据">
+      </label>
+      <p class="help-search-meta" id="helpSearchMeta">共 17 个问题</p>
+
+      <div class="help-groups" id="helpGroups">
+        <section class="help-group" data-help-group="start">
+          <h3>开课与连接</h3>
+          <details class="help-item">
+            <summary>第一次使用，需要准备什么？</summary>
+            <div class="help-answer">
+              <p>选一个数学知识点或题目，写清你想讲什么，然后点「开始讲课」。课堂里由你先开口讲解，AI 学生随后追问。</p>
+              <p>如果还没连接模型，点右上角「设置」填入自己的 API Key，或直接使用课堂共享代理。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>没有 API Key 也能用吗？</summary>
+            <div class="help-answer">
+              <p>可以。只要代理地址可用，留空 API Key 也能开课。共享代理有额度和频率限制；填自己的 Key 会更稳定。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>为什么提示连接失败？</summary>
+            <div class="help-answer">
+              <p>先检查 API Key、模型名和余额。如果使用自定义 Base URL，服务商需要支持浏览器跨域（CORS）。换成课堂共享代理通常最省事。</p>
+              <p>401 / 403 多半是 Key 或模型权限问题；429 是请求太频繁或额度用完了。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>图片题应该用哪个模型？</summary>
+            <div class="help-answer">
+              <p>默认的 Qwen3-VL 系列支持图片。DeepSeek V3 只支持文字；如果上传图片后提示不支持，请在设置里换回支持视觉的模型。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="student">
+          <h3>AI 学生与追问</h3>
+          <details class="help-item">
+            <summary>为什么 AI 学生不回答我的问题？</summary>
+            <div class="help-answer">
+              <p>这间教室的规则是：你是老师，AI 只当学生。它不会给答案、不会替你计算，也不会判断对错，只会从你刚说的话里提出疑问。</p>
+              <p>如果它开场只说「老师，我准备好了」，那是在等你先讲。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>人设和追问强度有什么区别？</summary>
+            <div class="help-answer">
+              <p>人设决定它关注什么，例如刨根问底型会追规则边界，粗心易错型会暴露常见误区。追问强度决定它问得多紧。</p>
+              <p>两处都可以在首页或课堂顶部切换；一节课内学科会锁定，避免混着讲。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>它一直追问同一个点，正常吗？</summary>
+            <div class="help-answer">
+              <p>正常。说明它还没从你的讲解里听到足够清楚的依据。可以补一个具体例子、反例或步骤依据，再继续讲。</p>
+              <p>如果确实卡住了，点「我卡住了」留下卡点，课后报告会把它算进诊断。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="classroom">
+          <h3>课堂操作</h3>
+          <details class="help-item">
+            <summary>怎么发送消息？</summary>
+            <div class="help-answer">
+              <p>点发送按钮，或按 Ctrl + Enter（Mac 上是 ⌘ + Enter）。Shift + Enter 换行。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>卡住了怎么办？</summary>
+            <div class="help-answer">
+              <p>课堂右下角的悬浮控制条里有「我卡住了」。写下卡在哪一步，它会作为卡点插在当前消息后面，也会进入课后诊断。</p>
+              <p>旁边的草稿板可以先列思路，支持 LaTeX 预览；手机上从「草稿板」按钮打开侧边抽屉。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>发错了，能撤回上一轮吗？</summary>
+            <div class="help-answer">
+              <p>可以。课堂顶部有「撤回上一轮」，会移除你最后一条可见消息和它后面的 AI 回复，并把文字和图片放回输入框。</p>
+              <p>如果撤回后课堂里已经没有你的讲解，AI 学生会回到等你先开口的状态。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>图片、手写和语音怎么用？</summary>
+            <div class="help-answer">
+              <p>题目图片可以点选、粘贴或拖进首页输入区；也可以先识别成文字再修改。课堂消息支持最多 4 张图。</p>
+              <p>手写板适合画图、列竖式和写公式；语音输入依赖浏览器的 Web Speech API，不支持时会自动隐藏。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="report">
+          <h3>报告与档案</h3>
+          <details class="help-item">
+            <summary>诊断报告是怎么打分的？</summary>
+            <div class="help-answer">
+              <p>AI 老师会从概念掌握、逻辑与步骤、表达清晰度、回应追问、知识迁移五个维度评分，并给出证据、薄弱点和下一步练习。</p>
+              <p>报告是学习提示，不是考试判分；证据不足时会标出低证据，不硬编结论。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>学习档案里有什么？</summary>
+            <div class="help-answer">
+              <p>每节课的主题、轮数、人设、对话回放和诊断报告都会保存。档案顶部还有时间范围筛选、学习热力图、连续天数和互动习惯。</p>
+              <p>可以按学科、题目来源筛选，也能多选后批量删除。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>怎么找到报告里的原话？</summary>
+            <div class="help-answer">
+              <p>报告里的「查看证据」会打开课堂回放，并定位到对应消息。档案里的历史课时也能直接回放。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="data">
+          <h3>数据与隐私</h3>
+          <details class="help-item">
+            <summary>我的 Key 和课堂数据存在哪里？</summary>
+            <div class="help-answer">
+              <p>全部只保存在当前浏览器的 localStorage / IndexedDB，不会上传到本站服务器。API Key 只会发往你选择的模型服务商或共享代理。</p>
+              <p>无痕模式、清理浏览器数据或换设备都会丢失本地数据，请定期导出 JSON 备份。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>导出的数据包含 API Key 吗？</summary>
+            <div class="help-answer">
+              <p>不包含。设置里的「导出全部 JSON」会自动移除 API Key；题库可以单独导出，导入时会按学科和题干去重。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>悬浮控制条为什么有时不见？</summary>
+            <div class="help-answer">
+              <p>它只出现在课堂里，并且会避开输入区。窗口较窄时会自动排成一行；如果没看到，先确认自己还在课堂页面。</p>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <div class="help-empty" id="helpEmpty" hidden>
+        <strong>没有找到相关问题</strong>
+        <p>换一个关键词试试，比如「报告」「图片」「保存」。</p>
+      </div>
+
+      <div class="help-foot">
+        <p><strong>快捷键</strong> Ctrl / ⌘ + Enter 发送 · Shift + Enter 换行 · Esc 关闭弹窗或抽屉</p>
+        <p>这个帮助页是本地静态内容，不会发起网络请求。</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ HISTORY MODAL ============ -->
   <div class="modal-layer" id="historyModal" hidden>
     <div class="modal-backdrop" data-close="historyModal"></div>
@@ -876,6 +1062,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261113b"></script>
+  <script type="module" src="./app.js?v=20261113c"></script>
 </body>
 </html>
