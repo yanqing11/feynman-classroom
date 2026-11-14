@@ -27,6 +27,18 @@ function safeParse(value) {
   }
 }
 
+function notifyStorageIssue(level, message) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent('feynman:storage-warning', {
+        detail: { source: 'history', level, message }
+      })
+    );
+  } catch {
+    /* Events are best-effort; saving must continue. */
+  }
+}
+
 function round(value) {
   return Number.isFinite(value) ? Math.round(value) : null;
 }
@@ -128,13 +140,16 @@ function persist(records) {
   if (tryStore(list)) return list;
 
   // 空间不够时先丢最早的对话原文，只留下报告和统计。
+  notifyStorageIssue('warn', '学习档案体积或本机空间不足，已自动省略较早的对话原文，只保留报告和统计。');
   list = list.map((record) => ({ ...record, messages: [] }));
   if (tryStore(list)) return list;
 
   // 还不够就只保留最近 20 课。
+  notifyStorageIssue('critical', '学习档案空间不足，只保留了最近 20 课。请先导出备份，再清理旧档案。');
   list = list.slice(0, 20);
   if (tryStore(list)) return list;
 
+  notifyStorageIssue('critical', '学习档案无法保存到本机。请先导出备份并清理旧档案，避免新记录继续丢失。');
   return loadHistory();
 }
 

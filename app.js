@@ -61,6 +61,10 @@ const TOPIC_IMAGE_HINT =
   '支持截图粘贴、拖拽上传；原图保存在本机，识别或发送时会交给你配置的 AI 模型；手写识别效果有限，识别后请校对文字';
 const TOPIC_IMAGE_READY_HINT = '已添加题目图片，可点「识别文字」自动转写，或直接开始讲课';
 
+const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
+const STORAGE_WARN_RATIO = 0.8;
+const STORAGE_CRITICAL_RATIO = 0.94;
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -335,6 +339,18 @@ const refs = {
   exportDataBtn: $('#exportDataBtn'),
   clearArchiveDataBtn: $('#clearArchiveDataBtn'),
   storageUsage: $('#storageUsage'),
+  storagePanel: $('#storagePanel'),
+  storageBadge: $('#storageBadge'),
+  storageMeter: $('#storageMeter'),
+  storageMeterFill: $('#storageMeterFill'),
+  storageHint: $('#storageHint'),
+  storageBanner: $('#storageBanner'),
+  storageBannerMark: $('#storageBannerMark'),
+  storageBannerTitle: $('#storageBannerTitle'),
+  storageBannerText: $('#storageBannerText'),
+  storageBannerExport: $('#storageBannerExport'),
+  storageBannerManage: $('#storageBannerManage'),
+  storageBannerClose: $('#storageBannerClose'),
   replayOnboardingBtn: $('#replayOnboardingBtn'),
   onboardingModal: $('#onboardingModal'),
   onboardingDots: $('#onboardingDots'),
@@ -423,6 +439,7 @@ let speech = null;
 let speechBase = '';
 let renderedSessionId = null;
 let lastPersistenceWarning = '';
+let lastStorageToastLevel = '';
 let composerObserver = null;
 let draftState = { sessionId: '', text: '', open: true, mode: 'edit' };
 let draftSaveTimer = null;
@@ -508,6 +525,7 @@ function init() {
   renderConnection();
   store.subscribe(onStoreChange);
   maybeOnboard();
+  setTimeout(() => checkStoragePressure(), 1000);
 }
 
 function populateExamples() {
@@ -1038,6 +1056,7 @@ function onStoreChange() {
   if (store.persistenceWarning && store.persistenceWarning !== lastPersistenceWarning) {
     lastPersistenceWarning = store.persistenceWarning;
     toast(store.persistenceWarning, 'warm', 7000);
+    checkStoragePressure({ source: 'session', message: store.persistenceWarning, force: true });
   }
   if (!store.persistenceWarning) lastPersistenceWarning = '';
 }
@@ -2209,12 +2228,183 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function updateStorageUsage() {
-  if (!refs.storageUsage) return;
+function storageSnapshot() {
   const used = localStorageBytes();
+  const ratio = Math.min(1, used / STORAGE_QUOTA_BYTES);
+  const level =
+    ratio >= STORAGE_CRITICAL_RATIO ? 'critical' : ratio >= STORAGE_WARN_RATIO ? 'warn' : 'ok';
+  return { used, ratio, percent: Math.min(100, Math.round(ratio * 100)), level };
+}
+
+function readStorageNotice() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(APP.storage.storageNotice) || 'null');
+    if (!stored || typeof stored !== 'object') return null;
+    return {
+      level: stored.level === 'critical' ? 'critical' : 'warn',
+      used: Number(stored.used) || 0
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStorageNotice(snapshot) {
+  try {
+    localStorage.setItem(
+      APP.storage.storageNotice,
+      JSON.stringify({ level: snapshot.level, used: snapshot.used, at: new Date().toISOString() })
+    );
+  } catch {
+    /* Ignore: storage is already under pressure. */
+  }
+}
+
+function clearStorageNotice() {
+  try {
+    localStorage.removeItem(APP.storage.storageNotice);
+  } catch {
+    /* Ignore. */
+  }
+}
+
+function storageNoticeSuppressed(snapshot) {
+  const notice = readStorageNotice();
+  if (!notice || notice.level !== snapshot.level) return false;
+  // Show again when usage has grown meaningfully since the last dismissal.
+  return snapshot.used <= notice.used * 1.08 + 200 * 1024;
+}
+
+function renderStorageMeter(snapshot = storageSnapshot()) {
   const records = loadHistory().length;
-  refs.storageUsage.textContent = `本机已用约 ${formatBytes(used)}（浏览器通常上限 5 MB）· ${records} 条学习档案。`;
-  refs.storageUsage.classList.toggle('is-warn', used > 4 * 1024 * 1024);
+
+  if (refs.storageUsage) {
+    refs.storageUsage.textContent = `本机已用约 ${formatBytes(snapshot.used)} / 5 MB（${snapshot.percent}%）· ${records} 条学习档案。`;
+  }
+  if (refs.storageMeterFill) {
+    refs.storageMeterFill.style.width = `${Math.max(1, snapshot.percent)}%`;
+  }
+  if (refs.storageMeter) {
+    refs.storageMeter.setAttribute('aria-valuenow', String(snapshot.percent));
+    refs.storageMeter.setAttribute(
+      'aria-valuetext',
+      `已用 ${formatBytes(snapshot.used)}，约占本机存储 ${snapshot.percent}%`
+    );
+  }
+  if (refs.storagePanel) {
+    refs.storagePanel.classList.toggle('is-warn', snapshot.level === 'warn');
+    refs.storagePanel.classList.toggle('is-critical', snapshot.level === 'critical');
+  }
+  if (refs.storageBadge) {
+    refs.storageBadge.textContent =
+      snapshot.level === 'critical' ? '即将用满' : snapshot.level === 'warn' ? '偏紧' : '充足';
+    refs.storageBadge.dataset.level = snapshot.level;
+  }
+  if (refs.storageHint) {
+    refs.storageHint.hidden = snapshot.level === 'ok';
+    refs.storageHint.textContent =
+      snapshot.level === 'critical'
+        ? '空间即将用尽，新的课堂和报告可能无法保存。请先导出备份，再清理旧档案。'
+        : snapshot.level === 'warn'
+          ? '空间开始紧张。建议导出备份，并清理不再需要的学习档案。'
+          : '';
+  }
+  return snapshot;
+}
+
+function storageBannerTitle(snapshot, source, eventLevel = '') {
+  if (source === 'session') return '课堂没能完整保存';
+  if (source === 'history') {
+    const level = eventLevel || snapshot.level;
+    return level === 'critical' ? '学习档案没能保存' : '学习档案已自动精简';
+  }
+  if (source === 'bank') return '题库没能完整保存';
+  return snapshot.level === 'critical' ? '本机存储即将用满' : '本机存储开始紧张';
+}
+
+function storageBannerMessage(snapshot, message) {
+  if (message) return message;
+  const used = formatBytes(snapshot.used);
+  if (snapshot.level === 'critical') {
+    return `已用约 ${used}（${snapshot.percent}%），新的课堂和报告可能存不下。请先导出 JSON 备份，再清理旧档案。`;
+  }
+  return `已用约 ${used}（${snapshot.percent}%）。先导出备份，再清理不需要的学习档案或题库图片。`;
+}
+
+function showStorageBanner(snapshot, { source = 'auto', message = '', eventLevel = '' } = {}) {
+  if (!refs.storageBanner) return;
+  refs.storageBanner.hidden = false;
+  refs.storageBanner.dataset.level = snapshot.level;
+  if (refs.storageBannerTitle) {
+    refs.storageBannerTitle.textContent = storageBannerTitle(snapshot, source, eventLevel);
+  }
+  if (refs.storageBannerText) {
+    refs.storageBannerText.textContent = storageBannerMessage(snapshot, message);
+  }
+  if (refs.storageBannerMark) {
+    refs.storageBannerMark.textContent = snapshot.level === 'critical' ? '!!' : '!';
+  }
+  if ((source === 'history' || source === 'bank') && lastStorageToastLevel !== snapshot.level) {
+    lastStorageToastLevel = snapshot.level;
+    toast(message || '本机存储空间不足，建议先导出备份。', 'warm', 6500);
+  }
+}
+
+function hideStorageBanner() {
+  if (refs.storageBanner) refs.storageBanner.hidden = true;
+}
+
+function dismissStorageBanner() {
+  const snapshot = storageSnapshot();
+  hideStorageBanner();
+  if (snapshot.level !== 'ok') writeStorageNotice(snapshot);
+}
+
+function checkStoragePressure({ source = 'auto', message = '', force = false, eventLevel = '' } = {}) {
+  const snapshot = renderStorageMeter();
+  const forced = force || source === 'session' || source === 'history' || source === 'bank';
+
+  if (snapshot.level === 'ok' && !forced) {
+    hideStorageBanner();
+    clearStorageNotice();
+    lastStorageToastLevel = '';
+    return snapshot;
+  }
+
+  const display =
+    snapshot.level === 'ok' ? { ...snapshot, level: 'critical' } : snapshot;
+  if (forced || !storageNoticeSuppressed(display)) {
+    showStorageBanner(display, { source, message, eventLevel });
+  }
+  return snapshot;
+}
+
+function updateStorageUsage() {
+  const snapshot = renderStorageMeter();
+  if (snapshot.level === 'ok') {
+    hideStorageBanner();
+    clearStorageNotice();
+    lastStorageToastLevel = '';
+  }
+}
+
+function openStorageSettings() {
+  fillSettingsForm();
+  openModal('settingsModal');
+  setTimeout(() => {
+    refs.clearArchiveDataBtn?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    refs.clearArchiveDataBtn?.focus({ preventScroll: true });
+  }, 340);
+}
+
+function handleStorageWarningEvent(event) {
+  const detail = event?.detail || {};
+  checkStoragePressure({
+    source: detail.source || 'history',
+    message: detail.message || '',
+    force: true,
+    eventLevel: detail.level || ''
+  });
 }
 
 function readSettingsForm() {
@@ -2339,6 +2529,11 @@ async function handleExportData() {
   if (!refs.exportDataBtn) return;
   refs.exportDataBtn.disabled = true;
   refs.exportDataBtn.textContent = '正在打包…';
+  const bannerExport = refs.storageBannerExport;
+  if (bannerExport) {
+    bannerExport.disabled = true;
+    bannerExport.textContent = '导出中…';
+  }
   try {
     let questions = [];
     try {
@@ -2375,6 +2570,10 @@ async function handleExportData() {
   } finally {
     refs.exportDataBtn.disabled = false;
     refs.exportDataBtn.textContent = '导出全部 JSON';
+    if (bannerExport) {
+      bannerExport.disabled = false;
+      bannerExport.textContent = '导出备份';
+    }
   }
 }
 
@@ -2395,7 +2594,7 @@ function handleClearArchiveData() {
   openHistoryIds = new Set();
   renderHistory();
   renderHistoryEntry();
-  updateStorageUsage();
+  checkStoragePressure();
   showSettingsStatus('学习档案已清空，课堂设置和题库没有受影响。', 'ok');
   toast('学习档案已清空。', 'success', 2600);
 }
@@ -2740,6 +2939,12 @@ function archiveCurrentLesson() {
   try {
     archiveSession(store.session, { model: store.settings?.model || '' });
     renderHistoryEntry();
+    // Do not hide a banner raised by an archive write failure; only refresh
+    // pressure state when usage itself has crossed a threshold.
+    const snapshot = renderStorageMeter();
+    if (snapshot.level !== 'ok' && refs.storageBanner?.hidden) {
+      checkStoragePressure({ source: 'archive' });
+    }
   } catch (error) {
     console.warn('保存学习档案失败：', error);
   }
@@ -3329,6 +3534,7 @@ function handleBulkDeleteHistory() {
   for (const id of ids) openHistoryIds.delete(id);
   renderHistory();
   renderHistoryEntry();
+  checkStoragePressure();
   toast(`已删除 ${removed} 条学习记录。`, 'success', 2600);
 }
 
@@ -3603,6 +3809,7 @@ function handleClearHistory() {
   historySelection = new Set();
   renderHistory();
   renderHistoryEntry();
+  checkStoragePressure();
   toast('学习档案已清空。', 'success', 2600);
 }
 
@@ -4404,6 +4611,11 @@ function bindEvents() {
     openModal('settingsModal');
   });
   refs.helpOpenHistory?.addEventListener('click', openHistory);
+
+  refs.storageBannerExport?.addEventListener('click', handleExportData);
+  refs.storageBannerManage?.addEventListener('click', openStorageSettings);
+  refs.storageBannerClose?.addEventListener('click', dismissStorageBanner);
+  window.addEventListener('feynman:storage-warning', handleStorageWarningEvent);
 
   refs.replayOnboardingBtn?.addEventListener('click', () => {
     openOnboarding({ stack: true });

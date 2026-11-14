@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261113c">
+  <link rel="stylesheet" href="./styles.css?v=20261113d">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -50,6 +50,21 @@
         <button class="btn btn-ghost btn-sm btn-danger-ghost" id="endSessionBtn" type="button" hidden>结束讲课</button>
       </div>
     </header>
+
+    <div class="storage-banner" id="storageBanner" hidden role="status" aria-live="polite">
+      <div class="storage-banner-inner">
+        <span class="storage-banner-mark" id="storageBannerMark" aria-hidden="true">!</span>
+        <div class="storage-banner-copy">
+          <strong id="storageBannerTitle">本机存储开始紧张</strong>
+          <p id="storageBannerText">建议先导出备份，再清理不需要的学习档案。</p>
+        </div>
+        <div class="storage-banner-actions">
+          <button class="btn btn-primary btn-sm" id="storageBannerExport" type="button">导出备份</button>
+          <button class="btn btn-outline btn-sm" id="storageBannerManage" type="button">去清理</button>
+          <button class="icon-btn storage-banner-close" id="storageBannerClose" type="button" aria-label="关闭存储提醒">×</button>
+        </div>
+      </div>
+    </div>
 
     <main id="main">
       <!-- ============ HOME ============ -->
@@ -536,7 +551,17 @@
             <button class="btn btn-outline btn-sm" id="exportDataBtn" type="button">导出全部 JSON</button>
             <button class="btn btn-danger-ghost btn-sm" id="clearArchiveDataBtn" type="button">清空学习档案</button>
           </div>
-          <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
+          <div class="storage-panel" id="storagePanel">
+            <div class="storage-panel-head">
+              <span class="storage-panel-title" id="storagePanelTitle">本机存储</span>
+              <span class="storage-badge" id="storageBadge">统计中</span>
+            </div>
+            <div class="storage-meter" id="storageMeter" role="progressbar" aria-labelledby="storagePanelTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span class="storage-meter-fill" id="storageMeterFill"></span>
+            </div>
+            <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
+            <p class="storage-hint" id="storageHint" hidden></p>
+          </div>
           <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。</p>
         </fieldset>
 
@@ -1062,6 +1087,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261113c"></script>
+  <script type="module" src="./app.js?v=20261113d"></script>
 </body>
 </html>

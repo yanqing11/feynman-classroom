@@ -12,6 +12,7 @@ export const APP = {
     history: 'feynman.history.v1',
     welcomed: 'feynman.welcomed.v1',
     onboarding: 'feynman.onboarding.v1',
+    storageNotice: 'feynman.storageNotice.v1',
     practice: 'feynman.practice.v1',
     bank: 'feynman.bank.v1',
     draft: 'feynman.draft.v1'

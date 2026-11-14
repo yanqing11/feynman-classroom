@@ -7442,3 +7442,313 @@ body.is-chat .topbar-tagline {
     font-size: 10px;
   }
 }
+
+/* ==========================================================================
+   P2-6 storage pressure warning
+   ========================================================================== */
+
+.storage-banner {
+  border-bottom: 1px solid #ecd9b0;
+  background: #fdf5e6;
+  color: #6f521b;
+}
+
+.storage-banner[data-level="critical"] {
+  border-bottom-color: #f0c7c2;
+  background: #fdf0ee;
+  color: #8f382f;
+}
+
+body.is-chat .storage-banner {
+  display: none;
+}
+
+.storage-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px clamp(18px, 3.6vw, 52px);
+}
+
+.storage-banner-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f2dfb4;
+  color: #7a5a1f;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.storage-banner[data-level="critical"] .storage-banner-mark {
+  background: #f7d9d5;
+  color: #a13f34;
+}
+
+.storage-banner-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.storage-banner-copy strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.storage-banner-copy p {
+  margin: 2px 0 0;
+  color: inherit;
+  font-size: 11.5px;
+  line-height: 1.55;
+  opacity: 0.86;
+}
+
+.storage-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.storage-banner-actions .btn {
+  min-height: 32px;
+  padding: 7px 13px;
+  font-size: 11.5px;
+}
+
+.storage-banner .btn-primary {
+  background: #8a641f;
+  box-shadow: none;
+}
+
+.storage-banner[data-level="critical"] .btn-primary {
+  background: #a13f34;
+}
+
+.storage-banner-close {
+  width: 30px;
+  height: 30px;
+  border-color: rgba(122, 90, 31, 0.28);
+  color: inherit;
+  font-size: 18px;
+}
+
+.storage-banner[data-level="critical"] .storage-banner-close {
+  border-color: rgba(161, 63, 52, 0.28);
+}
+
+.storage-panel {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card);
+}
+
+.storage-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.storage-panel-title {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.storage-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--green-pale);
+  color: var(--green-deep);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.storage-badge[data-level="warn"] {
+  background: rgba(196, 150, 58, 0.16);
+  color: #8a641f;
+}
+
+.storage-badge[data-level="critical"] {
+  background: rgba(201, 92, 76, 0.16);
+  color: #a13f34;
+}
+
+.storage-meter {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.storage-meter-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 0.35s var(--ease), background 0.2s;
+}
+
+.storage-panel.is-warn .storage-meter-fill {
+  background: var(--gold);
+}
+
+.storage-panel.is-critical .storage-meter-fill {
+  background: var(--coral);
+}
+
+.storage-panel .storage-usage {
+  color: var(--faint);
+}
+
+.storage-hint {
+  margin: 0;
+  color: #9a6b1d;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.storage-panel.is-critical .storage-hint {
+  color: var(--coral);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .storage-banner {
+  border-bottom-color: rgba(196, 150, 58, 0.34);
+  background: rgba(196, 150, 58, 0.13);
+  color: #e0bd7a;
+}
+
+[data-theme="dark"] .storage-banner[data-level="critical"] {
+  border-bottom-color: rgba(214, 98, 82, 0.36);
+  background: rgba(214, 98, 82, 0.13);
+  color: #eda79c;
+}
+
+[data-theme="dark"] .storage-banner-mark {
+  background: rgba(224, 189, 122, 0.2);
+  color: #e0bd7a;
+}
+
+[data-theme="dark"] .storage-banner[data-level="critical"] .storage-banner-mark {
+  background: rgba(237, 167, 156, 0.18);
+  color: #eda79c;
+}
+
+[data-theme="dark"] .storage-banner-close {
+  border-color: rgba(224, 189, 122, 0.32);
+}
+
+[data-theme="dark"] .storage-banner[data-level="critical"] .storage-banner-close {
+  border-color: rgba(237, 167, 156, 0.36);
+}
+
+[data-theme="dark"] .storage-banner .btn-primary {
+  background: #a87b28;
+  color: #141a17;
+}
+
+[data-theme="dark"] .storage-banner[data-level="critical"] .btn-primary {
+  background: #c26053;
+  color: #141a17;
+}
+
+[data-theme="dark"] .storage-banner .btn-outline {
+  border-color: rgba(224, 189, 122, 0.36);
+  color: inherit;
+}
+
+[data-theme="dark"] .storage-banner[data-level="critical"] .btn-outline {
+  border-color: rgba(237, 167, 156, 0.36);
+}
+
+[data-theme="dark"] .storage-panel {
+  border-color: var(--line);
+  background: rgba(17, 22, 20, 0.6);
+}
+
+[data-theme="dark"] .storage-badge {
+  background: rgba(146, 224, 196, 0.14);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .storage-badge[data-level="warn"] {
+  background: rgba(196, 150, 58, 0.2);
+  color: #e0bd7a;
+}
+
+[data-theme="dark"] .storage-badge[data-level="critical"] {
+  background: rgba(214, 98, 82, 0.2);
+  color: #eda79c;
+}
+
+[data-theme="dark"] .storage-hint {
+  color: #e0bd7a;
+}
+
+[data-theme="dark"] .storage-panel.is-critical .storage-hint {
+  color: var(--coral);
+}
+
+@media (max-width: 760px) {
+  .storage-banner-inner {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+
+  .storage-banner-copy {
+    flex: 1 1 180px;
+  }
+
+  .storage-banner-actions {
+    width: 100%;
+    padding-left: 36px;
+  }
+
+  .storage-banner-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .storage-banner-close {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .storage-banner-actions {
+    flex-wrap: wrap;
+    padding-left: 0;
+  }
+
+  .storage-banner-copy {
+    flex-basis: 100%;
+  }
+
+  .storage-banner-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    margin-left: 0;
+  }
+
+  .storage-banner-inner {
+    position: relative;
+    padding-right: 42px;
+  }
+}
