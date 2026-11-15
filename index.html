@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261115c">
+  <link rel="stylesheet" href="./styles.css?v=20261115d">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -280,6 +280,21 @@
           </section>
 
           <aside class="side-panel">
+            <div class="side-card teacher-call-card" id="teacherCallCard">
+              <div class="teacher-seal" aria-hidden="true">评</div>
+              <div class="side-card-head">
+                <span class="side-kicker">AI TEACHER · 旁听中</span>
+                <h3>卡住了？呼叫老师。</h3>
+              </div>
+              <p>AI 老师会看完整个对话，指出逻辑漏洞和表达盲区，再给你下一次的具体讲法。</p>
+              <button class="btn btn-primary btn-block" id="callTeacherBtn" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
+                <span id="callTeacherLabel">呼叫 AI 老师点评</span>
+              </button>
+              <button class="text-link" id="viewLastReportBtn" type="button" hidden>查看上一次诊断报告 →</button>
+              <p class="tiny-note">建议先讲 2–3 轮，老师的诊断会更准确。</p>
+            </div>
+
             <div class="side-card draft-card" id="draftCard">
               <div class="side-card-head draft-head">
                 <div>
@@ -340,21 +355,6 @@
                 <select id="chatModeSelect"></select>
               </div>
               <p class="tiny-note" id="practiceLockHint">学科已锁定；到设置里可以关闭锁定。</p>
-            </div>
-
-            <div class="side-card teacher-call-card" id="teacherCallCard">
-              <div class="teacher-seal" aria-hidden="true">评</div>
-              <div class="side-card-head">
-                <span class="side-kicker">AI TEACHER · 旁听中</span>
-                <h3>卡住了？呼叫老师。</h3>
-              </div>
-              <p>AI 老师会看完整个对话，指出逻辑漏洞和表达盲区，再给你下一次的具体讲法。</p>
-              <button class="btn btn-primary btn-block" id="callTeacherBtn" type="button">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
-                <span id="callTeacherLabel">呼叫 AI 老师点评</span>
-              </button>
-              <button class="text-link" id="viewLastReportBtn" type="button" hidden>查看上一次诊断报告 →</button>
-              <p class="tiny-note">建议先讲 2–3 轮，老师的诊断会更准确。</p>
             </div>
 
             <div class="side-card model-card">
@@ -1134,6 +1134,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261115c"></script>
+  <script type="module" src="./app.js?v=20261115d"></script>
 </body>
 </html>

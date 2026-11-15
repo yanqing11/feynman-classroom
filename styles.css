@@ -1559,12 +1559,30 @@ body.is-chat .footer {
   gap: 13px;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Flex children must keep their natural height, otherwise the cards shrink
+   to fit the panel and the bottom ones (呼叫老师) get clipped instead of
+   making the panel scrollable. */
+.side-panel > .side-card {
+  flex: 0 0 auto;
 }
 
 .side-panel::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.side-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.side-panel::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 6px;
 }
 
 .side-card.draft-card {
