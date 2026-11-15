@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="费曼小课堂：把数学讲给一个会追问的 AI 学生听，再用 AI 老师的量化报告找到自己的理解缺口。">
+  <meta name="theme-color" content="#fdfdfb">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
+  <title>费曼小课堂 · 讲给一个会追问的学生听</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="stylesheet" href="./styles.css?v=20261115d">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="brand" id="brandHome" type="button" aria-label="回到首页">
+        <span class="brand-mark" aria-hidden="true">∫</span>
+        <span class="brand-text">
+          <strong>费曼小课堂</strong>
+          <small>FEYNMAN CLASSROOM</small>
+        </span>
+      </button>
+
+      <p class="topbar-tagline" id="topbarTagline">费曼学习法 × 苏格拉底提问</p>
+
+      <div class="topbar-session" id="topbarSession" hidden>
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="topbar-topic" id="topbarTopic"></span>
+      </div>
+
+      <div class="topbar-actions">
+        <span class="connection-pill" id="connectionPill" title="AI 连接状态">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="connectionLabel">未连接</span>
+        </span>
+        <button class="btn btn-ghost btn-sm" id="helpBtn" type="button" title="查看帮助与快捷键">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2-2.3 3.6"/><path d="M12 17h.01"/></svg>
+          <span class="btn-label">帮助</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="historyBtn" type="button" title="查看学习档案">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M7 4v13a3 3 0 0 0 3 3"/><path d="M11 9h5"/><path d="M11 13h5"/></svg>
+          <span class="btn-label">学习档案</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="settingsBtn" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.54h.01A1.7 1.7 0 0 0 10.04 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+          <span class="btn-label">设置</span>
+        </button>
+        <button class="btn btn-ghost btn-sm btn-danger-ghost" id="endSessionBtn" type="button" hidden>结束讲课</button>
+      </div>
+    </header>
+
+    <div class="storage-banner" id="storageBanner" hidden role="status" aria-live="polite">
+      <div class="storage-banner-inner">
+        <span class="storage-banner-mark" id="storageBannerMark" aria-hidden="true">!</span>
+        <div class="storage-banner-copy">
+          <strong id="storageBannerTitle">本机存储开始紧张</strong>
+          <p id="storageBannerText">建议先导出备份，再清理不需要的学习档案。</p>
+        </div>
+        <div class="storage-banner-actions">
+          <button class="btn btn-primary btn-sm" id="storageBannerExport" type="button">导出备份</button>
+          <button class="btn btn-outline btn-sm" id="storageBannerManage" type="button">去清理</button>
+          <button class="icon-btn storage-banner-close" id="storageBannerClose" type="button" aria-label="关闭存储提醒">×</button>
+        </div>
+      </div>
+    </div>
+
+    <main id="main">
+      <!-- ============ HOME ============ -->
+      <section class="screen home-screen" id="homeScreen">
+        <div class="home-hero">
+          <p class="eyebrow home-eyebrow">
+            <span class="eyebrow-line" aria-hidden="true"></span>
+            费曼学习法 × 苏格拉底提问
+            <span class="eyebrow-line" aria-hidden="true"></span>
+          </p>
+          <h1 class="home-title">讲一遍，你就真的懂了。</h1>
+          <p class="home-subtitle" id="homeSubtitle">你来讲，AI 持续追问，找到知识盲区。</p>
+        </div>
+
+        <div class="home-card">
+          <div class="home-input">
+            <div class="home-subject-bar">
+              <div class="subject-tabs" id="subjectTabs" role="tablist" aria-label="选择学科"></div>
+              <span class="home-subject-hint" id="subjectHint">整节课会锁定在这个学科</span>
+            </div>
+
+            <label class="sr-only" for="topicInput">讲课主题或题目</label>
+            <textarea id="topicInput" class="topic-input" rows="3" maxlength="1200"
+              placeholder="写下你要讲解的数学主题，你作为老师来讲。例如：用配方法解 x²−6x+5=0，讲清楚每一步为什么这样做"></textarea>
+            <p class="home-teacher-hint" id="homeTeacherHint">
+              <span aria-hidden="true">⚠️</span>
+              <span id="homeTeacherHintText">开始讲课之后，需要由你先进行讲解，AI 学生等待你的发言，不会主动提问。</span>
+            </p>
+
+            <div class="home-meta">
+              <label class="home-meta-field home-meta-difficulty" for="difficultySelect">
+                <span>难度</span>
+                <select id="difficultySelect"></select>
+              </label>
+              <label class="home-meta-field" for="tagInput">
+                <span>知识点</span>
+                <input id="tagInput" type="text" list="tagOptions" maxlength="48" placeholder="选择或输入知识点，可用逗号分隔">
+                <datalist id="tagOptions"></datalist>
+              </label>
+            </div>
+
+            <div class="quick-tag-row">
+              <span class="quick-tag-label">快捷标签</span>
+              <div class="quick-tags" id="quickTags" role="group" aria-label="快捷知识点标签"></div>
+            </div>
+
+            <div class="home-persona home-ai-mode">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
+                <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
+              </div>
+              <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
+            </div>
+
+            <div class="home-persona" id="homePersonaBlock">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
+                <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
+              </div>
+              <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
+            </div>
+
+            <label class="home-note">
+              <span class="sr-only">题目备注</span>
+              <input id="noteInput" type="text" maxlength="1200" placeholder="备注（可选）：易错点、来源或给自己的提醒">
+            </label>
+
+            <div class="topic-image-preview" id="topicImagePreview" hidden>
+              <img id="topicImageThumb" alt="题目图片预览">
+              <button class="icon-btn remove-image" id="removeTopicImage" type="button" aria-label="移除题目图片">×</button>
+            </div>
+            <p class="ocr-status" id="ocrStatus" hidden role="status"></p>
+
+            <div class="home-input-foot">
+              <div class="topic-image-row">
+                <input type="file" id="topicImageInput" accept="image/*" hidden>
+                <input type="file" id="topicCameraInput" accept="image/*" capture="environment" hidden>
+                <button class="btn btn-outline btn-sm" id="topicImageBtn" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                  上传图片
+                </button>
+                <button class="btn btn-outline btn-sm" id="topicCameraBtn" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v12H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  拍照
+                </button>
+                <button class="btn btn-ghost btn-sm" id="recognizeBtn" type="button" hidden>识别文字</button>
+                <span class="image-hint" id="topicImageHint">支持截图粘贴、拖拽上传；原图保存在本机，识别或发送时会交给你配置的 AI 模型；手写识别效果有限，识别后请校对文字</span>
+              </div>
+              <button class="btn btn-primary btn-start" id="startBtn" type="button"><span id="startBtnLabel">开始讲课</span></button>
+            </div>
+
+            <div class="home-bank-row">
+              <button class="text-link" id="openBankSquareBtn" type="button">题库广场</button>
+              <button class="text-link" id="saveBankBtn" type="button">存入我的题库</button>
+              <button class="text-link" id="openBankBtn" type="button">我的题库</button>
+              <span class="home-source-note" id="sourceNote"></span>
+            </div>
+          </div>
+
+          <div class="example-row" id="exampleChips" aria-label="示例主题"></div>
+
+          <p class="privacy-note">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            题目和档案只保存在本地；图片识题会把图片发给你配置的 AI 模型。
+          </p>
+        </div>
+
+        <button class="history-entry" id="homeHistoryBtn" type="button">
+          <span class="history-entry-mark" aria-hidden="true">档</span>
+          <span class="history-entry-text">
+            <strong>学习档案</strong>
+            <small id="homeHistoryMeta">还没有记录，讲完一课就会自动保存</small>
+          </span>
+          <span class="history-entry-arrow" aria-hidden="true">→</span>
+        </button>
+      </section>
+
+      <!-- ============ CHAT ============ -->
+      <section class="screen chat-screen" id="chatScreen" hidden>
+        <div class="chat-layout">
+          <section class="chat-panel paper-card" aria-label="讲课对话">
+            <div class="chat-head">
+              <div class="chat-topic">
+                <span class="chat-kicker" id="chatKicker">正在讲课</span>
+                <p class="chat-sub" id="chatSub">小问会围绕顶部的题目追问</p>
+              </div>
+              <div class="chat-head-right">
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" id="abandonSessionBtn" type="button" title="放弃本次课堂，不存入学习档案">放弃本次课堂</button>
+                <span class="round-badge" id="roundBadge">第 0 轮</span>
+                <span class="stuck-badge" id="stuckBadge" hidden>卡点 0</span>
+                <button class="btn btn-primary btn-sm mobile-teacher-btn" id="callTeacherMobile" type="button">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
+                  <span id="callTeacherMobileLabel">呼叫老师</span>
+                </button>
+              </div>
+            </div>
+
+            <section class="chat-problem" id="topicCard" aria-label="本次题目" hidden>
+              <div class="chat-problem-head">
+                <span class="chat-problem-label">本次题目</span>
+                <div class="chat-problem-meta" id="topicMeta"></div>
+                <button class="chat-problem-toggle" id="topicToggleBtn" type="button" hidden>展开全文</button>
+              </div>
+              <div class="chat-problem-body" id="topicCardBody">
+                <p class="chat-problem-text" id="topicCardText"></p>
+                <img class="chat-problem-image" id="topicCardImage" alt="题目图片" data-zoom="true" hidden>
+              </div>
+            </section>
+
+            <div class="chat-body" id="chatBody">
+              <div class="message-list" id="messageList" role="log" aria-live="polite" aria-label="对话记录"></div>
+              <div class="typing-row" id="typingIndicator" hidden role="status" aria-live="polite">
+                <div class="message-avatar student-avatar" aria-hidden="true">问</div>
+                <div class="typing-bubble">
+                  <span class="typing-label" id="typingLabel">小问正在想</span>
+                  <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="typing-skeleton" aria-hidden="true"></span>
+                </div>
+              </div>
+            </div>
+
+            <form class="composer" id="composer">
+              <div class="pending-images" id="pendingImages" hidden></div>
+              <div class="composer-box">
+                <label class="sr-only" for="messageInput">你的讲解</label>
+                <textarea id="messageInput" rows="1" maxlength="4000"
+                  placeholder="把你的思路讲出来…… 不用完美，边想边说也可以。"></textarea>
+                <div class="composer-toolbar">
+                  <div class="composer-tools">
+                    <input type="file" id="chatImageInput" accept="image/*" hidden>
+                    <button class="tool-btn" id="attachBtn" type="button" title="添加图片">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                      <span>图片</span>
+                    </button>
+                    <button class="tool-btn" id="handwritingBtn" type="button" title="打开手写板">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3Z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5Z"/><path d="m2 2 7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
+                      <span>手写</span>
+                    </button>
+                    <button class="tool-btn" id="micBtn" type="button" title="语音输入">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/><path d="M8 22h8"/></svg>
+                      <span id="micLabel">语音</span>
+                    </button>
+                  </div>
+                  <div class="composer-submit">
+                    <span class="send-hint">Ctrl+Enter 发送 · Enter 换行</span>
+                    <button class="btn btn-primary btn-send" id="sendBtn" type="submit" aria-label="发送讲解">
+                      <span>发送</span>
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            <div class="classroom-fab" id="classroomFab" role="group" aria-label="课堂快捷操作">
+              <button class="fab-btn" id="undoTurnBtn" type="button" title="回退上一轮，把讲解放回输入框">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+                <span>回退上一轮</span>
+              </button>
+              <button class="fab-btn" id="markStuckBtn" type="button" title="标记当前对话为卡点，报告会重点分析">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M12 4h8l-2.5 4L20 12h-8"/></svg>
+                <span>标记卡点</span>
+              </button>
+              <button class="fab-btn fab-btn-draft" id="draftMobileBtn" type="button" title="打开草稿板" aria-expanded="false" aria-controls="draftCard">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+                <span>草稿板</span>
+              </button>
+              <button class="fab-btn fab-btn-primary" id="endAndReportBtn" type="button" title="结束课堂并生成诊断报告">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6"/><path d="M9 13h6"/><path d="M9 17h3"/></svg>
+                <span>结束并生成报告</span>
+              </button>
+            </div>
+          </section>
+
+          <aside class="side-panel">
+            <div class="side-card teacher-call-card" id="teacherCallCard">
+              <div class="teacher-seal" aria-hidden="true">评</div>
+              <div class="side-card-head">
+                <span class="side-kicker">AI TEACHER · 旁听中</span>
+                <h3>卡住了？呼叫老师。</h3>
+              </div>
+              <p>AI 老师会看完整个对话，指出逻辑漏洞和表达盲区，再给你下一次的具体讲法。</p>
+              <button class="btn btn-primary btn-block" id="callTeacherBtn" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
+                <span id="callTeacherLabel">呼叫 AI 老师点评</span>
+              </button>
+              <button class="text-link" id="viewLastReportBtn" type="button" hidden>查看上一次诊断报告 →</button>
+              <p class="tiny-note">建议先讲 2–3 轮，老师的诊断会更准确。</p>
+            </div>
+
+            <div class="side-card draft-card" id="draftCard">
+              <div class="side-card-head draft-head">
+                <div>
+                  <span class="side-kicker">DRAFT BOARD</span>
+                  <h3>草稿板</h3>
+                </div>
+                <button class="draft-toggle" id="draftToggleBtn" type="button" aria-expanded="true" aria-controls="draftBody" title="收起草稿板" aria-label="收起草稿板">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+              <div class="draft-body" id="draftBody">
+                <div class="draft-tabs" role="tablist" aria-label="草稿板模式">
+                  <button class="draft-tab is-active" id="draftEditTab" type="button" role="tab" aria-selected="true" aria-controls="draftInput" data-mode="edit">编辑</button>
+                  <button class="draft-tab" id="draftPreviewTab" type="button" role="tab" aria-selected="false" aria-controls="draftPreview" data-mode="preview">预览</button>
+                </div>
+                <label class="sr-only" for="draftInput">草稿内容</label>
+                <textarea id="draftInput" rows="4" maxlength="4000" placeholder="先把思路写在这里，比如：&#10;x^2 - 6x = -5&#10;两边加上 $9$，配成 $(x-3)^2 = 4$"></textarea>
+                <div class="draft-preview" id="draftPreview" role="tabpanel" aria-live="polite" hidden></div>
+                <p class="draft-hint" id="draftHint">支持 $x^2$、\frac{a}{b}、\sqrt{x} 等常见 LaTeX，切换「预览」查看排版。草稿只保存在本机。</p>
+              </div>
+            </div>
+
+            <div class="side-card progress-card" id="progressCard">
+              <div class="side-card-head">
+                <span class="side-kicker">TEACHING CHECKLIST</span>
+                <h3>讲清楚这三件事</h3>
+              </div>
+              <ul class="check-list">
+                <li><span class="check-index">1</span><div><strong>题目在问什么</strong><p>用自己的话复述条件与目标。</p></div></li>
+                <li><span class="check-index">2</span><div><strong>每一步为什么</strong><p>不是“怎么做”，而是“凭什么能做”。</p></div></li>
+                <li><span class="check-index">3</span><div><strong>换个例子验证</strong><p>代一个数回去，看看结论站不站得住。</p></div></li>
+              </ul>
+              <div class="session-stats">
+                <div><span id="statTurns">0</span><small id="statTurnsLabel">你的讲解</small></div>
+                <div><span id="statQuestions">0</span><small id="statQuestionsLabel">小问的追问</small></div>
+              </div>
+            </div>
+
+            <div class="side-card practice-card">
+              <div class="side-card-head">
+                <span class="side-kicker">CLASS SETTINGS</span>
+                <h3>这节课的参数</h3>
+              </div>
+              <div class="practice-row">
+                <label for="chatSubjectSelect">学科</label>
+                <select id="chatSubjectSelect"></select>
+              </div>
+              <div class="practice-row" id="chatPersonaRow">
+                <label for="chatPersonaSelect">学生人设</label>
+                <select id="chatPersonaSelect"></select>
+              </div>
+              <div class="practice-row" id="chatIntensityRow">
+                <label for="chatIntensitySelect">追问强度</label>
+                <select id="chatIntensitySelect"></select>
+              </div>
+              <div class="practice-row" id="chatModeRow">
+                <label for="chatModeSelect">学生模式</label>
+                <select id="chatModeSelect"></select>
+              </div>
+              <p class="tiny-note" id="practiceLockHint">学科已锁定；到设置里可以关闭锁定。</p>
+            </div>
+
+            <div class="side-card model-card">
+              <div class="model-row">
+                <span class="status-dot" id="sideStatusDot" aria-hidden="true"></span>
+                <div>
+                  <strong id="sideModelName">未连接 AI</strong>
+                  <p id="sideModelHint">在设置中填入 API Key 后开始</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <button class="draft-scrim" id="draftScrim" type="button" aria-label="关闭草稿板" hidden></button>
+      </section>
+    </main>
+
+    <footer class="footer" id="footer">
+      <span>费曼小课堂 · 输出，是最好的输入。</span>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <span>零后端 · BYOK · 不收集个人信息</span>
+    </footer>
+  </div>
+
+  <!-- ============ REPORT MODAL ============ -->
+  <div class="modal-layer" id="reportModal" hidden>
+    <div class="modal-backdrop" data-close="reportModal"></div>
+    <div class="modal report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="report-topbar">
+        <span class="report-stamp">AI TEACHER REVIEW</span>
+        <button class="icon-btn modal-close" data-close="reportModal" type="button" aria-label="关闭报告">×</button>
+      </div>
+
+      <div class="report-loading" id="reportLoading" hidden>
+        <div class="loader-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h2>陈老师正在看你的课……</h2>
+        <p>正在对照你的讲解，检查概念、步骤和表达。通常需要 10–20 秒。</p>
+        <div class="skeleton-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="report-error" id="reportError" hidden>
+        <div class="error-mark" aria-hidden="true">!</div>
+        <h2>老师暂时没看完</h2>
+        <p id="reportErrorText">发生了未知错误。</p>
+        <div class="report-error-actions">
+          <button class="btn btn-primary" id="retryReportBtn" type="button">再试一次</button>
+          <button class="btn btn-ghost" data-close="reportModal" type="button">回到对话</button>
+        </div>
+      </div>
+
+      <div class="report-content" id="reportContent" hidden>
+        <header class="report-head">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line"></span>学习诊断报告</p>
+            <h2 id="reportTitle">你把这道题，讲清楚了吗？</h2>
+            <p class="report-topic" id="reportTopic"></p>
+            <p class="report-meta" id="reportMeta"></p>
+          </div>
+          <div class="overall-score">
+            <div class="score-ring" id="overallRing" style="--score:0">
+              <div class="score-ring-inner">
+                <strong id="overallScore">0</strong><span>%</span>
+                <small>综合</small>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="report-verdict">
+          <span class="verdict-label">老师总评</span>
+          <p id="reportVerdict"></p>
+        </div>
+
+        <section class="report-section">
+          <div class="section-heading"><span>01</span><h3>三维评分</h3></div>
+          <div class="metric-grid" id="metricGrid"></div>
+        </section>
+
+        <section class="report-section">
+          <div class="section-heading"><span>02</span><h3>关键理解缺口</h3><p>不是挑错，是帮你看见下一次可以补哪里。</p></div>
+          <div class="misconception-list" id="misconceptionList"></div>
+        </section>
+
+        <section class="report-section">
+          <div class="section-heading"><span>03</span><h3>下一次可以这样讲</h3><p>把建议变成一句能直接说出口的话。</p></div>
+          <div class="next-step-list" id="nextStepList"></div>
+        </section>
+
+        <section class="report-section strengths-section" id="strengthsSection" hidden>
+          <div class="section-heading"><span>04</span><h3>你做得好的地方</h3></div>
+          <ul class="strength-list" id="strengthList"></ul>
+        </section>
+
+        <div class="encouragement-card">
+          <span class="teacher-sign" aria-hidden="true">陈</span>
+          <div>
+            <span class="verdict-label">陈老师想说</span>
+            <p id="reportEncouragement"></p>
+          </div>
+        </div>
+
+        <footer class="report-actions">
+          <button class="btn btn-outline" id="copyReportBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制 Markdown
+          </button>
+          <button class="btn btn-outline" id="exerciseBtn" type="button" hidden>做练习</button>
+          <button class="btn btn-ghost" data-close="reportModal" type="button">继续讲一会儿</button>
+          <button class="btn btn-primary" id="restartFromReportBtn" type="button">换个主题，重新开始</button>
+        </footer>
+        <p class="report-disclaimer">本报告由 AI 根据对话内容生成，仅用于学习诊断，不替代老师的人工判断。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS SIDE PANEL ============ -->
+  <div class="modal-layer settings-layer" id="settingsModal" hidden>
+    <div class="modal-backdrop" data-close="settingsModal"></div>
+    <div class="modal settings-modal settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>CLASSROOM SETTINGS</p>
+          <h2 id="settingsTitle">课堂设置</h2>
+          <p>连接你的模型、调整 AI 学生与外观。所有配置只保存在当前浏览器。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="settingsModal" type="button" aria-label="关闭设置">×</button>
+      </div>
+
+      <form id="settingsForm" class="settings-form" novalidate>
+        <div class="field">
+          <label for="apiKeyInput">API Key</label>
+          <div class="key-input-wrap">
+            <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-v1-…">
+            <button class="key-toggle" id="toggleKeyBtn" type="button" aria-label="显示或隐藏 API Key">显示</button>
+          </div>
+          <p class="field-hint">留空即可使用课堂共享代理。填自己的 Key 时只保存在本机浏览器，并直接发往你选择的模型服务商。</p>
+        </div>
+
+        <div class="field">
+          <label for="modelInput">模型</label>
+          <input id="modelInput" type="text" list="modelPresets" autocomplete="off" spellcheck="false" placeholder="qwen/qwen3-vl-30b-a3b-instruct">
+          <datalist id="modelPresets"></datalist>
+          <p class="field-hint">默认 <code>qwen/qwen3-vl-30b-a3b-instruct</code>，中文自然、支持图片。课堂共享代理开放 <code>qwen/qwen3-vl-30b-a3b-instruct</code>、<code>qwen/qwen3-vl-8b-instruct</code>、<code>mistralai/mistral-small-3.2-24b-instruct</code>、<code>deepseek/deepseek-chat-v3-0324</code>；其中 DeepSeek V3 只支持文字，看图片请用前三者。</p>
+        </div>
+
+        <div class="field">
+          <label for="temperatureInput">表达活跃度 <span class="range-value" id="temperatureValue">0.75</span></label>
+          <input id="temperatureInput" type="range" min="0" max="1.2" step="0.05" value="0.75">
+          <div class="range-labels"><span>更严谨</span><span>更活泼</span></div>
+        </div>
+
+        <fieldset class="practice-settings">
+          <legend>AI 学生设置</legend>
+          <p class="field-hint" id="aiModeSettingsNote" hidden>这些设置只在 AI 学生模式下生效；当前选择的是 AI 家教。</p>
+          <div class="field">
+            <label for="studentPersonaSelect">学生人设</label>
+            <select id="studentPersonaSelect"></select>
+            <p class="field-hint" id="studentPersonaHint">刨根问底型：总想问“为什么这个规则成立”。</p>
+          </div>
+          <div class="field">
+            <label for="studentModeSelect">学生模式</label>
+            <select id="studentModeSelect"></select>
+            <p class="field-hint" id="studentModeHint">真实学生模式：疑问从你的讲解里自然生长。</p>
+          </div>
+          <div class="field">
+            <label for="studentIntensitySelect">追问强度</label>
+            <select id="studentIntensitySelect"></select>
+            <p class="field-hint" id="studentIntensityHint">正常：每次抓一个最关键的点追问。</p>
+          </div>
+          <label class="toggle-field" for="lockSubjectToggle">
+            <input id="lockSubjectToggle" type="checkbox">
+            <span>学科锁定：一节课内不能切换学科</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="appearance-settings">
+          <legend>外观</legend>
+          <div class="field">
+            <span class="field-label">主题</span>
+            <div class="theme-switch" id="themeSwitch" role="radiogroup" aria-label="界面主题">
+              <button class="theme-option" type="button" role="radio" data-theme="light" aria-checked="true">
+                <span class="theme-swatch theme-swatch-light" aria-hidden="true"></span>
+                浅色
+              </button>
+              <button class="theme-option" type="button" role="radio" data-theme="dark" aria-checked="false">
+                <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
+                深色
+              </button>
+            </div>
+            <p class="field-hint">深色模式先覆盖课堂主界面，公式、图表与草稿板会在 P2 完整适配。</p>
+          </div>
+        </fieldset>
+
+        <fieldset class="guide-settings">
+          <legend>新手引导</legend>
+          <p class="field-hint">第一次来？四步弄清这间教室怎么用。以后想复习也可以随时重看。</p>
+          <button class="btn btn-outline btn-sm" id="replayOnboardingBtn" type="button">再看一次新手引导</button>
+        </fieldset>
+
+        <fieldset class="data-settings">
+          <legend>数据管理</legend>
+          <p class="field-hint">所有配置、课堂与档案只保存在当前浏览器，不会上传服务器；无痕模式或清理浏览器缓存会丢失全部本地数据，请定期导出 JSON 备份。</p>
+          <div class="data-actions">
+            <button class="btn btn-outline btn-sm" id="exportDataBtn" type="button">导出全部 JSON</button>
+            <button class="btn btn-danger-ghost btn-sm" id="clearArchiveDataBtn" type="button">清空学习档案</button>
+          </div>
+          <div class="storage-panel" id="storagePanel">
+            <div class="storage-panel-head">
+              <span class="storage-panel-title" id="storagePanelTitle">本机存储</span>
+              <span class="storage-badge" id="storageBadge">统计中</span>
+            </div>
+            <div class="storage-meter" id="storageMeter" role="progressbar" aria-labelledby="storagePanelTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span class="storage-meter-fill" id="storageMeterFill"></span>
+            </div>
+            <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
+            <p class="storage-hint" id="storageHint" hidden></p>
+          </div>
+          <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。</p>
+        </fieldset>
+
+        <details class="advanced">
+          <summary>高级设置</summary>
+          <div class="field">
+            <label for="baseUrlInput">API Base URL</label>
+            <input id="baseUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1">
+            <p class="field-hint">任何兼容 OpenAI Chat Completions 的服务都可以。浏览器直连需要服务商支持 CORS。</p>
+          </div>
+          <div class="field">
+            <label for="proxyUrlInput">课堂共享代理（可选）</label>
+            <input id="proxyUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://feynman-proxy.example.workers.dev">
+            <p class="field-hint">填了代理地址就<b>不需要 API Key</b>，学生打开链接即可上课。真正的 Key 保存在代理服务器里。</p>
+          </div>
+          <div class="field">
+            <label for="accessCodeInput">访问码（可选）</label>
+            <input id="accessCodeInput" type="text" autocomplete="off" spellcheck="false" placeholder="与代理的 ACCESS_CODE 一致">
+            <p class="field-hint">只是防扫站的软门槛，会随网页公开；真正的额度保护靠代理的限流。</p>
+          </div>
+        </details>
+
+        <div class="settings-status" id="settingsStatus" hidden role="status"></div>
+
+        <div class="settings-actions">
+          <button class="btn btn-outline" id="testKeyBtn" type="button">测试连接</button>
+          <div class="settings-actions-right">
+            <button class="btn btn-ghost" id="clearKeyBtn" type="button">清除 Key</button>
+            <button class="btn btn-primary" id="saveSettingsBtn" type="submit">保存并开始</button>
+          </div>
+        </div>
+
+        <p class="settings-note">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+          本站不上传、不收集、不记录你的 Key。清除浏览器数据会同时清除 Key、课堂和全部学习档案。
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ FIRST-USE ONBOARDING ============ -->
+  <div class="modal-layer" id="onboardingModal" hidden>
+    <div class="modal-backdrop" data-close="onboardingModal"></div>
+    <div class="modal onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle" tabindex="-1">
+      <div class="onboarding-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>FIRST CLASS</p>
+          <h2 id="onboardingTitle">先花 30 秒，弄清这间教室</h2>
+          <p>这里的老师是你，AI 是学生。讲得越清楚，课后诊断越准确。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="onboardingModal" type="button" aria-label="关闭新手引导">×</button>
+      </div>
+
+      <div class="onboarding-progress" id="onboardingDots" aria-hidden="true"></div>
+      <p class="sr-only" id="onboardingStatus" aria-live="polite">第 1 步，共 4 步</p>
+
+      <div class="onboarding-steps" id="onboardingSteps">
+        <section class="onboarding-step is-active" data-step="0">
+          <span class="onboarding-mark" aria-hidden="true">讲</span>
+          <div class="onboarding-copy">
+            <h3>你来当老师</h3>
+            <p>选一个数学知识点，像给同学讲题一样，把思路一步步说清楚。不需要写得很正式，讲人话就行。</p>
+            <p class="onboarding-tip">支持文字、图片、手写板和语音输入。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="1" hidden>
+          <span class="onboarding-mark" aria-hidden="true">问</span>
+          <div class="onboarding-copy">
+            <h3>AI 学生只提问，不替你算</h3>
+            <p>它会追问「为什么」「这一步怎么来的」，但不会给答案、不会判断对错，也不会自己推理。所有解释都得由你给出。</p>
+            <p class="onboarding-tip">默认是刨根问底型，可以在首页切换人设和追问强度。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="2" hidden>
+          <span class="onboarding-mark" aria-hidden="true">停</span>
+          <div class="onboarding-copy">
+            <h3>卡住时别硬撑</h3>
+            <p>课堂右下角有悬浮控制条：可以点「我卡住了」留下卡点，也可以复制某条消息、打开草稿板，把思路先写下来。</p>
+            <p class="onboarding-tip">草稿板支持 LaTeX 预览，手机上也能从侧边抽屉打开。</p>
+          </div>
+        </section>
+        <section class="onboarding-step" data-step="3" hidden>
+          <span class="onboarding-mark" aria-hidden="true">评</span>
+          <div class="onboarding-copy">
+            <h3>下课后，拿一份诊断报告</h3>
+            <p>结束课堂会生成五维评分、薄弱点和下一步练习建议，并自动存进学习档案。每一课都能回放，也能看到长期变化。</p>
+            <p class="onboarding-tip">开课前可以在右上角「设置」里填入自己的 API Key。</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="onboarding-actions">
+        <button class="btn btn-ghost btn-sm" id="onboardingSkipBtn" type="button">跳过引导</button>
+        <div class="onboarding-actions-right">
+          <button class="btn btn-outline btn-sm" id="onboardingPrevBtn" type="button">上一步</button>
+          <button class="btn btn-primary btn-sm" id="onboardingNextBtn" type="button">下一步</button>
+        </div>
+      </div>
+      <p class="onboarding-note">以后可以在「设置 → 新手引导」里再看一次。</p>
+    </div>
+  </div>
+
+  <!-- ============ HELP CENTER ============ -->
+  <div class="modal-layer" id="helpModal" hidden>
+    <div class="modal-backdrop" data-close="helpModal"></div>
+    <div class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1">
+      <div class="help-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>HELP CENTER</p>
+          <h2 id="helpTitle">帮助中心</h2>
+          <p>从开课、追问到诊断报告，常遇到的问题都收在这里。搜关键词会更快。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="helpModal" type="button" aria-label="关闭帮助中心">×</button>
+      </div>
+
+      <div class="help-quick-actions">
+        <button class="help-quick" id="helpReplayOnboarding" type="button">
+          <span aria-hidden="true">◎</span>
+          重看新手引导
+        </button>
+        <button class="help-quick" id="helpOpenSettings" type="button">
+          <span aria-hidden="true">⚙</span>
+          连接模型 / 打开设置
+        </button>
+        <button class="help-quick" id="helpOpenHistory" type="button">
+          <span aria-hidden="true">▤</span>
+          查看学习档案
+        </button>
+      </div>
+
+      <label class="help-search">
+        <span class="sr-only">搜索帮助内容</span>
+        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="helpSearch" type="search" autocomplete="off" placeholder="搜索问题，例如：API Key、卡住、报告、数据">
+      </label>
+      <p class="help-search-meta" id="helpSearchMeta">共 17 个问题</p>
+
+      <div class="help-groups" id="helpGroups">
+        <section class="help-group" data-help-group="start">
+          <h3>开课与连接</h3>
+          <details class="help-item">
+            <summary>第一次使用，需要准备什么？</summary>
+            <div class="help-answer">
+              <p>选一个数学知识点或题目，写清你想讲什么，然后点「开始讲课」。课堂里由你先开口讲解，AI 学生随后追问。</p>
+              <p>如果还没连接模型，点右上角「设置」填入自己的 API Key，或直接使用课堂共享代理。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>没有 API Key 也能用吗？</summary>
+            <div class="help-answer">
+              <p>可以。只要代理地址可用，留空 API Key 也能开课。共享代理有额度和频率限制；填自己的 Key 会更稳定。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>为什么提示连接失败？</summary>
+            <div class="help-answer">
+              <p>先检查 API Key、模型名和余额。如果使用自定义 Base URL，服务商需要支持浏览器跨域（CORS）。换成课堂共享代理通常最省事。</p>
+              <p>401 / 403 多半是 Key 或模型权限问题；429 是请求太频繁或额度用完了。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>图片题应该用哪个模型？</summary>
+            <div class="help-answer">
+              <p>默认的 Qwen3-VL 系列支持图片。DeepSeek V3 只支持文字；如果上传图片后提示不支持，请在设置里换回支持视觉的模型。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="student">
+          <h3>AI 学生与追问</h3>
+          <details class="help-item">
+            <summary>为什么 AI 学生不回答我的问题？</summary>
+            <div class="help-answer">
+              <p>这间教室的规则是：你是老师，AI 只当学生。它不会给答案、不会替你计算，也不会判断对错，只会从你刚说的话里提出疑问。</p>
+              <p>如果它开场只说「老师，我准备好了」，那是在等你先讲。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>人设和追问强度有什么区别？</summary>
+            <div class="help-answer">
+              <p>人设决定它关注什么，例如刨根问底型会追规则边界，粗心易错型会暴露常见误区。追问强度决定它问得多紧。</p>
+              <p>两处都可以在首页或课堂顶部切换；一节课内学科会锁定，避免混着讲。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>它一直追问同一个点，正常吗？</summary>
+            <div class="help-answer">
+              <p>正常。说明它还没从你的讲解里听到足够清楚的依据。可以补一个具体例子、反例或步骤依据，再继续讲。</p>
+              <p>如果确实卡住了，点「我卡住了」留下卡点，课后报告会把它算进诊断。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="classroom">
+          <h3>课堂操作</h3>
+          <details class="help-item">
+            <summary>怎么发送消息？</summary>
+            <div class="help-answer">
+              <p>点发送按钮，或按 Ctrl + Enter（Mac 上是 ⌘ + Enter）。Shift + Enter 换行。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>卡住了怎么办？</summary>
+            <div class="help-answer">
+              <p>课堂右下角的悬浮控制条里有「我卡住了」。写下卡在哪一步，它会作为卡点插在当前消息后面，也会进入课后诊断。</p>
+              <p>旁边的草稿板可以先列思路，支持 LaTeX 预览；手机上从「草稿板」按钮打开侧边抽屉。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>发错了，能撤回上一轮吗？</summary>
+            <div class="help-answer">
+              <p>可以。课堂顶部有「撤回上一轮」，会移除你最后一条可见消息和它后面的 AI 回复，并把文字和图片放回输入框。</p>
+              <p>如果撤回后课堂里已经没有你的讲解，AI 学生会回到等你先开口的状态。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>图片、手写和语音怎么用？</summary>
+            <div class="help-answer">
+              <p>题目图片可以点选、粘贴或拖进首页输入区；也可以先识别成文字再修改。课堂消息支持最多 4 张图。</p>
+              <p>手写板适合画图、列竖式和写公式；语音输入依赖浏览器的 Web Speech API，不支持时会自动隐藏。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="report">
+          <h3>报告与档案</h3>
+          <details class="help-item">
+            <summary>诊断报告是怎么打分的？</summary>
+            <div class="help-answer">
+              <p>AI 老师会从概念掌握、逻辑与步骤、表达清晰度、回应追问、知识迁移五个维度评分，并给出证据、薄弱点和下一步练习。</p>
+              <p>报告是学习提示，不是考试判分；证据不足时会标出低证据，不硬编结论。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>学习档案里有什么？</summary>
+            <div class="help-answer">
+              <p>每节课的主题、轮数、人设、对话回放和诊断报告都会保存。档案顶部还有时间范围筛选、学习热力图、连续天数和互动习惯。</p>
+              <p>可以按学科、题目来源筛选，也能多选后批量删除。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>怎么找到报告里的原话？</summary>
+            <div class="help-answer">
+              <p>报告里的「查看证据」会打开课堂回放，并定位到对应消息。档案里的历史课时也能直接回放。</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="help-group" data-help-group="data">
+          <h3>数据与隐私</h3>
+          <details class="help-item">
+            <summary>我的 Key 和课堂数据存在哪里？</summary>
+            <div class="help-answer">
+              <p>全部只保存在当前浏览器的 localStorage / IndexedDB，不会上传到本站服务器。API Key 只会发往你选择的模型服务商或共享代理。</p>
+              <p>无痕模式、清理浏览器数据或换设备都会丢失本地数据，请定期导出 JSON 备份。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>导出的数据包含 API Key 吗？</summary>
+            <div class="help-answer">
+              <p>不包含。设置里的「导出全部 JSON」会自动移除 API Key；题库可以单独导出，导入时会按学科和题干去重。</p>
+            </div>
+          </details>
+          <details class="help-item">
+            <summary>悬浮控制条为什么有时不见？</summary>
+            <div class="help-answer">
+              <p>它只出现在课堂里，并且会避开输入区。窗口较窄时会自动排成一行；如果没看到，先确认自己还在课堂页面。</p>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <div class="help-empty" id="helpEmpty" hidden>
+        <strong>没有找到相关问题</strong>
+        <p>换一个关键词试试，比如「报告」「图片」「保存」。</p>
+      </div>
+
+      <div class="help-foot">
+        <p><strong>快捷键</strong> Ctrl / ⌘ + Enter 发送 · Shift + Enter 换行 · Esc 关闭弹窗或抽屉</p>
+        <p>这个帮助页是本地静态内容，不会发起网络请求。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ HISTORY MODAL ============ -->
+  <div class="modal-layer" id="historyModal" hidden>
+    <div class="modal-backdrop" data-close="historyModal"></div>
+    <div class="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle" tabindex="-1">
+      <div class="history-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>LEARNING ARCHIVE</p>
+          <h2 id="historyTitle">学习档案</h2>
+          <p>每讲完一课，主题、轮数、当时的回答和诊断报告都会留在这里；上方的数据看板帮你看清长期变化。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="historyModal" type="button" aria-label="关闭学习档案">×</button>
+      </div>
+
+      <div class="history-empty" id="historyEmpty" hidden>
+        <div class="history-empty-mark" aria-hidden="true">档</div>
+        <h3>还没有记录</h3>
+        <p>完成一节练习课程，这里就会展示你的讲课记录。</p>
+        <button class="btn btn-primary" data-close="historyModal" type="button">去讲第一课</button>
+      </div>
+
+      <div class="history-content" id="historyContent" hidden>
+        <div class="history-filters">
+          <div class="filter-tabs history-subject-filter" id="historySubjectFilter" role="tablist" aria-label="按学科筛选"></div>
+          <div class="history-filter-tools">
+            <div class="filter-tabs history-range" id="historyRangeFilter" role="group" aria-label="按时间范围筛选">
+              <button class="filter-tab is-active" type="button" data-range="all" aria-pressed="true">全部</button>
+              <button class="filter-tab" type="button" data-range="30" aria-pressed="false">近 30 天</button>
+              <button class="filter-tab" type="button" data-range="7" aria-pressed="false">近 7 天</button>
+            </div>
+            <label class="history-source-filter">
+              <span class="sr-only">按题目来源筛选</span>
+              <select id="historySourceFilter"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="history-bulk-bar" id="historyBulkBar" hidden>
+          <span class="history-bulk-count" id="historyBulkCount" aria-live="polite">还没有选择记录</span>
+          <div class="history-bulk-actions">
+            <button class="btn btn-ghost btn-sm" id="historySelectAllBtn" type="button">全选本页</button>
+            <button class="btn btn-danger-ghost btn-sm" id="historyBulkDeleteBtn" type="button" disabled>删除所选</button>
+            <button class="btn btn-ghost btn-sm" id="historyBulkCancelBtn" type="button">退出选择</button>
+          </div>
+        </div>
+
+        <section class="history-summary" id="historySummary"></section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>学习节奏</h3>
+            <span class="history-section-meta" id="historyActivityMeta"></span>
+          </div>
+          <div class="activity-panel" id="historyActivity"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>分学科总览</h3>
+            <span class="history-section-meta">三科独立统计，不混算</span>
+          </div>
+          <div class="subject-overview" id="historySubjectOverview"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>课堂互动习惯</h3>
+            <span class="history-section-meta" id="historyHabitMeta"></span>
+          </div>
+          <div class="habit-grid" id="historyHabits"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>知识点薄弱点</h3>
+            <span class="history-section-meta" id="historyTagMeta"></span>
+          </div>
+          <div class="tag-stats" id="historyTagStats"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>综合评分走势</h3>
+            <span class="history-section-meta" id="historyTrendMeta"></span>
+          </div>
+          <div class="trend-chart" id="historyTrendChart"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>三个维度的平均表现</h3>
+            <span class="history-section-meta">只统计有诊断报告的课时</span>
+          </div>
+          <div class="history-dimensions" id="historyDimensions"></div>
+        </section>
+
+        <section class="history-block" id="historyAdviceBlock" hidden>
+          <div class="history-section-head">
+            <h3>下一步可以这样补</h3>
+            <span class="history-section-meta">从最近的诊断报告里汇总</span>
+          </div>
+          <div class="advice-list" id="historyAdvice"></div>
+        </section>
+
+        <section class="history-block">
+          <div class="history-section-head">
+            <h3>历史课时</h3>
+            <div class="history-section-actions">
+              <button class="text-link" id="historySelectBtn" type="button" aria-pressed="false">批量选择</button>
+              <button class="text-link" id="clearHistoryBtn" type="button">清空档案</button>
+            </div>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+
+        <p class="history-note">档案只保存在当前浏览器，不会上传服务器，也不包含聊天图片。清除浏览器数据会同时清除档案。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPLAY MODAL ============ -->
+  <div class="modal-layer" id="replayModal" hidden>
+    <div class="modal-backdrop" data-close="replayModal"></div>
+    <div class="modal replay-modal" role="dialog" aria-modal="true" aria-labelledby="replayTitle" tabindex="-1">
+      <div class="history-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>LESSON REPLAY</p>
+          <h2 id="replayTitle">课堂回放</h2>
+          <p id="replayMeta"></p>
+        </div>
+        <button class="icon-btn modal-close" data-close="replayModal" type="button" aria-label="关闭课堂回放">×</button>
+      </div>
+      <div class="replay-body" id="replayList"></div>
+      <p class="history-note" id="replayNote" hidden>这节课的对话原文没有保存下来，但诊断报告仍然保留。</p>
+    </div>
+  </div>
+
+  <!-- ============ QUESTION SQUARE / MY BANK ============ -->
+  <div class="modal-layer" id="bankModal" hidden>
+    <div class="modal-backdrop" data-close="bankModal"></div>
+    <div class="modal bank-modal" role="dialog" aria-modal="true" aria-labelledby="bankTitle" tabindex="-1">
+      <div class="bank-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>QUESTION SQUARE</p>
+          <h2 id="bankTitle">题库广场</h2>
+          <p id="bankIntro">按学科挑一道现成的数学题，直接开讲；也可以先存进自己的题库再改。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="bankModal" type="button" aria-label="关闭题库">×</button>
+      </div>
+
+      <div class="bank-tabs" role="tablist" aria-label="题库视图">
+        <button class="bank-tab is-active" id="bankTabSquare" type="button" role="tab" aria-selected="true" aria-controls="bankList">
+          题库广场<span class="bank-tab-count" id="bankSquareCount">0</span>
+        </button>
+        <button class="bank-tab" id="bankTabMine" type="button" role="tab" aria-selected="false" aria-controls="bankList">
+          我的题库<span class="bank-tab-count" id="bankMineCount">0</span>
+        </button>
+      </div>
+
+      <div class="bank-toolbar">
+        <label class="bank-search">
+          <span class="sr-only">搜索题目</span>
+          <input id="bankSearch" type="search" autocomplete="off" placeholder="搜索题干或知识点">
+        </label>
+        <select id="bankSubjectFilter" aria-label="按学科筛选"></select>
+        <select id="bankSourceFilter" aria-label="按来源筛选"></select>
+        <div class="bank-actions" id="bankMineActions" hidden>
+          <button class="btn btn-ghost btn-sm" id="bankImportBtn" type="button">导入备份</button>
+          <button class="btn btn-ghost btn-sm" id="bankExportBtn" type="button">导出题库</button>
+          <input id="bankImportInput" type="file" accept="application/json,.json" hidden>
+        </div>
+      </div>
+
+      <div class="bank-empty" id="bankEmpty" hidden>
+        <div class="history-empty-mark" aria-hidden="true">题</div>
+        <h3 id="bankEmptyTitle">题库还是空的</h3>
+        <p id="bankEmptyText">在首页输入题目后点「存入我的题库」，或拍一张题目照片识别后保存。</p>
+        <button class="btn btn-outline btn-sm" id="bankEmptyAction" type="button">去题库广场挑一道</button>
+      </div>
+
+      <div class="bank-list" id="bankList" role="tabpanel" aria-labelledby="bankTabSquare"></div>
+
+      <p class="bank-note" id="bankNote">题库和图片只保存在当前浏览器。清除浏览器数据会同时清除题库。</p>
+    </div>
+  </div>
+
+  <!-- ============ HANDWRITING MODAL ============ -->
+  <div class="modal-layer" id="handwritingModal" hidden>
+    <div class="modal-backdrop" data-close="handwritingModal"></div>
+    <div class="modal handwriting-modal" role="dialog" aria-modal="true" aria-labelledby="handwritingTitle" tabindex="-1">
+      <div class="handwriting-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>HANDWRITING PAD</p>
+          <h2 id="handwritingTitle">手写你的推导</h2>
+          <p>适合画图、列竖式、写公式。支持鼠标、触控和 Apple Pencil。</p>
+        </div>
+        <button class="icon-btn modal-close" data-close="handwritingModal" type="button" aria-label="关闭手写板">×</button>
+      </div>
+
+      <div class="pad-toolbar">
+        <div class="pen-colors" role="group" aria-label="笔迹颜色">
+          <button class="color-swatch is-active" type="button" data-color="#1f2a2a" style="--swatch:#1f2a2a" aria-label="墨黑" aria-pressed="true"></button>
+          <button class="color-swatch" type="button" data-color="#1f6f5c" style="--swatch:#1f6f5c" aria-label="深绿" aria-pressed="false"></button>
+          <button class="color-swatch" type="button" data-color="#c15b3f" style="--swatch:#c15b3f" aria-label="砖红" aria-pressed="false"></button>
+          <button class="color-swatch" type="button" data-color="#2f5d9e" style="--swatch:#2f5d9e" aria-label="靛蓝" aria-pressed="false"></button>
+        </div>
+        <div class="pad-tools">
+          <button class="tool-btn" id="eraserBtn" type="button" aria-pressed="false">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4-4L14 6l6 6-9 9H7Z"/><path d="m11 10 6 6"/><path d="M5 21h16"/></svg>
+            橡皮
+          </button>
+          <button class="tool-btn" id="undoBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+            撤销
+          </button>
+          <button class="tool-btn" id="clearPadBtn" type="button">清空</button>
+        </div>
+      </div>
+
+      <div class="pad-wrap">
+        <canvas id="handwritingCanvas" aria-label="手写画布"></canvas>
+        <div class="pad-placeholder" id="padPlaceholder">在这里写或画……</div>
+      </div>
+
+      <div class="handwriting-actions">
+        <span class="pad-hint">提示：写完点“插入消息”，会作为图片发给小问。</span>
+        <div>
+          <button class="btn btn-ghost" data-close="handwritingModal" type="button">取消</button>
+          <button class="btn btn-primary" id="insertHandwritingBtn" type="button">插入消息</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ IMAGE LIGHTBOX ============ -->
+  <div class="lightbox" id="imageLightbox" hidden>
+    <button class="lightbox-close" id="closeLightbox" type="button" aria-label="关闭图片">×</button>
+    <img id="lightboxImage" alt="放大查看的图片">
+  </div>
+
+  <!-- ============ EXERCISE MODAL ============ -->
+  <div class="modal-layer" id="exerciseModal" hidden>
+    <div class="modal-backdrop" data-close="exerciseModal"></div>
+    <div class="modal exercise-modal" role="dialog" aria-modal="true" aria-labelledby="exerciseTitle" tabindex="-1">
+      <div class="report-topbar">
+        <span class="report-stamp">巩固练习</span>
+        <button class="icon-btn modal-close" data-close="exerciseModal" type="button" aria-label="关闭练习">×</button>
+      </div>
+      <div class="report-loading" id="exerciseLoading" hidden>
+        <div class="loader-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h2 id="exerciseTitle">陈老师正在出题……</h2>
+        <p>正在根据你的薄弱点生成巩固练习题。</p>
+      </div>
+      <div class="report-error" id="exerciseError" hidden>
+        <div class="error-mark" aria-hidden="true">!</div>
+        <h2>出题失败了</h2>
+        <p id="exerciseErrorText">请稍后再试。</p>
+        <div class="report-error-actions">
+          <button class="btn btn-primary" id="retryExerciseBtn" type="button">再试一次</button>
+          <button class="btn btn-ghost" data-close="exerciseModal" type="button">关闭</button>
+        </div>
+      </div>
+      <div class="report-content exercise-content" id="exerciseContent" hidden>
+        <header class="report-head">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line"></span>巩固练习</p>
+            <h2 id="exerciseTitleText">基于本课的练习题</h2>
+          </div>
+        </header>
+        <div id="exerciseList"></div>
+        <footer class="report-actions">
+          <button class="btn btn-ghost" data-close="exerciseModal" type="button">关闭</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+  <script type="module" src="./app.js?v=20261115d"></script>
+</body>
+</html>
