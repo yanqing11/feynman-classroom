@@ -2,6 +2,7 @@ import {
   APP,
   METRICS,
   STUDENT_PROMPT,
+  TUTOR_PROMPT,
   TEACHER_PROMPT,
   ASSIST_MODE_OVERRIDE,
   difficultyInfo,
@@ -280,6 +281,42 @@ ${studentClassContext(session)}
 - 你只能以「小问」这个学生的身份说话。
 - 你绝不能给出答案、解法或公式推导。
 - 你看不到评分报告；不要假装自己知道老师讲得对不对。${stagePrompt}${stuckPrompt}`;
+
+  return [{ role: 'system', content: system }, ...trimmed];
+}
+
+/**
+ * Build the message list for 小理 (AI 家教).
+ * The first round is diagnosis only; later rounds teach one point then ask
+ * exactly one question. The hidden kickoff message acts as the first user turn.
+ */
+export function buildTutorMessages(session) {
+  const history = session.messages
+    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .map((message) => ({ role: message.role, content: apiContent(message) }));
+
+  let trimmed = trimHistory(history, APP.limits.historyChars);
+  if (!trimmed.length || trimmed[0].role === 'assistant') {
+    trimmed = [{ role: 'user', content: kickoffMessage(session.topic, 'tutor') }, ...trimmed];
+  }
+
+  const subject = subjectInfo(session.subject);
+  const tags = normalizeTags(session.tags);
+  const context = [];
+  if (subject) context.push(`【学段】${subject.stage}数学（${subject.label}）。用这个学段听得懂的话讲。`);
+  if (tags.length) context.push(`【知识点】${tags.join('、')}。`);
+
+  const firstRound = humanTurnCount(session) === 0;
+  const roundPrompt = firstRound
+    ? `\n【当前轮次：第一轮 · 诊断】学生刚说出想学的主题。先只用一句话确认你明白他想学什么，再问他“已经知道什么、哪里最想弄懂”，问完就停下来等他回答。这一轮不要讲解，也不要给答案。`
+    : `\n【当前轮次：第 ${humanTurnCount(session) + 1} 轮 · 讲解 + 提问】先用大白话讲清一个关键点，配一个具体数字或生活例子；然后只提一个问题，让他用刚学的内容回答或质疑。问完就停，不要自问自答。`;
+
+  const system = `${TUTOR_PROMPT}
+
+【本次学习主题】
+${session.topic}
+
+${context.join('\n')}${roundPrompt}`;
 
   return [{ role: 'system', content: system }, ...trimmed];
 }
@@ -605,6 +642,33 @@ export class StudentAgent {
 
     // All retries exhausted: return safe fallback.
     return SAFE_FALLBACK_REPLY;
+  }
+}
+
+export class TutorAgent {
+  /**
+   * 小理 teaches one small point, then asks one question. Output is streamed
+   * straight to the chat; no student-style abuse checks apply here.
+   */
+  async reply({ session, settings, signal, onDelta }) {
+    let fullOutput = '';
+    const wrappedOnDelta = (delta) => {
+      fullOutput += delta;
+      if (onDelta) onDelta(delta);
+    };
+
+    await streamChat({
+      settings,
+      messages: buildTutorMessages(session),
+      maxTokens: APP.limits.tutorMaxTokens,
+      temperature: settings.temperature ?? APP.defaults.temperature,
+      signal,
+      onDelta: wrappedOnDelta
+    });
+
+    const text = clean(fullOutput);
+    if (!text) throw new ApiError('小理这次没有回应，请再试一次。');
+    return text;
   }
 }
 

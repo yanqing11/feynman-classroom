@@ -5021,6 +5021,17 @@ body.is-chat .topbar-tagline {
   gap: 6px;
 }
 
+.ai-mode-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ai-mode-picker .persona-option {
+  min-height: 34px;
+  font-weight: 600;
+}
+
 .persona-option {
   min-height: 36px;
   padding: 7px 9px;

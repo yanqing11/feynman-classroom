@@ -419,11 +419,13 @@ export const AI_MODES = [
   {
     key: 'student',
     label: 'AI 学生',
+    name: '小问',
     hint: '你来讲，它像学生一样追问，练的是把知识讲清楚。'
   },
   {
     key: 'tutor',
     label: 'AI 家教',
+    name: '小理',
     hint: '它先简短讲解，再提一个问题等你回答，练的是把知识想明白。'
   }
 ];
@@ -470,6 +472,10 @@ export function intensityInfo(key) {
 
 export function aiModeInfo(key) {
   return AI_MODE_MAP[key] || AI_MODES[0];
+}
+
+export function aiDisplayName(aiMode) {
+  return aiModeInfo(aiMode).name;
 }
 
 export function normalizeTags(tags) {

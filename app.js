@@ -1,4 +1,5 @@
 import {
+  AI_MODES,
   APP,
   BUILTIN_QUESTIONS,
   DIFFICULTIES,
@@ -11,6 +12,8 @@ import {
   SUBJECT_KEYS,
   EXERCISE_PROMPT,
   FAREWELL_PROMPT,
+  aiDisplayName,
+  aiModeInfo,
   difficultyInfo,
   intensityInfo,
   modeInfo,
@@ -21,7 +24,7 @@ import {
   subjectInfo
 } from './js/config.js';
 import { ApiError, isAbortError, isConfigured, recognizeProblem, testConnection, completeChat } from './js/api.js';
-import { StudentAgent, TeacherAgent, humanTurnCount } from './js/agents.js';
+import { StudentAgent, TeacherAgent, TutorAgent, humanTurnCount } from './js/agents.js';
 import {
   ClassroomStore,
   STATUS,
@@ -336,6 +339,7 @@ const refs = {
   studentModeHint: $('#studentModeHint'),
   studentIntensitySelect: $('#studentIntensitySelect'),
   studentIntensityHint: $('#studentIntensityHint'),
+  aiModeSettingsNote: $('#aiModeSettingsNote'),
   lockSubjectToggle: $('#lockSubjectToggle'),
   themeSwitch: $('#themeSwitch'),
   exportDataBtn: $('#exportDataBtn'),
@@ -372,6 +376,22 @@ const refs = {
   helpOpenHistory: $('#helpOpenHistory'),
   personaPicker: $('#personaPicker'),
   homePersonaHint: $('#homePersonaHint'),
+  homePersonaBlock: $('#homePersonaBlock'),
+  aiModePicker: $('#aiModePicker'),
+  aiModeHint: $('#aiModeHint'),
+  homeSubtitle: $('#homeSubtitle'),
+  homeTeacherHint: $('#homeTeacherHint'),
+  homeTeacherHintText: $('#homeTeacherHintText'),
+  startBtnLabel: $('#startBtnLabel'),
+  chatKicker: $('#chatKicker'),
+  typingLabel: $('#typingLabel'),
+  statTurnsLabel: $('#statTurnsLabel'),
+  statQuestionsLabel: $('#statQuestionsLabel'),
+  chatPersonaRow: $('#chatPersonaRow'),
+  chatIntensityRow: $('#chatIntensityRow'),
+  chatModeRow: $('#chatModeRow'),
+  progressCard: $('#progressCard'),
+  teacherCallCard: $('#teacherCallCard'),
   chatSubjectSelect: $('#chatSubjectSelect'),
   chatPersonaSelect: $('#chatPersonaSelect'),
   chatIntensitySelect: $('#chatIntensitySelect'),
@@ -426,6 +446,7 @@ const refs = {
 const store = new ClassroomStore();
 const studentAgent = new StudentAgent();
 const teacherAgent = new TeacherAgent();
+const tutorAgent = new TutorAgent();
 
 let pendingImages = [];
 let topicImage = null;
@@ -568,6 +589,7 @@ function populatePracticeControls() {
   }
 
   populateSelect(refs.studentPersonaSelect, PERSONAS);
+  populateAiModePicker();
   populateSelect(refs.studentModeSelect, STUDENT_MODES);
   populateSelect(refs.studentIntensitySelect, INTENSITIES);
   populatePersonaPicker();
@@ -655,6 +677,47 @@ function populatePersonaPicker() {
     button.addEventListener('keydown', handlePersonaKeydown);
     refs.personaPicker.append(button);
   }
+}
+
+function populateAiModePicker() {
+  if (!refs.aiModePicker) return;
+  refs.aiModePicker.replaceChildren();
+  for (const mode of AI_MODES) {
+    const button = el('button', 'persona-option', mode.label);
+    button.type = 'button';
+    button.dataset.aiMode = mode.key;
+    button.setAttribute('role', 'radio');
+    button.title = `${mode.label}：${mode.hint}`;
+    button.addEventListener('click', () => selectAiMode(mode.key));
+    button.addEventListener('keydown', handleAiModeKeydown);
+    refs.aiModePicker.append(button);
+  }
+}
+
+function selectAiMode(key) {
+  const mode = aiModeInfo(key);
+  store.updatePractice({ aiMode: mode.key });
+  renderPracticeUI();
+}
+
+function handleAiModeKeydown(event) {
+  const keys = AI_MODES.map((mode) => mode.key);
+  const current = keys.indexOf(store.practice.aiMode);
+  let next = current;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    next = (current + 1) % keys.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    next = (current - 1 + keys.length) % keys.length;
+  } else if (event.key === 'Home') {
+    next = 0;
+  } else if (event.key === 'End') {
+    next = keys.length - 1;
+  } else {
+    return;
+  }
+  event.preventDefault();
+  selectAiMode(keys[next]);
+  refs.aiModePicker?.querySelector(`[data-ai-mode="${keys[next]}"]`)?.focus();
 }
 
 function selectPersona(key) {
@@ -754,6 +817,36 @@ function renderPracticeUI() {
       button.tabIndex = active ? 0 : -1;
     }
   }
+
+  const aiMode = aiModeInfo(practice.aiMode);
+  const isTutor = aiMode.key === 'tutor';
+  if (refs.aiModePicker) {
+    for (const button of refs.aiModePicker.querySelectorAll('.persona-option')) {
+      const active = button.dataset.aiMode === practice.aiMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-checked', String(active));
+      button.tabIndex = active ? 0 : -1;
+    }
+  }
+  if (refs.aiModeHint) refs.aiModeHint.textContent = `${aiMode.label}：${aiMode.hint}`;
+  if (refs.aiModeSettingsNote) refs.aiModeSettingsNote.hidden = !isTutor;
+  if (refs.homePersonaBlock) refs.homePersonaBlock.hidden = isTutor;
+  if (refs.homeSubtitle) {
+    refs.homeSubtitle.textContent = isTutor
+      ? 'AI 家教先短讲，再提问，你负责把每一步想明白。'
+      : '你来讲，AI 持续追问，找到知识盲区。';
+  }
+  if (refs.homeTeacherHintText) {
+    refs.homeTeacherHintText.textContent = isTutor
+      ? '开始上课之后，小理会先问你已知什么、想弄懂什么，然后讲解一个关键点，再提一个问题等你回答。'
+      : '开始讲课之后，需要由你先进行讲解，AI 学生等待你的发言，不会主动提问。';
+  }
+  if (refs.topicInput) {
+    refs.topicInput.placeholder = isTutor
+      ? '写下你想学的数学主题，例如：为什么判别式能判断一元二次方程根的个数？请小理一步步带我弄懂'
+      : '写下你要讲解的数学主题，你作为老师来讲。例如：用配方法解 x²−6x+5=0，讲清楚每一步为什么这样做';
+  }
+  if (refs.startBtnLabel) refs.startBtnLabel.textContent = isTutor ? '开始上课' : '开始讲课';
 
   const persona = personaInfo(practice.persona);
   if (refs.homePersonaHint) {
@@ -1247,9 +1340,59 @@ function showScreen(name) {
   }
 }
 
+function currentAiMode() {
+  return store.session?.aiMode || store.practice.aiMode;
+}
+
+function isTutorSession() {
+  return currentAiMode() === 'tutor';
+}
+
+/**
+ * Swap teacher-side chrome (labels, hints, report entry points) when the
+ * session runs in AI 家教 mode. The mode is locked at session start.
+ */
+function applyAiModeChrome() {
+  const session = store.session;
+  const tutor = session?.aiMode === 'tutor';
+  const name = aiDisplayName(session?.aiMode || store.practice.aiMode);
+
+  if (refs.chatKicker) refs.chatKicker.textContent = tutor ? 'AI 家教' : '正在讲课';
+  if (refs.typingLabel) refs.typingLabel.textContent = `${name}正在想`;
+  if (refs.statTurnsLabel) refs.statTurnsLabel.textContent = tutor ? '你的回答' : '你的讲解';
+  if (refs.statQuestionsLabel) {
+    refs.statQuestionsLabel.textContent = tutor ? `${name}的提问` : '小问的追问';
+  }
+  if (refs.messageInput) {
+    refs.messageInput.placeholder = tutor
+      ? '写下你的答案…… 不确定也可以直接说哪里没懂。'
+      : '把你的思路讲出来…… 不用完美，边想边说也可以。';
+    refs.messageInput.setAttribute('aria-label', tutor ? '你的回答' : '你的讲解');
+  }
+  if (refs.sendBtn) refs.sendBtn.setAttribute('aria-label', tutor ? '发送回答' : '发送讲解');
+  if (refs.endSessionBtn) {
+    refs.endSessionBtn.textContent = tutor ? '结束辅导' : '结束本次讲课';
+  }
+
+  // Teacher-training surfaces have no meaning while 小理 is the one teaching.
+  for (const node of [
+    refs.progressCard,
+    refs.teacherCallCard,
+    refs.chatPersonaRow,
+    refs.chatIntensityRow,
+    refs.chatModeRow,
+    refs.markStuckBtn,
+    refs.endAndReportBtn,
+    refs.callTeacherMobile
+  ]) {
+    if (node) node.hidden = tutor;
+  }
+}
+
 function syncChrome() {
   const session = store.session;
   const busy = store.busy;
+  applyAiModeChrome();
   const evaluating = store.state.status === STATUS.EVALUATING;
   const hasReport = Boolean(session?.report);
 
@@ -1328,12 +1471,17 @@ function renderTopicMeta(session) {
 
   const persona = personaInfo(session.studentPersona);
   const mode = modeInfo(session.studentMode);
+  const tutor = session.aiMode === 'tutor';
   if (refs.chatSub) {
     const parts = [];
     if (meta.subject) parts.push(meta.subject.short);
-    parts.push(persona.label);
-    parts.push(mode.label);
-    refs.chatSub.textContent = `小问 · ${parts.join(' · ')}`;
+    if (tutor) {
+      parts.push('先讲再问');
+    } else {
+      parts.push(persona.label);
+      parts.push(mode.label);
+    }
+    refs.chatSub.textContent = `${aiDisplayName(session.aiMode)} · ${parts.join(' · ')}`;
   }
 }
 
@@ -1469,17 +1617,31 @@ function renderSession() {
 
 function renderMessage(message) {
   const isUser = message.role === 'user';
+  const tutor = store.session?.aiMode === 'tutor';
+  const name = aiDisplayName(store.session?.aiMode);
   const row = el('article', `message-row ${isUser ? 'user' : 'student'}`);
   row.id = `msg-${message.id}`;
   row.dataset.id = message.id;
 
-  const avatar = el('div', `message-avatar ${isUser ? 'user-avatar' : 'student-avatar'}`, isUser ? '我' : '问');
+  const avatar = el(
+    'div',
+    `message-avatar ${isUser ? 'user-avatar' : 'student-avatar'}`,
+    isUser ? '我' : tutor ? '理' : '问'
+  );
   avatar.setAttribute('aria-hidden', 'true');
 
   const main = el('div', 'message-main');
   const meta = el('div', 'message-meta');
   meta.append(
-    el('span', 'message-name', isUser ? '我 · 老师' : '小问 · AI 学生'),
+    el(
+      'span',
+      'message-name',
+      isUser
+        ? tutor
+          ? '我 · 学生'
+          : '我 · 老师'
+        : `${name} · ${tutor ? 'AI 家教' : 'AI 学生'}`
+    ),
     el('span', 'message-time', formatTime(message.createdAt))
   );
   const copyButton = renderMessageCopy(message);
@@ -1523,7 +1685,11 @@ function renderMessageCopy(message) {
   const button = el('button', 'message-copy', '复制');
   button.type = 'button';
   button.title = '复制这条消息';
-  button.setAttribute('aria-label', `复制${message.role === 'user' ? '你的讲解' : '小问的回复'}`);
+  const tutor = isTutorSession();
+  button.setAttribute(
+    'aria-label',
+    `复制${message.role === 'user' ? (tutor ? '你的回答' : '你的讲解') : `${aiDisplayName(store.session?.aiMode)}的回复`}`
+  );
   button.addEventListener('click', async (event) => {
     event.stopPropagation();
     const ok = await copyText(text);
@@ -1676,7 +1842,8 @@ async function handleStart() {
     difficulty,
     tags,
     source,
-    studentPersona: store.practice.persona
+    studentPersona: store.practice.persona,
+    aiMode: store.practice.aiMode
   });
   bankEditingId = '';
   refs.topicInput.value = '';
@@ -1722,7 +1889,7 @@ function handleSend(event) {
   const content = refs.messageInput.value.trim();
   const images = pendingImages.slice(0, APP.limits.maxImages);
   if (!content && !images.length) {
-    toast('写点什么再发给小问吧。', 'warm');
+    toast(`写点什么再发给${aiDisplayName(store.session.aiMode)}吧。`, 'warm');
     refs.messageInput.focus();
     return;
   }
@@ -1751,6 +1918,9 @@ async function requestStudent() {
   if (!ensureKey()) return;
 
   const sessionId = store.session.id;
+  const tutor = store.session.aiMode === 'tutor';
+  const agent = tutor ? tutorAgent : studentAgent;
+  const name = aiDisplayName(store.session.aiMode);
   store.setBusy(true);
   showTyping(true);
 
@@ -1761,7 +1931,7 @@ async function requestStudent() {
   let streamedContent = '';
 
   try {
-    const finalText = await studentAgent.reply({
+    const finalText = await agent.reply({
       session: store.session,
       settings: store.settings,
       signal: controller.signal,
@@ -1828,7 +1998,9 @@ async function requestStudent() {
         requestStudent();
       };
       appendNotice(
-        `小问这次没有接上话：${error.message || '未知错误'}。你的讲解已经保留，可以直接重试。`,
+        `${name}这次没有接上话：${error.message || '未知错误'}。你的${
+          tutor ? '回答' : '讲解'
+        }已经保留，可以直接重试。`,
         { retry }
       );
     } else if (!received) {
@@ -1848,6 +2020,7 @@ async function requestStudent() {
 
 async function handleCallTeacher() {
   if (!store.session) return;
+  if (isTutorSession()) return;
   if (store.busy || store.state.status === STATUS.EVALUATING) return;
   if (!ensureKey()) return;
 
@@ -4567,17 +4740,22 @@ function handleAbandonSession() {
 
 async function handleEndSession() {
   if (!store.session || endingSession) return;
-  if (!window.confirm('结束本次讲课？本次对话会存入学习档案，API Key 会保留。')) return;
+  const tutor = isTutorSession();
+  const confirmText = tutor
+    ? '结束这次辅导？本次对话不会存入学习档案。'
+    : '结束本次讲课？本次对话会存入学习档案，API Key 会保留。';
+  if (!window.confirm(confirmText)) return;
 
   endingSession = true;
   if (refs.endSessionBtn) refs.endSessionBtn.disabled = true;
   try {
-    // Stop any in-flight generation first, then let 小问 say goodbye.
+    // Stop any in-flight generation first.
     studentAbort?.abort();
     teacherAbort?.abort();
 
     let farewell = '';
-    if (humanTurnCount(store.session) > 0 && isConfigured(store.settings)) {
+    if (!tutor && humanTurnCount(store.session) > 0 && isConfigured(store.settings)) {
+      // 小问 says goodbye only in AI 学生 mode; tutoring sessions just close.
       showTyping(true);
       farewell = await generateFarewell();
       showTyping(false);
@@ -4587,12 +4765,20 @@ async function handleEndSession() {
       if (msg) appendMessageElement(msg);
     }
 
-    archiveCurrentLesson();
+    if (!tutor) archiveCurrentLesson();
     if (activeModalId) closeModal(activeModalId);
     store.end();
     resetAfterSession();
     renderHistoryEntry();
-    toast(farewell ? '小问跟你告别了，本次讲课已存入学习档案。' : '本次讲课已结束，已存入学习档案。', 'success', 4000);
+    toast(
+      tutor
+        ? '这次辅导结束了，没有存入学习档案。'
+        : farewell
+          ? '小问跟你告别了，本次讲课已存入学习档案。'
+          : '本次讲课已结束，已存入学习档案。',
+      'success',
+      4000
+    );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } finally {
     showTyping(false);
@@ -4604,12 +4790,12 @@ async function handleEndSession() {
 function handleUndoTurn() {
   if (!store.session) return;
   if (store.busy) {
-    toast('小问还在回复，等它说完再回退这一轮。', 'warm');
+    toast(`${aiDisplayName(store.session?.aiMode)}还在回复，等它说完再回退这一轮。`, 'warm');
     return;
   }
   const removed = store.undoLastTurn();
   if (!removed?.length) {
-    toast('还没有可以回退的讲解。', 'warm');
+    toast(`还没有可以回退的${isTutorSession() ? '回答' : '讲解'}。`, 'warm');
     return;
   }
   const userMessage = removed.find((message) => message.role === 'user');
@@ -4643,7 +4829,7 @@ function handleMarkStuck() {
 }
 
 function handleEndAndReport() {
-  if (!store.session) return;
+  if (!store.session || isTutorSession()) return;
   if (store.busy || store.state.status === STATUS.EVALUATING) return;
   if (humanTurnCount(store.session) < 1) {
     toast('先向小问讲一段，再生成诊断报告。', 'warm');

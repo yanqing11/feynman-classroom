@@ -1,4 +1,5 @@
 import {
+  AI_MODES,
   APP,
   DIFFICULTIES,
   INTENSITIES,
@@ -55,6 +56,7 @@ const SOURCE_KEYS = new Set(Object.keys(SOURCES));
 const PERSONA_KEYS = new Set(PERSONAS.map((item) => item.key));
 const MODE_KEYS = new Set(STUDENT_MODES.map((item) => item.key));
 const INTENSITY_KEYS = new Set(INTENSITIES.map((item) => item.key));
+const AI_MODE_KEYS = new Set(AI_MODES.map((item) => item.key));
 
 const PRACTICE_DEFAULT = {
   subject: 'junior',
@@ -62,6 +64,7 @@ const PRACTICE_DEFAULT = {
   persona: 'curious',
   mode: 'real',
   intensity: 'normal',
+  aiMode: 'student',
   lockSubject: true
 };
 
@@ -77,6 +80,7 @@ export function loadPractice() {
     persona: pick(stored.persona, PERSONA_KEYS, PRACTICE_DEFAULT.persona),
     mode: pick(stored.mode, MODE_KEYS, PRACTICE_DEFAULT.mode),
     intensity: pick(stored.intensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
+    aiMode: pick(stored.aiMode, AI_MODE_KEYS, PRACTICE_DEFAULT.aiMode),
     lockSubject:
       typeof stored.lockSubject === 'boolean' ? stored.lockSubject : PRACTICE_DEFAULT.lockSubject
   };
@@ -90,6 +94,7 @@ export function savePractice(practice) {
     persona: pick(merged.persona, PERSONA_KEYS, PRACTICE_DEFAULT.persona),
     mode: pick(merged.mode, MODE_KEYS, PRACTICE_DEFAULT.mode),
     intensity: pick(merged.intensity, INTENSITY_KEYS, PRACTICE_DEFAULT.intensity),
+    aiMode: pick(merged.aiMode, AI_MODE_KEYS, PRACTICE_DEFAULT.aiMode),
     lockSubject: Boolean(merged.lockSubject)
   };
   try {
@@ -173,10 +178,11 @@ export function maskKey(key) {
 
 function createSession(topic, topicImage, meta = {}) {
   const now = new Date().toISOString();
+  const aiMode = pick(meta.aiMode, AI_MODE_KEYS, PRACTICE_DEFAULT.aiMode);
   const kickoff = {
     id: newId(),
     role: 'user',
-    content: kickoffMessage(topic),
+    content: kickoffMessage(topic, aiMode),
     images: topicImage ? [topicImage] : [],
     hidden: true,
     createdAt: now
@@ -184,6 +190,7 @@ function createSession(topic, topicImage, meta = {}) {
   return {
     id: newId(),
     topic,
+    aiMode,
     subject: pick(meta.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
     difficulty: pick(meta.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
     tags: normalizeTags(meta.tags),
@@ -223,6 +230,7 @@ function restoreSession() {
   return {
     id: typeof stored.id === 'string' ? stored.id : newId(),
     topic: String(stored.topic).slice(0, APP.limits.maxTopicChars),
+    aiMode: pick(stored.aiMode, AI_MODE_KEYS, PRACTICE_DEFAULT.aiMode),
     subject: pick(stored.subject, SUBJECT_KEYS_SET, PRACTICE_DEFAULT.subject),
     difficulty: pick(stored.difficulty, DIFFICULTY_KEYS, PRACTICE_DEFAULT.difficulty),
     tags: normalizeTags(stored.tags),

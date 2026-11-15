@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261115b">
+  <link rel="stylesheet" href="./styles.css?v=20261115c">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -76,7 +76,7 @@
             <span class="eyebrow-line" aria-hidden="true"></span>
           </p>
           <h1 class="home-title">讲一遍，你就真的懂了。</h1>
-          <p class="home-subtitle">你来讲，AI 持续追问，找到知识盲区。</p>
+          <p class="home-subtitle" id="homeSubtitle">你来讲，AI 持续追问，找到知识盲区。</p>
         </div>
 
         <div class="home-card">
@@ -89,9 +89,9 @@
             <label class="sr-only" for="topicInput">讲课主题或题目</label>
             <textarea id="topicInput" class="topic-input" rows="3" maxlength="1200"
               placeholder="写下你要讲解的数学主题，你作为老师来讲。例如：用配方法解 x²−6x+5=0，讲清楚每一步为什么这样做"></textarea>
-            <p class="home-teacher-hint">
+            <p class="home-teacher-hint" id="homeTeacherHint">
               <span aria-hidden="true">⚠️</span>
-              开始讲课之后，需要由你先进行讲解，AI 学生等待你的发言，不会主动提问。
+              <span id="homeTeacherHintText">开始讲课之后，需要由你先进行讲解，AI 学生等待你的发言，不会主动提问。</span>
             </p>
 
             <div class="home-meta">
@@ -111,7 +111,15 @@
               <div class="quick-tags" id="quickTags" role="group" aria-label="快捷知识点标签"></div>
             </div>
 
-            <div class="home-persona">
+            <div class="home-persona home-ai-mode">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
+                <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
+              </div>
+              <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
+            </div>
+
+            <div class="home-persona" id="homePersonaBlock">
               <div class="home-persona-head">
                 <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
                 <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
@@ -145,7 +153,7 @@
                 <button class="btn btn-ghost btn-sm" id="recognizeBtn" type="button" hidden>识别文字</button>
                 <span class="image-hint" id="topicImageHint">支持截图粘贴、拖拽上传；原图保存在本机，识别或发送时会交给你配置的 AI 模型；手写识别效果有限，识别后请校对文字</span>
               </div>
-              <button class="btn btn-primary btn-start" id="startBtn" type="button">开始讲课</button>
+              <button class="btn btn-primary btn-start" id="startBtn" type="button"><span id="startBtnLabel">开始讲课</span></button>
             </div>
 
             <div class="home-bank-row">
@@ -180,7 +188,7 @@
           <section class="chat-panel paper-card" aria-label="讲课对话">
             <div class="chat-head">
               <div class="chat-topic">
-                <span class="chat-kicker">正在讲课</span>
+                <span class="chat-kicker" id="chatKicker">正在讲课</span>
                 <p class="chat-sub" id="chatSub">小问会围绕顶部的题目追问</p>
               </div>
               <div class="chat-head-right">
@@ -211,7 +219,7 @@
               <div class="typing-row" id="typingIndicator" hidden role="status" aria-live="polite">
                 <div class="message-avatar student-avatar" aria-hidden="true">问</div>
                 <div class="typing-bubble">
-                  <span class="typing-label">小问正在想</span>
+                  <span class="typing-label" id="typingLabel">小问正在想</span>
                   <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                   <span class="typing-skeleton" aria-hidden="true"></span>
                 </div>
@@ -294,7 +302,7 @@
               </div>
             </div>
 
-            <div class="side-card progress-card">
+            <div class="side-card progress-card" id="progressCard">
               <div class="side-card-head">
                 <span class="side-kicker">TEACHING CHECKLIST</span>
                 <h3>讲清楚这三件事</h3>
@@ -305,8 +313,8 @@
                 <li><span class="check-index">3</span><div><strong>换个例子验证</strong><p>代一个数回去，看看结论站不站得住。</p></div></li>
               </ul>
               <div class="session-stats">
-                <div><span id="statTurns">0</span><small>你的讲解</small></div>
-                <div><span id="statQuestions">0</span><small>小问的追问</small></div>
+                <div><span id="statTurns">0</span><small id="statTurnsLabel">你的讲解</small></div>
+                <div><span id="statQuestions">0</span><small id="statQuestionsLabel">小问的追问</small></div>
               </div>
             </div>
 
@@ -319,22 +327,22 @@
                 <label for="chatSubjectSelect">学科</label>
                 <select id="chatSubjectSelect"></select>
               </div>
-              <div class="practice-row">
+              <div class="practice-row" id="chatPersonaRow">
                 <label for="chatPersonaSelect">学生人设</label>
                 <select id="chatPersonaSelect"></select>
               </div>
-              <div class="practice-row">
+              <div class="practice-row" id="chatIntensityRow">
                 <label for="chatIntensitySelect">追问强度</label>
                 <select id="chatIntensitySelect"></select>
               </div>
-              <div class="practice-row">
+              <div class="practice-row" id="chatModeRow">
                 <label for="chatModeSelect">学生模式</label>
                 <select id="chatModeSelect"></select>
               </div>
               <p class="tiny-note" id="practiceLockHint">学科已锁定；到设置里可以关闭锁定。</p>
             </div>
 
-            <div class="side-card teacher-call-card">
+            <div class="side-card teacher-call-card" id="teacherCallCard">
               <div class="teacher-seal" aria-hidden="true">评</div>
               <div class="side-card-head">
                 <span class="side-kicker">AI TEACHER · 旁听中</span>
@@ -500,6 +508,7 @@
 
         <fieldset class="practice-settings">
           <legend>AI 学生设置</legend>
+          <p class="field-hint" id="aiModeSettingsNote" hidden>这些设置只在 AI 学生模式下生效；当前选择的是 AI 家教。</p>
           <div class="field">
             <label for="studentPersonaSelect">学生人设</label>
             <select id="studentPersonaSelect"></select>
@@ -1125,6 +1134,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261115b"></script>
+  <script type="module" src="./app.js?v=20261115c"></script>
 </body>
 </html>
