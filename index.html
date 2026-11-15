@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261113e">
+  <link rel="stylesheet" href="./styles.css?v=20261115b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -453,6 +453,7 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             复制 Markdown
           </button>
+          <button class="btn btn-outline" id="exerciseBtn" type="button" hidden>做练习</button>
           <button class="btn btn-ghost" data-close="reportModal" type="button">继续讲一会儿</button>
           <button class="btn btn-primary" id="restartFromReportBtn" type="button">换个主题，重新开始</button>
         </footer>
@@ -1085,8 +1086,45 @@
     <img id="lightboxImage" alt="放大查看的图片">
   </div>
 
+  <!-- ============ EXERCISE MODAL ============ -->
+  <div class="modal-layer" id="exerciseModal" hidden>
+    <div class="modal-backdrop" data-close="exerciseModal"></div>
+    <div class="modal exercise-modal" role="dialog" aria-modal="true" aria-labelledby="exerciseTitle" tabindex="-1">
+      <div class="report-topbar">
+        <span class="report-stamp">巩固练习</span>
+        <button class="icon-btn modal-close" data-close="exerciseModal" type="button" aria-label="关闭练习">×</button>
+      </div>
+      <div class="report-loading" id="exerciseLoading" hidden>
+        <div class="loader-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h2 id="exerciseTitle">陈老师正在出题……</h2>
+        <p>正在根据你的薄弱点生成巩固练习题。</p>
+      </div>
+      <div class="report-error" id="exerciseError" hidden>
+        <div class="error-mark" aria-hidden="true">!</div>
+        <h2>出题失败了</h2>
+        <p id="exerciseErrorText">请稍后再试。</p>
+        <div class="report-error-actions">
+          <button class="btn btn-primary" id="retryExerciseBtn" type="button">再试一次</button>
+          <button class="btn btn-ghost" data-close="exerciseModal" type="button">关闭</button>
+        </div>
+      </div>
+      <div class="report-content exercise-content" id="exerciseContent" hidden>
+        <header class="report-head">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line"></span>巩固练习</p>
+            <h2 id="exerciseTitleText">基于本课的练习题</h2>
+          </div>
+        </header>
+        <div id="exerciseList"></div>
+        <footer class="report-actions">
+          <button class="btn btn-ghost" data-close="exerciseModal" type="button">关闭</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261113e"></script>
+  <script type="module" src="./app.js?v=20261115b"></script>
 </body>
 </html>

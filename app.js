@@ -9,6 +9,8 @@ import {
   STUDENT_MODES,
   SUBJECT_LIST,
   SUBJECT_KEYS,
+  EXERCISE_PROMPT,
+  FAREWELL_PROMPT,
   difficultyInfo,
   intensityInfo,
   modeInfo,
@@ -18,7 +20,7 @@ import {
   sourceInfo,
   subjectInfo
 } from './js/config.js';
-import { ApiError, isAbortError, isConfigured, recognizeProblem, testConnection } from './js/api.js';
+import { ApiError, isAbortError, isConfigured, recognizeProblem, testConnection, completeChat } from './js/api.js';
 import { StudentAgent, TeacherAgent, humanTurnCount } from './js/agents.js';
 import {
   ClassroomStore,
@@ -405,6 +407,15 @@ const refs = {
   imageLightbox: $('#imageLightbox'),
   lightboxImage: $('#lightboxImage'),
   closeLightbox: $('#closeLightbox'),
+  exerciseBtn: $('#exerciseBtn'),
+  exerciseModal: $('#exerciseModal'),
+  exerciseLoading: $('#exerciseLoading'),
+  exerciseError: $('#exerciseError'),
+  exerciseErrorText: $('#exerciseErrorText'),
+  retryExerciseBtn: $('#retryExerciseBtn'),
+  exerciseContent: $('#exerciseContent'),
+  exerciseTitleText: $('#exerciseTitleText'),
+  exerciseList: $('#exerciseList'),
   toastStack: $('#toastStack')
 };
 
@@ -420,6 +431,7 @@ let pendingImages = [];
 let topicImage = null;
 let studentAbort = null;
 let teacherAbort = null;
+let endingSession = false;
 let activeModalId = null;
 let lastFocused = null;
 let modalStack = [];
@@ -755,7 +767,9 @@ function renderPracticeUI() {
     refs.studentModeHint.textContent =
       practice.mode === 'examiner'
         ? '考官模式：会更认真地核对每一步依据，但仍然一次只问一个问题。'
-        : '真实学生模式：疑问从你的讲解里自然生长，不按固定顺序。';
+        : practice.mode === 'assist'
+          ? '简易辅助模式：温和引导老师开口，适合完全不会讲的情况。'
+          : '真实学生模式：疑问从你的讲解里自然生长，不按固定顺序。';
   }
   if (refs.studentIntensityHint) {
     refs.studentIntensityHint.textContent = `${intensity.label}：${intensity.hint}。`;
@@ -1744,9 +1758,10 @@ async function requestStudent() {
   studentAbort = controller;
   let assistant = null;
   let received = false;
+  let streamedContent = '';
 
   try {
-    await studentAgent.reply({
+    const finalText = await studentAgent.reply({
       session: store.session,
       settings: store.settings,
       signal: controller.signal,
@@ -1759,10 +1774,28 @@ async function requestStudent() {
           if (assistant) appendMessageElement(assistant);
         }
         if (!assistant) return;
+        streamedContent += delta;
         store.appendToMessage(assistant.id, delta, { persist: false });
         updateStreamingMessage(assistant.id, assistant.content);
       }
     });
+
+    // If the agent returned a different text (e.g. after post-detection retry),
+    // replace the streamed content with the final clean version.
+    const finalClean = typeof finalText === 'string' ? finalText.trim() : '';
+    if (!assistant && finalClean) {
+      // The first stream produced nothing usable (or was fully rejected), but a
+      // retry did return text — still show it instead of losing the turn.
+      showTyping(false);
+      assistant = store.addMessage('assistant', finalClean, []);
+      if (assistant) appendMessageElement(assistant);
+    } else if (assistant && finalClean && finalClean !== streamedContent) {
+      const message = store.session?.messages.find((item) => item.id === assistant.id);
+      if (message) {
+        message.content = finalClean;
+        updateStreamingMessage(assistant.id, finalClean);
+      }
+    }
 
     if (assistant) {
       const message = store.session?.messages.find((item) => item.id === assistant.id);
@@ -1889,6 +1922,8 @@ function presentReport(report, { topic = '', archived = false, meta = '', record
   refs.reportError.hidden = true;
   refs.reportContent.hidden = false;
   refs.reportModal.querySelector('.modal').scrollTop = 0;
+  // Show exercise button only for live sessions (not archived reports)
+  if (refs.exerciseBtn) refs.exerciseBtn.hidden = archived || !store.settings;
   renderReport(report, currentReportTopic, currentReportMeta);
 }
 
@@ -2023,9 +2058,19 @@ function renderReport(report, topicOverride, meta = '') {
     card.append(el('span', 'gap-index', String(index + 1).padStart(2, '0')));
 
     const body = el('div');
-    body.append(el('h4', '', gap.title || `理解缺口 ${index + 1}`));
+    const titleRow = el('div', 'gap-title-row');
+    titleRow.append(el('h4', '', gap.title || `理解缺口 ${index + 1}`));
+    if (gap.type) {
+      const typeBadge = el('span', `gap-type-badge gap-type-${gap.type.includes('知识') ? 'error' : gap.type.includes('跳跃') ? 'jump' : 'missing'}`, gap.type);
+      titleRow.append(typeBadge);
+    }
+    if (gap.zpd) {
+      const zpdBadge = el('span', `gap-zpd-badge gap-zpd-${gap.zpd === '已掌握' ? 'mastered' : gap.zpd === '未触及' ? 'unreached' : 'edge'}`, gap.zpd);
+      titleRow.append(zpdBadge);
+    }
+    body.append(titleRow);
     if (gap.evidence) {
-      body.append(el('p', 'gap-evidence', `“${gap.evidence}”`));
+      body.append(el('p', 'gap-evidence', `"${gap.evidence}"`));
     }
     if (gap.why) {
       const row = el('div', 'gap-row');
@@ -2080,7 +2125,13 @@ function renderReport(report, topicOverride, meta = '') {
     card.append(el('span', 'next-index', String(index + 1)));
 
     const body = el('div');
-    body.append(el('h4', '', step.title || `下一步 ${index + 1}`));
+    const titleRow = el('div', 'gap-title-row');
+    titleRow.append(el('h4', '', step.title || `下一步 ${index + 1}`));
+    if (step.zpd) {
+      const zpdBadge = el('span', `gap-zpd-badge gap-zpd-${step.zpd === '已掌握' ? 'mastered' : step.zpd === '未触及' ? 'unreached' : 'edge'}`, step.zpd);
+      titleRow.append(zpdBadge);
+    }
+    body.append(titleRow);
     if (step.action) body.append(el('p', 'next-action', step.action));
     if (step.example) body.append(el('p', 'next-example', step.example));
     card.append(body);
@@ -2093,6 +2144,176 @@ function renderReport(report, topicOverride, meta = '') {
   strengths.forEach((strength) => {
     refs.strengthList.append(el('li', '', strength));
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Exercise generation & farewell                                             */
+/* -------------------------------------------------------------------------- */
+
+function buildExerciseMessages(report, session) {
+  const topic = session?.topic || currentReportTopic || '';
+  const meta = session ? sessionMeta(session) : null;
+  const lines = [];
+
+  lines.push(`讲课主题是：《${topic}》。`);
+  if (meta?.subject) lines.push(`学科：${meta.subject.label}。`);
+  if (meta?.difficulty) lines.push(`难度：${meta.difficulty.label}。`);
+  if (meta?.tags?.length) lines.push(`知识点：${meta.tags.join('、')}。`);
+
+  // Summarize misconceptions for the exercise prompt
+  const gaps = report?.misconceptions || [];
+  if (gaps.length) {
+    lines.push('诊断报告中发现的薄弱点：');
+    for (const gap of gaps) {
+      lines.push(`- ${gap.title}（${gap.type || '步骤缺失'}，${gap.zpd || '边缘掌握'}）：${gap.fix || ''}`);
+    }
+  }
+
+  const system = `${EXERCISE_PROMPT}
+
+【本课诊断信息】
+${lines.join('\n')}`;
+
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: `请基于以上诊断信息，出 1-2 道巩固练习题。` }
+  ];
+}
+
+function parseExercise(raw) {
+  const text = String(raw || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('练习题格式不正确，请再试一次。');
+  }
+  const object = JSON.parse(text.slice(start, end + 1));
+  if (!object.exercises || !Array.isArray(object.exercises) || !object.exercises.length) {
+    throw new Error('没有生成练习题，请再试一次。');
+  }
+  return object;
+}
+
+function renderExercise(data) {
+  refs.exerciseTitleText.textContent = data.title || '巩固练习';
+  refs.exerciseList.replaceChildren();
+
+  for (const ex of data.exercises) {
+    const card = el('article', 'exercise-card');
+    const isChoice = ex.type === 'choice' && Array.isArray(ex.options) && ex.options.length;
+
+    const question = el('div', 'exercise-question');
+    question.append(el('span', 'exercise-type-badge', isChoice ? '选择题' : '填空题'));
+    question.append(el('p', '', ex.question || ''));
+    card.append(question);
+
+    if (isChoice) {
+      const options = el('div', 'exercise-options');
+      for (const opt of ex.options) {
+        const btn = el('button', 'exercise-option', opt);
+        btn.type = 'button';
+        const isCorrect = String(opt).charAt(0).toUpperCase() === String(ex.answer).toUpperCase();
+        btn.addEventListener('click', () => {
+          // Reveal correctness
+          for (const o of options.querySelectorAll('.exercise-option')) {
+            o.disabled = true;
+            const letter = String(o.textContent).charAt(0).toUpperCase();
+            o.classList.toggle('is-correct', letter === String(ex.answer).toUpperCase());
+            o.classList.toggle('is-wrong', o === btn && !isCorrect);
+          }
+          toast(isCorrect ? '答对了！' : '再看看答案~', isCorrect ? 'success' : 'warm', 2600);
+        });
+        options.append(btn);
+      }
+      card.append(options);
+    }
+
+    const reveal = el('details', 'exercise-reveal');
+    const summary = el('summary', '', '查看答案与提示');
+    const body = el('div', 'exercise-reveal-body');
+    body.append(el('p', '', `答案：${ex.answer || '—'}`));
+    if (ex.hint) body.append(el('p', 'exercise-hint', `提示：${ex.hint}`));
+    if (ex.targetWeakness) body.append(el('p', 'exercise-target', `对应薄弱点：${ex.targetWeakness}`));
+    reveal.append(summary, body);
+    card.append(reveal);
+
+    refs.exerciseList.append(card);
+  }
+}
+
+let exerciseAbort = null;
+
+async function handleExercise() {
+  if (!currentReport) {
+    toast('请先生成诊断报告，再做练习。', 'warm');
+    return;
+  }
+  if (!ensureKey()) return;
+
+  const session = store.session;
+  const report = currentReport;
+
+  openModal('exerciseModal');
+  refs.exerciseLoading.hidden = false;
+  refs.exerciseError.hidden = true;
+  refs.exerciseContent.hidden = true;
+
+  const controller = new AbortController();
+  exerciseAbort = controller;
+
+  try {
+    const messages = buildExerciseMessages(report, session);
+    const raw = await completeChat({
+      settings: store.settings,
+      messages,
+      maxTokens: 1200,
+      temperature: 0.5,
+      jsonMode: true,
+      signal: controller.signal
+    });
+    const data = parseExercise(raw);
+    refs.exerciseLoading.hidden = true;
+    refs.exerciseContent.hidden = false;
+    renderExercise(data);
+  } catch (error) {
+    if (isAbortError(error)) return;
+    refs.exerciseLoading.hidden = true;
+    refs.exerciseContent.hidden = true;
+    refs.exerciseError.hidden = false;
+    refs.exerciseErrorText.textContent = error.message || '出题失败，请稍后再试。';
+  } finally {
+    exerciseAbort = null;
+  }
+}
+
+/**
+ * Generate a farewell message from the student agent when ending a session.
+ * Returns the farewell text, or empty string if generation fails.
+ */
+async function generateFarewell() {
+  if (!store.session) return '';
+  try {
+    const visibleMsgs = (store.session.messages || [])
+      .filter((m) => !m.hidden && (m.role === 'user' || m.role === 'assistant'))
+      .map((m) => `${m.role === 'user' ? '老师' : '小问'}：${m.content || ''}`)
+      .join('\n');
+
+    const messages = [
+      { role: 'system', content: FAREWELL_PROMPT },
+      { role: 'user', content: `以下是这节课的对话记录，请根据它生成告别语：\n\n${visibleMsgs.slice(-2000)}` }
+    ];
+
+    const result = await completeChat({
+      settings: store.settings,
+      messages,
+      maxTokens: 120,
+      temperature: 0.8,
+      signal: AbortSignal.timeout(8000)
+    });
+    return String(result || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 async function copyReport() {
@@ -4344,19 +4565,40 @@ function handleAbandonSession() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function handleEndSession() {
-  if (!store.session) return;
+async function handleEndSession() {
+  if (!store.session || endingSession) return;
   if (!window.confirm('结束本次讲课？本次对话会存入学习档案，API Key 会保留。')) return;
 
-  archiveCurrentLesson();
-  studentAbort?.abort();
-  teacherAbort?.abort();
-  if (activeModalId) closeModal(activeModalId);
-  store.end();
-  resetAfterSession();
-  renderHistoryEntry();
-  toast('本次讲课已结束，已存入学习档案。', 'success');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  endingSession = true;
+  if (refs.endSessionBtn) refs.endSessionBtn.disabled = true;
+  try {
+    // Stop any in-flight generation first, then let 小问 say goodbye.
+    studentAbort?.abort();
+    teacherAbort?.abort();
+
+    let farewell = '';
+    if (humanTurnCount(store.session) > 0 && isConfigured(store.settings)) {
+      showTyping(true);
+      farewell = await generateFarewell();
+      showTyping(false);
+    }
+    if (farewell) {
+      const msg = store.addMessage('assistant', farewell, []);
+      if (msg) appendMessageElement(msg);
+    }
+
+    archiveCurrentLesson();
+    if (activeModalId) closeModal(activeModalId);
+    store.end();
+    resetAfterSession();
+    renderHistoryEntry();
+    toast(farewell ? '小问跟你告别了，本次讲课已存入学习档案。' : '本次讲课已结束，已存入学习档案。', 'success', 4000);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } finally {
+    showTyping(false);
+    endingSession = false;
+    if (refs.endSessionBtn) refs.endSessionBtn.disabled = false;
+  }
 }
 
 function handleUndoTurn() {
@@ -4641,6 +4883,8 @@ function bindEvents() {
   refs.undoTurnBtn?.addEventListener('click', handleUndoTurn);
   refs.markStuckBtn?.addEventListener('click', handleMarkStuck);
   refs.endAndReportBtn?.addEventListener('click', handleEndAndReport);
+  refs.exerciseBtn?.addEventListener('click', handleExercise);
+  refs.retryExerciseBtn?.addEventListener('click', handleExercise);
   refs.startBtn.addEventListener('click', handleStart);
   refs.topicInput.addEventListener('input', autoGrowTopic);
   refs.topicInput.addEventListener('keydown', (event) => {

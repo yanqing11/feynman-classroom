@@ -448,6 +448,8 @@ export function reportToText(record) {
     lines.push('## 关键理解缺口');
     report.misconceptions.forEach((item, index) => {
       lines.push(`${index + 1}. **${item.title || '理解缺口'}**`);
+      if (item.type) lines.push(`   - 类型：${item.type}`);
+      if (item.zpd) lines.push(`   - 最近发展区：${item.zpd}`);
       if (item.evidence) lines.push(`   - 证据：${item.evidence}`);
       if (item.why) lines.push(`   - 为什么：${item.why}`);
       if (item.fix) lines.push(`   - 怎么补：${item.fix}`);
@@ -460,6 +462,7 @@ export function reportToText(record) {
     lines.push('## 下一次可以这样讲');
     report.nextSteps.forEach((item, index) => {
       lines.push(`${index + 1}. **${item.title || '下一步'}**`);
+      if (item.zpd) lines.push(`   - 最近发展区：${item.zpd}`);
       if (item.action) lines.push(`   - 动作：${item.action}`);
       if (item.example) lines.push(`   - 示范：${item.example}`);
     });

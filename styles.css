@@ -2514,6 +2514,61 @@ body.is-chat .footer {
   font-weight: 700;
 }
 
+.gap-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.gap-title-row h4 {
+  margin: 0;
+}
+
+.gap-type-badge,
+.gap-zpd-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.gap-type-badge.gap-type-error {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.gap-type-badge.gap-type-missing {
+  background: var(--gold-soft);
+  color: #8a6a1a;
+}
+
+.gap-type-badge.gap-type-jump {
+  background: var(--gold-soft);
+  color: #8a6a1a;
+}
+
+.gap-zpd-badge.gap-zpd-mastered {
+  background: var(--green-soft);
+  color: var(--green-deep);
+}
+
+.gap-zpd-badge.gap-zpd-edge {
+  background: var(--green-pale);
+  color: var(--green);
+  border: 1px solid rgba(31, 111, 92, 0.2);
+}
+
+.gap-zpd-badge.gap-zpd-unreached {
+  background: var(--paper-deep);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
 .gap-evidence {
   margin: 0 0 8px;
   padding: 7px 10px;
@@ -7915,4 +7970,163 @@ body.is-chat .storage-banner {
 [data-theme="dark"] input[type="range"] {
   background: transparent;
   accent-color: var(--green);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Exercise modal                                                             */
+/* -------------------------------------------------------------------------- */
+
+.exercise-modal {
+  max-width: 580px;
+}
+
+.exercise-content {
+  padding: 0 24px 24px;
+}
+
+.exercise-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  background: var(--card);
+}
+
+.exercise-question {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.exercise-question p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  flex: 1;
+}
+
+.exercise-type-badge {
+  flex: none;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.exercise-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.exercise-option {
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+  font-size: 13.5px;
+  line-height: 1.6;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.exercise-option:hover:not(:disabled) {
+  border-color: var(--green);
+  background: var(--green-pale);
+}
+
+.exercise-option.is-correct {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-weight: 600;
+}
+
+.exercise-option.is-wrong {
+  border-color: var(--red, #c15b3f);
+  background: rgba(193, 91, 63, 0.08);
+  color: var(--red, #c15b3f);
+}
+
+.exercise-option:disabled {
+  cursor: default;
+}
+
+.exercise-reveal {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.exercise-reveal summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.exercise-reveal summary:hover {
+  color: var(--green);
+}
+
+.exercise-reveal-body {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.exercise-reveal-body p {
+  margin: 0 0 4px;
+}
+
+.exercise-hint {
+  color: var(--ink-soft);
+}
+
+.exercise-target {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+[data-theme="dark"] .exercise-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .exercise-option {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .exercise-option:hover:not(:disabled) {
+  border-color: var(--green);
+  background: rgba(31, 111, 92, 0.12);
+}
+
+[data-theme="dark"] .exercise-option.is-correct {
+  border-color: var(--green);
+  background: rgba(31, 111, 92, 0.28);
+  color: var(--green-deep);
+}
+
+[data-theme="dark"] .exercise-reveal {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .exercise-option.is-wrong {
+  border-color: var(--coral);
+  background: rgba(229, 146, 119, 0.14);
+  color: var(--coral);
+}
+
+[data-theme="dark"] .gap-type-badge.gap-type-missing,
+[data-theme="dark"] .gap-type-badge.gap-type-jump {
+  color: var(--gold);
 }

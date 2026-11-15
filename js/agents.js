@@ -3,6 +3,7 @@ import {
   METRICS,
   STUDENT_PROMPT,
   TEACHER_PROMPT,
+  ASSIST_MODE_OVERRIDE,
   difficultyInfo,
   intensityInfo,
   kickoffMessage,
@@ -17,6 +18,93 @@ import {
 import { ApiError, completeChat, streamChat } from './api.js';
 
 const clean = (value) => (typeof value === 'string' ? value.trim() : '');
+
+/* -------------------------------------------------------------------------- */
+/* Student output post-detection rules (防滥用检测)                            */
+/* -------------------------------------------------------------------------- */
+
+const ANSWER_LEAK_PATTERNS = [
+  /答案是/,
+  /所以\s*x\s*=/,
+  /最终结果/,
+  /综上/,
+  /因此答案是/,
+  /我们可以得出/
+];
+
+const ANSWER_VALUE_PATTERN = /x\s*=\s*-?\d+(?:\.\d+)?/;
+const ROLE_CONTAMINATION_PATTERNS = [
+  /作为\s*AI/,
+  /我是一个语言模型/,
+  /你的讲解有以下问题/,
+  /我建议你/,
+  /^\s*```json\s*$/im,
+  /^#{1,6}\s/m
+];
+
+const STUCK_PATTERN =
+  /(我不会|不知道|卡住|卡壳|没思路|不会做|给点提示|提示一下|帮帮我|想不出来|教教我)/;
+const HINT_REQUEST_PATTERN = /(提示|给点提示|提示一下|翻书|看看书|书上)/;
+
+/**
+ * Count Chinese characters (rough — CJK + full-width punctuation).
+ */
+function countChineseChars(text) {
+  const matches = String(text || '').match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Detect issues in student agent output before showing it to the user.
+ * Returns { passed, issues[], retryHint } — if issues is non-empty, the
+ * caller should retry generation with the retryHint appended to the system
+ * message.
+ */
+function checkStudentOutput(output, previousOutput = '') {
+  const text = String(output || '').trim();
+  const issues = [];
+  let retryHint = '';
+
+  // Detection 1: Answer leak
+  if (ANSWER_LEAK_PATTERNS.some((re) => re.test(text)) || ANSWER_VALUE_PATTERN.test(text)) {
+    issues.push('answer_leak');
+    retryHint = '注意：你刚才的回复包含了答案或解题步骤，这是被禁止的。请只输出一个疑问或一句复述。';
+  }
+
+  // Detection 2: Length overflow (100 chars with 20% tolerance = 120)
+  const charCount = countChineseChars(text);
+  if (charCount > 120) {
+    issues.push('length_overflow');
+    retryHint = '注意：你刚才的回复太长了，请缩短到 1～2 句话，不超过 80 个汉字。';
+  }
+
+  // Detection 3: Role contamination
+  if (ROLE_CONTAMINATION_PATTERNS.some((re) => re.test(text))) {
+    issues.push('role_contamination');
+    retryHint = '注意：你刚才的回复包含了评判性内容或格式异常，这不符合小问的学生角色。请只以学生的口吻说一句话。';
+  }
+
+  // Detection 4: Consecutive same-pattern (not blocking, just a hint)
+  if (previousOutput) {
+    const prevStart = previousOutput.slice(0, 6);
+    const currStart = text.slice(0, 6);
+    if (prevStart === currStart && prevStart.length >= 3) {
+      // Non-blocking: we flag it but don't retry
+      issues.push('consecutive_pattern');
+    }
+  }
+
+  const blockingIssues = issues.filter((i) => i !== 'consecutive_pattern');
+  return {
+    passed: blockingIssues.length === 0,
+    issues,
+    retryHint,
+    consecutivePattern: issues.includes('consecutive_pattern')
+  };
+}
+
+const SAFE_FALLBACK_REPLY = '老师，我有点听糊涂了，你能换个方式再讲讲吗？';
+const MAX_OUTPUT_RETRIES = 2;
 
 function apiContent(message) {
   const text = message.content || '';
@@ -50,10 +138,6 @@ function trimHistory(messages, maxChars) {
 function visibleMessages(session) {
   return session.messages.filter((message) => !message.hidden);
 }
-
-const STUCK_PATTERN =
-  /(我不会|不知道|卡住|卡壳|没思路|不会做|给点提示|提示一下|帮帮我|想不出来|教教我)/;
-const HINT_REQUEST_PATTERN = /(提示|给点提示|提示一下|翻书|看看书|书上)/;
 
 function lastUserMessage(session) {
   return [...visibleMessages(session)].reverse().find((message) => message.role === 'user');
@@ -109,6 +193,11 @@ function studentClassContext(session) {
     lines.push(
       '【提问模式：考官模式】在不违反阶段锁的前提下，可以比真实学生更认真地核对每一步依据；但依然一次只问一个问题，不能按固定清单或固定梯度连环追问，也不能主动规划学习路线。'
     );
+  } else if (mode.key === 'assist') {
+    lines.push(
+      '【提问模式：简易辅助模式】你的疑问要从老师上一句讲解里自然生长。在遵守所有学生规则的前提下，如果老师明确请求你帮忙检查或确认，你可以在不给出最终答案的前提下，用学生的口吻指出你"觉得有点不对劲的地方"。如果老师连续 2 次表达"不知道怎么讲"，你可以用更温和的语气引导老师开口。'
+    );
+    lines.push(ASSIST_MODE_OVERRIDE);
   } else {
     lines.push(
       '【提问模式：真实学生模式】你的疑问要从老师上一句讲解里自然生长，不按固定顺序。可以听懂后复述，可以半懂卡在一个点，可以完全跟不上请求简化，也可以说出自己的错误猜想。'
@@ -153,18 +242,20 @@ export function buildStudentMessages(session) {
     Boolean(session.hasTeacherSpeak) ||
     visibleMessages(session).some((message) => message.role === 'user');
 
+  const roundNumber = humanTurnCount(session);
+
+  const roundPrompt = hasTeacherSpeak
+    ? `\n\n【当前轮次：第 ${roundNumber} 轮】${roundNumber <= 2 ? '（开场期：优先用举例型或原理型追问，语气更轻柔。）' : roundNumber <= 5 ? '（深入期：可以引入条件变化型、反例检验型追问。）' : roundNumber <= 8 ? '（收束期：追问逐步减少，可以开始用复述确认代替新提问。）' : '（建议收束：不再主动开启新方向的追问，可以暗示老师收尾。）'}`
+    : '';
+
+  // AI-plagiarism detection: check if the teacher's last message looks like copied AI output
+  const plagiarismPrompt = hasTeacherSpeak ? detectAiplagiarism(session) : '';
+
   const stagePrompt = hasTeacherSpeak
     ? `
-
-【系统提示：当前是阶段 B（hasTeacherSpeak = true）】
-老师已经开口讲解。继续遵守防越界铁律：不自己推理、不计算、不判断对错、不替老师分析式子；一次只问一个问题，疑问只能来自老师上一句话。`
+\n【系统提示：当前是阶段 B（hasTeacherSpeak = true）】\n老师已经开口讲解。继续遵守防越界铁律：不自己推理、不计算、不判断对错、不替老师分析式子；一次只问一个问题，疑问只能来自老师上一句话。${roundPrompt}${plagiarismPrompt}`
     : `
-
-【系统提示：当前是阶段 A（hasTeacherSpeak = false）】
-课堂刚开始，还没有老师真正的讲解内容。你只能从下面两句里逐字选一句输出，不能增删、改写任何字，也不要加引号：
-老师，我准备好了，你来讲吧。
-老师，我听着，你开始讲。
-不要提问、不要猜、不要拆解知识点、不要主动发起任何问题。`;
+\n【系统提示：当前是阶段 A（hasTeacherSpeak = false）】\n课堂刚开始，还没有老师真正的讲解内容。你只能从下面两句里逐字选一句输出，不能增删、改写任何字，也不要加引号：\n老师，我准备好了，你来讲吧。\n老师，我听着，你开始讲。\n不要提问、不要猜、不要拆解知识点、不要主动发起任何问题。`;
 
   const stuckPrompt = !hasTeacherSpeak || !teacherSeemsStuck(session)
     ? ''
@@ -172,11 +263,11 @@ export function buildStudentMessages(session) {
       ? `
 
 【系统提示：老师要提示】
-老师已经明确要提示，视为老师已经同意，不用再问“要不要看”。你可以直接给一个半成品线索（类比、反例或某一步的起点），并说明这是“我在书上看到的”或“我自己瞎猜的”，不要说成是你自己分析出来的结论；仍然不要说最终答案，也不要把剩余步骤推导完；说完停下来等老师接话。`
+老师已经明确要提示，视为老师已经同意，不用再问"要不要看"。你可以直接给一个半成品线索（类比、反例或某一步的起点），并说明这是"我在书上看到的"或"我自己瞎猜的"，不要说成是你自己分析出来的结论；仍然不要说最终答案，也不要把剩余步骤推导完；说完停下来等老师接话。`
       : `
 
 【系统提示：老师可能卡住了】
-老师刚刚在向你求助。你仍然不能替老师解题或给答案。先问老师要不要看你在书上找到的一个提示；只有老师同意后，才给一个半成品线索（类比、反例或某一步的起点），并说明这是“我在书上看到的”或“我自己瞎猜的”，不要说成是你自己分析出来的结论；不要说最终答案，也不要把剩余步骤推导完。老师拒绝就不要再提。`;
+老师刚刚在向你求助。你仍然不能替老师解题或给答案。先问老师要不要看你在书上找到的一个提示；只有老师同意后，才给一个半成品线索（类比、反例或某一步的起点），并说明这是"我在书上看到的"或"我自己瞎猜的"，不要说成是你自己分析出来的结论；不要说最终答案，也不要把剩余步骤推导完。老师拒绝就不要再提。`;
 
   const system = `${STUDENT_PROMPT}
 
@@ -191,6 +282,32 @@ ${studentClassContext(session)}
 - 你看不到评分报告；不要假装自己知道老师讲得对不对。${stagePrompt}${stuckPrompt}`;
 
   return [{ role: 'system', content: system }, ...trimmed];
+}
+
+/**
+ * Detect if the teacher's latest message looks like copied AI output.
+ * Returns a system prompt fragment if detected, empty string otherwise.
+ */
+function detectAiplagiarism(session) {
+  const lastUser = lastUserMessage(session);
+  if (!lastUser) return '';
+
+  const content = lastUser.content || '';
+  const charCount = countChineseChars(content);
+
+  // Check for AI-like patterns: very long + highly structured
+  const hasStructureWords = /(首先|其次|然后|最后|综上所述|总而言之)/.test(content);
+  const hasCompleteSolution = /(解：|解法|步骤[一二三123]|因此.*[=＝])/.test(content);
+  const isVeryLong = charCount > 300;
+
+  if (isVeryLong && hasStructureWords && hasCompleteSolution) {
+    return `
+
+【系统提示：检测到老师可能复制了 AI 生成的话术】
+老师的上一条消息很长、结构非常工整，且包含完整的解题步骤，可能是直接复制了 AI 生成的内容而不是自己讲的。请用你的学生口吻温和地提醒老师用自己的话重新讲，例如："老师，你讲得好多呀，不过感觉好正式哦——你能用你自己的话再跟我说一遍吗？我怕我听不太懂这种说法。"不要直接指控老师。`;
+  }
+
+  return '';
 }
 
 export function buildTeacherMessages(session, { includeImages = true } = {}) {
@@ -301,12 +418,12 @@ export function normalizeReport(raw, session) {
   }
 
   const misconceptions = (Array.isArray(object.misconceptions) ? object.misconceptions : [])
-    .map((item) => normalizeItem(item, ['title', 'evidence', 'why', 'fix', 'exercise', 'nextGoal']))
+    .map((item) => normalizeItem(item, ['title', 'type', 'evidence', 'why', 'fix', 'exercise', 'nextGoal', 'zpd']))
     .filter(Boolean)
     .slice(0, 5);
 
   const nextSteps = (Array.isArray(object.nextSteps) ? object.nextSteps : [])
-    .map((item) => normalizeItem(item, ['title', 'action', 'example']))
+    .map((item) => normalizeItem(item, ['title', 'zpd', 'action', 'example']))
     .filter(Boolean)
     .slice(0, 4);
 
@@ -318,14 +435,18 @@ export function normalizeReport(raw, session) {
   if (!misconceptions.length) {
     misconceptions.push({
       title: '这轮的有效证据还不多',
+      type: '步骤缺失',
       evidence: '老师目前的讲解还比较短，暂时没有足够证据定位具体缺口。',
       why: '对话轮数少时，很难判断是表达省略，还是理解上真的断了。',
-      fix: '再讲 2–3 轮，把每一步的“为什么”说出来，再让老师看一次。'
+      fix: '再讲 2–3 轮，把每一步的"为什么"说出来，再让老师看一次。',
+      zpd: '边缘掌握'
     });
   }
 
   for (const gap of misconceptions) {
     const title = gap.title || '这个缺口';
+    if (!gap.type) gap.type = '步骤缺失';
+    if (!gap.zpd) gap.zpd = '边缘掌握';
     if (!gap.exercise) {
       gap.exercise = `用 1 分钟把「${title}」重新讲一遍，并补上每一步的依据。`;
     }
@@ -334,15 +455,21 @@ export function normalizeReport(raw, session) {
     }
   }
 
+  for (const step of nextSteps) {
+    if (!step.zpd) step.zpd = '边缘掌握';
+  }
+
   if (!nextSteps.length) {
     nextSteps.push(
       {
         title: '先讲“为什么”，再讲“怎么做”',
+        zpd: '边缘掌握',
         action: '每写一个步骤，先停一秒，用一句大白话补上依据。',
         example: '下次可以这样说：“这一步我用了等式两边同时加同一个数，等式仍然成立。”'
       },
       {
         title: '用一个具体数字验证',
+        zpd: '未触及',
         action: '讲完结论后，代一个简单的数回去，检查左右是否相等。',
         example: '下次可以这样说：“我拿 x = 1 代进去验算一下，看看是不是真的成立。”'
       }
@@ -389,16 +516,95 @@ export function parseReport(raw, session) {
 }
 
 export class StudentAgent {
+  /**
+   * Get the previous assistant output for consecutive-pattern detection.
+   * Returns the last visible assistant message content before the current turn.
+   */
+  _previousOutput(session) {
+    const messages = visibleMessages(session);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return messages[i].content || '';
+    }
+    return '';
+  }
+
+  /**
+   * Non-streaming completion for retry attempts. Collects the full text
+   * without calling onDelta, so the user doesn't see a rejected stream.
+   */
+  async _completeQuiet(messages, settings, signal) {
+    return completeChat({
+      settings,
+      messages,
+      maxTokens: APP.limits.studentMaxTokens,
+      temperature: settings.temperature ?? APP.defaults.temperature,
+      signal
+    });
+  }
+
   async reply({ session, settings, signal, onDelta }) {
     const messages = buildStudentMessages(session);
-    return streamChat({
+    const prevOutput = this._previousOutput(session);
+    let fullOutput = '';
+
+    // First attempt: stream to the user, but also collect the full text.
+    const wrappedOnDelta = (delta) => {
+      fullOutput += delta;
+      if (onDelta) onDelta(delta);
+    };
+
+    await streamChat({
       settings,
       messages,
       maxTokens: APP.limits.studentMaxTokens,
       temperature: settings.temperature ?? APP.defaults.temperature,
       signal,
-      onDelta
+      onDelta: wrappedOnDelta
     });
+
+    // Post-detection: check the completed output.
+    const result = checkStudentOutput(fullOutput, prevOutput);
+
+    if (result.passed) {
+      return fullOutput;
+    }
+
+    // If consecutive pattern is the only issue, we still show the output
+    // (it's non-blocking). We just note it for the next turn.
+    if (result.issues.length === 1 && result.consecutivePattern) {
+      return fullOutput;
+    }
+
+    // Blocking issue detected: we need to retry.
+    // The streamed output is already visible to the user via onDelta,
+    // but the caller (app.js) will replace the message with the retry result
+    // via finalizeMessageElement. We do silent retries here.
+    for (let attempt = 0; attempt < MAX_OUTPUT_RETRIES; attempt++) {
+      const retryMessages = [...messages];
+      // Append the retry hint to the system message
+      if (retryMessages[0]?.role === 'system') {
+        retryMessages[0] = {
+          ...retryMessages[0],
+          content: retryMessages[0].content + '\n\n' + result.retryHint
+        };
+      }
+
+      try {
+        const retryOutput = await this._completeQuiet(retryMessages, settings, signal);
+        const retryResult = checkStudentOutput(retryOutput, prevOutput);
+        if (retryResult.passed || (retryResult.issues.length === 1 && retryResult.consecutivePattern)) {
+          // Success: replace the visible output by calling onDelta with
+          // the correction. The caller handles UI replacement.
+          return retryOutput;
+        }
+      } catch {
+        // If retry fails (e.g. network), fall through to safe fallback.
+        break;
+      }
+    }
+
+    // All retries exhausted: return safe fallback.
+    return SAFE_FALLBACK_REPLY;
   }
 }
 
