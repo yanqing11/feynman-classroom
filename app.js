@@ -14,6 +14,7 @@ import {
   FAREWELL_PROMPT,
   aiDisplayName,
   aiModeInfo,
+  detectSubject,
   difficultyInfo,
   intensityInfo,
   modeInfo,
@@ -777,6 +778,14 @@ function renderPracticeUI() {
   const practice = store.practice;
   const subject = subjectInfo(practice.subject);
 
+  // 联动难度：如果当前难度不在新学段的允许列表里，降级到最近的
+  if (subject?.allowedDifficulties && !subject.allowedDifficulties.includes(practice.difficulty)) {
+    store.updatePractice({ difficulty: subject.allowedDifficulties[0] });
+  }
+
+  // 按学科过滤难度选项
+  renderDifficultyOptions(subject);
+
   if (refs.subjectTabs) {
     for (const button of refs.subjectTabs.querySelectorAll('.subject-tab')) {
       const active = button.dataset.subject === practice.subject;
@@ -872,6 +881,31 @@ function renderPracticeUI() {
   renderHistoryFilterState();
   renderSourceNote();
   renderChatPractice();
+}
+
+/**
+ * 按学科过滤难度选项。
+ * 小学只有「基础/中档」，初中和高中有「基础/中档/压轴」。
+ */
+function renderDifficultyOptions(subject) {
+  if (!refs.difficultySelect) return;
+  const allowed = subject?.allowedDifficulties;
+  if (!allowed) return;
+  refs.difficultySelect.replaceChildren();
+  for (const difficulty of DIFFICULTIES) {
+    if (!allowed.includes(difficulty.key)) continue;
+    const option = document.createElement('option');
+    option.value = difficulty.key;
+    option.textContent = `${difficulty.label} · ${difficulty.hint}`;
+    refs.difficultySelect.append(option);
+  }
+  // 确保当前选中的值在允许列表中
+  const currentVal = store.practice.difficulty;
+  if (allowed.includes(currentVal)) {
+    refs.difficultySelect.value = currentVal;
+  } else {
+    refs.difficultySelect.value = allowed[0];
+  }
 }
 
 function renderQuickTags(subject = subjectInfo(store.practice.subject)) {
@@ -1847,6 +1881,28 @@ async function handleStart() {
   if (!topic && image) {
     topic = await recognizeTopicFromImage(image);
     if (!topic) return;
+  }
+
+  // 学段智能匹配：检测输入内容是否与当前选的学科匹配
+  const detected = detectSubject(topic);
+  if (detected && detected !== store.practice.subject) {
+    const detectedLabel = subjectInfo(detected).label;
+    const currentLabel = subjectInfo(store.practice.subject).label;
+    const switchConfirmed = window.confirm(
+      `你输入的内容看起来像是${detectedLabel}的题目，但当前学科设定是${currentLabel}。\n\n` +
+      `学科不匹配会影响 AI 学生的提问风格和老师的评分标准。\n\n` +
+      `点击「确定」自动切换到${detectedLabel}，点击「取消」保持${currentLabel}。`
+    );
+    if (switchConfirmed) {
+      store.updatePractice({ subject: detected });
+      // 联动难度：如果当前难度不在新学段的允许列表里，降级到基础
+      const newSubject = subjectInfo(detected);
+      if (newSubject.allowedDifficulties && !newSubject.allowedDifficulties.includes(store.practice.difficulty)) {
+        store.updatePractice({ difficulty: newSubject.allowedDifficulties[0] });
+      }
+      renderPracticeUI();
+      toast(`已切换到${detectedLabel}`, 'info', 2000);
+    }
   }
 
   store.updatePractice({ difficulty });

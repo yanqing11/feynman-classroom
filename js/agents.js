@@ -2,6 +2,7 @@ import {
   APP,
   METRICS,
   STUDENT_PROMPT,
+  STUDENT_PROMPT_RULES,
   TUTOR_PROMPT,
   TEACHER_PROMPT,
   ASSIST_MODE_OVERRIDE,
@@ -13,6 +14,8 @@ import {
   personaInfo,
   sourceInfo,
   subjectInfo,
+  studentPersonaText,
+  studentStyleText,
   TAG_MISCONCEPTIONS,
   teacherRequest
 } from './config.js';
@@ -168,6 +171,11 @@ function studentClassContext(session) {
     lines.push(
       `【当前学科】${subject.label}。你正在学${subject.stage}数学，这块内容对你来说很难，需要老师一步一步讲。`
     );
+    // 注入学段对应的说话风格
+    const styleText = studentStyleText(session.subject);
+    if (styleText) {
+      lines.push(`【说话风格】${styleText}`);
+    }
   }
   const tagMisconceptions = tags.flatMap((tag) => TAG_MISCONCEPTIONS[tag] || []);
   if (tagMisconceptions.length) {
@@ -270,7 +278,14 @@ export function buildStudentMessages(session) {
 【系统提示：老师可能卡住了】
 老师刚刚在向你求助。你仍然不能替老师解题或给答案。先问老师要不要看你在书上找到的一个提示；只有老师同意后，才给一个半成品线索（类比、反例或某一步的起点），并说明这是"我在书上看到的"或"我自己瞎猜的"，不要说成是你自己分析出来的结论；不要说最终答案，也不要把剩余步骤推导完。老师拒绝就不要再提。`;
 
-  const system = `${STUDENT_PROMPT}
+  // 动态生成学生人设：根据学段选择对应的角色描述
+  const personaIntro = studentPersonaText(session.subject);
+  const dynamicStudentPrompt = `你是「小问」，${personaIntro}
+现在，人类用户扮演你的老师，正在给你讲一道数学题或一个数学概念。你要以小问的身份向老师请教，认真听，并通过追问让老师把思路讲清楚。
+
+${STUDENT_PROMPT_RULES}`;
+
+  const system = `${dynamicStudentPrompt}
 
 【当前讲课主题】
 ${session.topic}
