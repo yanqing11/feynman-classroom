@@ -279,6 +279,12 @@ const refs = {
   overallRing: $('#overallRing'),
   overallScore: $('#overallScore'),
   reportVerdict: $('#reportVerdict'),
+  reportCompare: $('#reportCompare'),
+  reportCompareTag: $('#reportCompareTag'),
+  reportCompareDate: $('#reportCompareDate'),
+  comparePrev: $('#comparePrev'),
+  compareNow: $('#compareNow'),
+  compareDelta: $('#compareDelta'),
   metricGrid: $('#metricGrid'),
   misconceptionList: $('#misconceptionList'),
   nextStepList: $('#nextStepList'),
@@ -1656,11 +1662,71 @@ function renderSession() {
     refs.messageList.append(renderMessage(message));
   }
 
+  syncCoachCard();
+
   renderStuckMarkers(session.stuckPoints || []);
 
   refs.typingIndicator.hidden = true;
   syncChrome();
   requestAnimationFrame(() => scrollToBottom(true));
+}
+
+/**
+ * 讲课刚开始、老师还没开口时，给一个折叠的「讲解思路提示」。
+ * 老师发出第一条消息后自动消失。
+ */
+function buildCoachCard() {
+  const card = document.createElement('details');
+  card.className = 'coach-card';
+  card.id = 'coachCard';
+
+  const toggle = el('span', 'coach-toggle', '展开');
+  const summary = document.createElement('summary');
+  summary.className = 'coach-summary';
+  summary.append(
+    el('span', 'coach-icon', '💡'),
+    el('span', 'coach-title', '讲解思路提示'),
+    el('span', 'coach-sub', '不知道从哪开口？点开看 3 步'),
+    toggle
+  );
+  card.append(summary);
+
+  const steps = el('ol', 'coach-steps');
+  const items = [
+    ['先复述题目', '用自己的话说清：已知什么，要求什么。'],
+    ['说清每一步依据', '为什么用这个公式、这一步是怎么来的。'],
+    ['用例子验证', '举个小例子或反例，再说说最容易错的地方。']
+  ];
+  items.forEach(([title, text], index) => {
+    const li = document.createElement('li');
+    li.append(el('span', 'coach-step-no', String(index + 1)));
+    const body = el('div', 'coach-step-body');
+    body.append(el('b', '', title), el('span', '', text));
+    li.append(body);
+    steps.append(li);
+  });
+  card.append(steps);
+  card.append(el('p', 'coach-foot', '讲错也没关系，小问只会追问，不会替你下结论。'));
+
+  card.addEventListener('toggle', () => {
+    toggle.textContent = card.open ? '收起' : '展开';
+  });
+  return card;
+}
+
+function syncCoachCard() {
+  if (!refs.messageList) return;
+  const session = store.session;
+  const existing = document.getElementById('coachCard');
+  const show =
+    Boolean(session) &&
+    session.aiMode !== 'tutor' &&
+    !visibleMessages().some((message) => message.role === 'user');
+  if (!show) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (!existing) refs.messageList.append(buildCoachCard());
 }
 
 function renderMessage(message) {
@@ -1788,6 +1854,7 @@ function appendStuckMarker(point, number) {
 function appendMessageElement(message) {
   if (!message || message.hidden) return;
   refs.messageList.append(renderMessage(message));
+  syncCoachCard();
   scrollToBottom(true);
 }
 
@@ -2242,6 +2309,89 @@ function gapNextGoalText(gap) {
   return `下一次讲课先补上「${gap.title || '这个缺口'}」的依据，再进入新题。`;
 }
 
+/* -------------------------------------------------------------------------- */
+/* 同知识点历史对比                                                            */
+/* -------------------------------------------------------------------------- */
+
+const LESSON_NOISE = /[\s，。、；：！？,.!?;:（）()【】\[\]「」『』“”"'’‘·—\-_/\\]/g;
+
+function normalizeLessonText(value) {
+  return String(value || '').replace(LESSON_NOISE, '').toLowerCase();
+}
+
+function lessonCompareDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+}
+
+/**
+ * 找同一知识点（优先标签交集，其次同名主题）的上一节课。
+ * 只读本机学习档案，不改动任何存储结构。
+ */
+function findPreviousLesson(current) {
+  if (!current) return null;
+  const records = loadHistory();
+  const tags = new Set(normalizeTags(current.tags));
+  const topic = normalizeLessonText(current.topic);
+  const before = Date.parse(current.endedAt || '') || Date.now();
+  let best = null;
+
+  for (const record of records) {
+    if (!record || record.id === current.id) continue;
+    const score = Number(record.report?.overallScore);
+    if (!Number.isFinite(score)) continue;
+    if (current.subject && record.subject && record.subject !== current.subject) continue;
+    const endedAt = Date.parse(record.endedAt || '') || 0;
+    if (endedAt >= before) continue;
+    const recordTags = normalizeTags(record.tags || []);
+    const sharedTag = recordTags.find((tag) => tags.has(tag)) || '';
+    const sameTopic = Boolean(topic) && normalizeLessonText(record.topic) === topic;
+    if (!sharedTag && !sameTopic) continue;
+    if (!best || endedAt > best.endedAt) best = { record, endedAt, sharedTag };
+  }
+  return best;
+}
+
+function renderReportCompare(overall) {
+  if (!refs.reportCompare) return;
+  const archived = currentReportRecord;
+  const session = store.session;
+  const current = archived
+    ? {
+        id: archived.id,
+        subject: archived.subject,
+        tags: archived.tags,
+        topic: archived.topic,
+        endedAt: archived.endedAt
+      }
+    : session
+      ? {
+          id: session.id,
+          subject: session.subject,
+          tags: session.tags,
+          topic: session.topic,
+          endedAt: new Date().toISOString()
+        }
+      : null;
+  const previous = findPreviousLesson(current);
+  if (!previous) {
+    refs.reportCompare.hidden = true;
+    return;
+  }
+
+  const prevScore = Math.max(0, Math.min(100, Math.round(Number(previous.record.report.overallScore))));
+  const delta = overall - prevScore;
+  const date = lessonCompareDate(previous.record.endedAt);
+  refs.reportCompareTag.textContent = previous.sharedTag || '同一主题';
+  refs.reportCompareDate.textContent = date ? `${date} · 上次` : '上次';
+  refs.comparePrev.textContent = `${prevScore}%`;
+  refs.compareNow.textContent = `${overall}%`;
+  refs.compareDelta.textContent = delta > 0 ? `进步 ${delta} 分` : delta < 0 ? `退步 ${Math.abs(delta)} 分` : '持平';
+  refs.compareDelta.className = `compare-delta ${delta > 0 ? 'is-up' : delta < 0 ? 'is-down' : 'is-flat'}`;
+  refs.reportCompare.hidden = false;
+}
+
 function renderReport(report, topicOverride, meta = '') {
   const topic = topicOverride ?? store.session?.topic ?? '';
   refs.reportTopic.replaceChildren(document.createTextNode(topic));
@@ -2260,6 +2410,7 @@ function renderReport(report, topicOverride, meta = '') {
   // background tabs, which would otherwise leave the score stuck at zero.
   refs.overallRing.style.setProperty('--score', String(overall));
   refs.overallScore.textContent = String(overall);
+  renderReportCompare(overall);
 
   refs.reportVerdict.textContent = report.verdict || '';
   refs.reportEncouragement.textContent = report.encouragement || '';

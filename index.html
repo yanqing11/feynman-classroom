@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261115d">
+  <link rel="stylesheet" href="./styles.css?v=20261116b">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -422,6 +422,26 @@
             </div>
           </div>
         </header>
+
+        <div class="report-compare" id="reportCompare" hidden>
+          <div class="compare-head">
+            <span class="compare-kicker">同知识点对比</span>
+            <span class="compare-tag" id="reportCompareTag"></span>
+            <span class="compare-date" id="reportCompareDate"></span>
+          </div>
+          <div class="compare-track">
+            <div class="compare-point">
+              <span class="compare-name">上次</span>
+              <strong id="comparePrev">—</strong>
+            </div>
+            <span class="compare-line" aria-hidden="true"></span>
+            <div class="compare-point is-now">
+              <span class="compare-name">本次</span>
+              <strong id="compareNow">—</strong>
+            </div>
+            <span class="compare-delta is-flat" id="compareDelta"></span>
+          </div>
+        </div>
 
         <div class="report-verdict">
           <span class="verdict-label">老师总评</span>
@@ -1134,6 +1154,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261116a"></script>
+  <script type="module" src="./app.js?v=20261116b"></script>
 </body>
 </html>

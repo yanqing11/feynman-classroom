@@ -1366,6 +1366,118 @@ body.is-chat .footer {
   text-align: center;
 }
 
+/* 讲课前的折叠思路提示：老师第一次发言后自动移除 */
+.coach-card {
+  margin: 2px 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--green-pale), var(--card));
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.coach-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.coach-summary::-webkit-details-marker {
+  display: none;
+}
+
+.coach-summary:hover {
+  background: rgba(31, 111, 92, 0.05);
+}
+
+.coach-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.coach-title {
+  font-weight: 700;
+}
+
+.coach-sub {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.coach-toggle {
+  margin-left: auto;
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.coach-steps {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 2px 14px 10px;
+  list-style: none;
+}
+
+.coach-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.coach-step-no {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.coach-step-body {
+  display: grid;
+  gap: 2px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.coach-step-body b {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.coach-foot {
+  margin: 0;
+  padding: 0 14px 12px 41px;
+  color: var(--faint);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .coach-sub {
+    display: none;
+  }
+}
+
 @keyframes dot-pulse {
   0%,
   60%,
@@ -2366,6 +2478,103 @@ body.is-chat .footer {
   padding: 16px 18px;
   border-left: 2px solid var(--gold);
   background: linear-gradient(90deg, rgba(217, 164, 65, 0.09), transparent 80%);
+}
+
+/* 同知识点历史对比 */
+.report-compare {
+  display: grid;
+  gap: 9px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.compare-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compare-kicker {
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.compare-tag {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.compare-date {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.compare-track {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.compare-point {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.compare-name {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.compare-point strong {
+  font-family: var(--serif);
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.compare-point.is-now strong {
+  color: var(--green);
+}
+
+.compare-line {
+  align-self: center;
+  width: 34px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.compare-delta {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compare-delta.is-up {
+  background: var(--green-soft);
+  color: var(--green-deep);
+}
+
+.compare-delta.is-down {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.compare-delta.is-flat {
+  background: var(--paper-deep);
+  color: var(--muted);
 }
 
 .verdict-label {
