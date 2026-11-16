@@ -877,6 +877,11 @@ function renderPracticeUI() {
 function renderQuickTags(subject = subjectInfo(store.practice.subject)) {
   if (!refs.quickTags) return;
   refs.quickTags.replaceChildren();
+  const row = refs.quickTags.closest('.quick-tag-row');
+  // 小学数学不展示快捷标签，初中和高中保留。
+  const show = subject.key !== 'primary';
+  if (row) row.hidden = !show;
+  if (!show) return;
   const selected = new Set(parseTags(refs.tagInput?.value));
   for (const tag of subject.tags) {
     const chip = el('button', 'quick-tag', tag);
@@ -884,9 +889,18 @@ function renderQuickTags(subject = subjectInfo(store.practice.subject)) {
     chip.dataset.tag = tag;
     chip.classList.toggle('is-active', selected.has(tag));
     chip.setAttribute('aria-pressed', String(selected.has(tag)));
-    chip.addEventListener('click', () => toggleQuickTag(tag));
+    chip.addEventListener('click', () => handleQuickTagClick(tag));
     refs.quickTags.append(chip);
   }
+}
+
+function handleQuickTagClick(tag) {
+  toggleQuickTag(tag);
+  if (!refs.topicInput) return;
+  refs.topicInput.value = tag;
+  setHomeSource('custom');
+  refs.topicInput.focus();
+  autoGrowTopic();
 }
 
 function toggleQuickTag(tag) {
