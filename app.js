@@ -206,6 +206,11 @@ const refs = {
   tagOptions: $('#tagOptions'),
   quickTags: $('#quickTags'),
   noteInput: $('#noteInput'),
+  homeAdvanced: $('#homeAdvanced'),
+  homeAdvancedCurrent: $('#homeAdvancedCurrent'),
+  homeAdvancedToggle: $('#homeAdvancedToggle'),
+  homeIntensitySelect: $('#homeIntensitySelect'),
+  homeIntensityHint: $('#homeIntensityHint'),
   sourceNote: $('#sourceNote'),
   topicImageInput: $('#topicImageInput'),
   topicCameraInput: $('#topicCameraInput'),
@@ -226,6 +231,8 @@ const refs = {
   roundBadge: $('#roundBadge'),
   callTeacherMobile: $('#callTeacherMobile'),
   callTeacherMobileLabel: $('#callTeacherMobileLabel'),
+  mobileTeacherBar: $('#mobileTeacherBar'),
+  viewLastReportMobile: $('#viewLastReportMobile'),
   chatBody: $('#chatBody'),
   topicCard: $('#topicCard'),
   topicCardBody: $('#topicCardBody'),
@@ -254,6 +261,10 @@ const refs = {
   draftScrim: $('#draftScrim'),
   pendingImages: $('#pendingImages'),
   messageInput: $('#messageInput'),
+  composerPreview: $('#composerPreview'),
+  composerCounter: $('#composerCounter'),
+  previewBtn: $('#previewBtn'),
+  previewBtnLabel: $('#previewBtnLabel'),
   chatImageInput: $('#chatImageInput'),
   attachBtn: $('#attachBtn'),
   handwritingBtn: $('#handwritingBtn'),
@@ -270,6 +281,7 @@ const refs = {
   statQuestions: $('#statQuestions'),
   reportModal: $('#reportModal'),
   reportLoading: $('#reportLoading'),
+  reportSteps: $('#reportSteps'),
   reportError: $('#reportError'),
   reportErrorText: $('#reportErrorText'),
   retryReportBtn: $('#retryReportBtn'),
@@ -484,6 +496,10 @@ let composerObserver = null;
 let draftState = { sessionId: '', text: '', open: true, mode: 'edit' };
 let draftSaveTimer = null;
 let draftDrawerOpen = false;
+let composerPreviewOpen = false;
+let reportStepTimer = null;
+let reportStepIndex = 0;
+const COMPOSER_WARN_CHARS = 3000;
 let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
@@ -599,6 +615,7 @@ function populatePracticeControls() {
   populateAiModePicker();
   populateSelect(refs.studentModeSelect, STUDENT_MODES);
   populateSelect(refs.studentIntensitySelect, INTENSITIES);
+  populateSelect(refs.homeIntensitySelect, INTENSITIES);
   populatePersonaPicker();
   populateSelect(refs.chatPersonaSelect, PERSONAS);
   populateSelect(refs.chatModeSelect, STUDENT_MODES);
@@ -822,6 +839,7 @@ function renderPracticeUI() {
   if (refs.studentPersonaSelect) refs.studentPersonaSelect.value = practice.persona;
   if (refs.studentModeSelect) refs.studentModeSelect.value = practice.mode;
   if (refs.studentIntensitySelect) refs.studentIntensitySelect.value = practice.intensity;
+  if (refs.homeIntensitySelect) refs.homeIntensitySelect.value = practice.intensity;
   if (refs.lockSubjectToggle) refs.lockSubjectToggle.checked = practice.lockSubject;
 
   if (refs.personaPicker) {
@@ -868,6 +886,12 @@ function renderPracticeUI() {
     refs.homePersonaHint.textContent = `${persona.label}：${persona.prompt}`;
   }
   const intensity = intensityInfo(practice.intensity);
+  if (refs.homeIntensityHint) {
+    refs.homeIntensityHint.textContent = `${intensity.label}：${intensity.hint}`;
+  }
+  if (refs.homeAdvancedCurrent) {
+    refs.homeAdvancedCurrent.textContent = `${aiMode.label} · ${persona.label} · ${intensity.label}追问`;
+  }
   if (refs.studentPersonaHint) {
     refs.studentPersonaHint.textContent = `${persona.label}：${persona.prompt}`;
   }
@@ -1358,6 +1382,18 @@ function draftMathToHtml(raw) {
   return text;
 }
 
+function buildDraftSheet(source) {
+  const sheet = el('div', 'draft-sheet');
+  const lines = String(source).split('\n');
+  for (const line of lines) {
+    const row = el('p', `draft-line${line.trim() ? '' : ' is-empty'}`);
+    if (line.trim()) row.innerHTML = draftMathToHtml(line);
+    else row.append(document.createTextNode(' '));
+    sheet.append(row);
+  }
+  return sheet;
+}
+
 function renderDraftPreview() {
   if (!refs.draftPreview) return;
   const source = refs.draftInput.value;
@@ -1366,20 +1402,15 @@ function renderDraftPreview() {
     refs.draftPreview.append(el('p', 'draft-preview-empty', '草稿还是空的。先在「编辑」里写几行，再回来预览。'));
     return;
   }
-  const sheet = el('div', 'draft-sheet');
-  const lines = source.split('\n');
-  for (const line of lines) {
-    const row = el('p', `draft-line${line.trim() ? '' : ' is-empty'}`);
-    if (line.trim()) row.innerHTML = draftMathToHtml(line);
-    else row.append(document.createTextNode(' '));
-    sheet.append(row);
-  }
-  refs.draftPreview.append(sheet);
+  refs.draftPreview.append(buildDraftSheet(source));
 }
 
 function showScreen(name) {
   const isChat = name === 'chat';
-  if (!isChat) setDraftDrawer(false);
+  if (!isChat) {
+    setDraftDrawer(false);
+    setComposerPreview(false, { focus: false });
+  }
   refs.homeScreen.hidden = isChat;
   refs.chatScreen.hidden = !isChat;
   document.body.classList.toggle('is-chat', isChat);
@@ -1437,6 +1468,7 @@ function applyAiModeChrome() {
     refs.chatModeRow,
     refs.markStuckBtn,
     refs.endAndReportBtn,
+    refs.mobileTeacherBar,
     refs.callTeacherMobile
   ]) {
     if (node) node.hidden = tutor;
@@ -1476,6 +1508,7 @@ function syncChrome() {
 
   refs.viewLastReportBtn.hidden = !hasReport;
   refs.viewLastReportBtn.textContent = hasReport ? '查看上一次诊断报告 →' : '';
+  if (refs.viewLastReportMobile) refs.viewLastReportMobile.hidden = !hasReport;
 
   const sendLabel = refs.sendBtn.querySelector('span');
   if (sendLabel) sendLabel.textContent = busy ? '停止' : '发送';
@@ -1980,6 +2013,7 @@ async function handleStart() {
     tags,
     source,
     studentPersona: store.practice.persona,
+    studentIntensity: store.practice.intensity,
     aiMode: store.practice.aiMode
   });
   bankEditingId = '';
@@ -2044,6 +2078,7 @@ function handleSend(event) {
   refs.messageInput.value = '';
   pendingImages = [];
   renderPendingImages();
+  setComposerPreview(false, { focus: false });
   autoGrowMessage();
   speechBase = '';
   appendMessageElement(message);
@@ -2192,6 +2227,7 @@ async function handleCallTeacher() {
     renderConnection();
   } catch (error) {
     if (isAbortError(error)) {
+      stopReportProgress();
       if (store.state.status === STATUS.EVALUATING) store.setStatus(STATUS.TEACHING);
       return;
     }
@@ -2204,15 +2240,52 @@ async function handleCallTeacher() {
   }
 }
 
+function updateReportSteps(activeIndex) {
+  const steps = refs.reportSteps?.querySelectorAll('.report-step');
+  if (!steps) return;
+  steps.forEach((step, index) => {
+    const done = index < activeIndex;
+    const active = index === activeIndex;
+    step.classList.toggle('is-done', done);
+    step.classList.toggle('is-active', active);
+    const badge = step.querySelector('.report-step-index');
+    if (badge) badge.textContent = done ? '✓' : String(index + 1);
+  });
+}
+
+function stopReportProgress() {
+  if (reportStepTimer) clearInterval(reportStepTimer);
+  reportStepTimer = null;
+}
+
+function startReportProgress() {
+  stopReportProgress();
+  reportStepIndex = 0;
+  updateReportSteps(0);
+  if (!refs.reportSteps) return;
+  const total = refs.reportSteps.querySelectorAll('.report-step').length;
+  if (total < 2) return;
+  reportStepTimer = setInterval(() => {
+    if (reportStepIndex >= total - 1) {
+      stopReportProgress();
+      return;
+    }
+    reportStepIndex += 1;
+    updateReportSteps(reportStepIndex);
+  }, 5000);
+}
+
 function openReportLoading() {
   openModal('reportModal');
   refs.reportLoading.hidden = false;
   refs.reportError.hidden = true;
   refs.reportContent.hidden = true;
   refs.reportModal.querySelector('.modal').scrollTop = 0;
+  startReportProgress();
 }
 
 function showReportError(message) {
+  stopReportProgress();
   refs.reportLoading.hidden = true;
   refs.reportContent.hidden = true;
   refs.reportError.hidden = false;
@@ -2227,6 +2300,7 @@ function presentReport(report, { topic = '', archived = false, meta = '', record
   currentReportMeta = meta || (store.session ? formatSessionMeta(store.session) : '');
   currentReportRecord = record;
   reportFromArchive = archived;
+  stopReportProgress();
   openModal('reportModal');
   refs.reportLoading.hidden = true;
   refs.reportError.hidden = true;
@@ -2427,6 +2501,7 @@ function renderReport(report, topicOverride, meta = '') {
     top.append(labels, value);
 
     const bar = el('div', 'metric-bar');
+    bar.title = `${metric.label}：${score}%`;
     const fill = el('div', 'metric-fill');
     fill.style.width = `${score}%`;
     bar.append(fill);
@@ -4022,6 +4097,9 @@ function renderHistoryTrend(records, summary) {
       .join(' ')} L${points[points.length - 1].x} ${padTop + plotH} Z`
   );
   area.setAttribute('class', 'trend-area');
+  const areaTitle = document.createElementNS(ns, 'title');
+  areaTitle.textContent = '综合评分走势';
+  area.append(areaTitle);
   svg.append(area);
 
   const line = document.createElementNS(ns, 'polyline');
@@ -4063,6 +4141,7 @@ function renderHistoryDimensions(summary) {
         summary.strongest?.key === metric.key ? ' is-strong' : ''
       }`
     );
+    row.title = `${metric.label}：${Number.isFinite(value) ? `${value}%` : '暂无数据'}`;
     const track = el('div', 'dimension-track');
     const fill = el('div', 'dimension-fill');
     fill.style.setProperty('--value', `${Number.isFinite(value) ? value : 0}%`);
@@ -4853,6 +4932,7 @@ function closeModal(id) {
   if (returnToHistory) replayReturnHistory = false;
 
   if (id === 'reportModal') {
+    stopReportProgress();
     if (store.state.status === STATUS.EVALUATING) {
       teacherAbort?.abort();
       store.setStatus(STATUS.TEACHING);
@@ -5157,6 +5237,7 @@ function resetAfterSession() {
   clearTopicImage();
   setHomeSource('custom');
   renderPendingImages();
+  setComposerPreview(false, { focus: false });
   autoGrowMessage();
   showTyping(false);
   refs.typingIndicator.hidden = true;
@@ -5230,6 +5311,61 @@ function autoGrowTopic() {
 function autoGrowMessage() {
   refs.messageInput.style.height = 'auto';
   refs.messageInput.style.height = `${Math.min(refs.messageInput.scrollHeight, 190)}px`;
+  updateComposerCounter();
+  refreshComposerPreview();
+}
+
+function updateComposerCounter() {
+  if (!refs.composerCounter) return;
+  const count = [...refs.messageInput.value].length;
+  refs.composerCounter.textContent = count > COMPOSER_WARN_CHARS ? `${count} 字 · 偏长` : `${count} 字`;
+  refs.composerCounter.classList.toggle('is-warn', count > COMPOSER_WARN_CHARS);
+  refs.composerCounter.title =
+    count > COMPOSER_WARN_CHARS
+      ? `已超过 ${COMPOSER_WARN_CHARS} 字，建议精简后再发送`
+      : `超过 ${COMPOSER_WARN_CHARS} 字会提醒精简`;
+}
+
+function renderComposerPreview() {
+  if (!refs.composerPreview) return;
+  const source = refs.messageInput.value;
+  refs.composerPreview.replaceChildren();
+  if (!source.trim()) {
+    refs.composerPreview.append(
+      el('p', 'draft-preview-empty', '输入框还是空的。先写几行，再按 Ctrl+P 预览排版。')
+    );
+    return;
+  }
+  refs.composerPreview.append(buildDraftSheet(source));
+}
+
+function refreshComposerPreview() {
+  if (composerPreviewOpen) renderComposerPreview();
+}
+
+function setComposerPreview(open, { focus = true } = {}) {
+  const next = Boolean(open);
+  if (!refs.composerPreview || !refs.messageInput) return;
+  if (composerPreviewOpen === next) {
+    if (next) renderComposerPreview();
+    return;
+  }
+  composerPreviewOpen = next;
+  refs.messageInput.hidden = next;
+  refs.composerPreview.hidden = !next;
+  refs.previewBtn?.classList.toggle('is-active', next);
+  refs.previewBtn?.setAttribute('aria-pressed', String(next));
+  if (refs.previewBtn) refs.previewBtn.title = next ? '返回编辑 (Ctrl+P)' : '预览排版 (Ctrl+P)';
+  if (refs.previewBtnLabel) refs.previewBtnLabel.textContent = next ? '编辑' : '预览';
+  if (next) {
+    renderComposerPreview();
+    refs.composerPreview.scrollTop = 0;
+    if (focus) refs.composerPreview.focus({ preventScroll: true });
+    scrollToBottom(true);
+  } else {
+    autoGrowMessage();
+    if (focus) refs.messageInput.focus({ preventScroll: true });
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -5304,6 +5440,15 @@ function bindEvents() {
   refs.difficultySelect?.addEventListener('change', () => {
     store.updatePractice({ difficulty: refs.difficultySelect.value });
   });
+  refs.homeIntensitySelect?.addEventListener('change', () => {
+    store.updatePractice({ intensity: refs.homeIntensitySelect.value });
+    renderPracticeUI();
+  });
+  refs.homeAdvanced?.addEventListener('toggle', () => {
+    if (refs.homeAdvancedToggle) {
+      refs.homeAdvancedToggle.textContent = refs.homeAdvanced.open ? '收起' : '展开';
+    }
+  });
   refs.tagInput?.addEventListener('change', () => {
     refs.tagInput.value = parseTags(refs.tagInput.value).join('、');
     syncQuickTagState();
@@ -5366,8 +5511,21 @@ function bindEvents() {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing) {
       event.preventDefault();
       handleSend(event);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p' && !event.isComposing) {
+      event.preventDefault();
+      setComposerPreview(!composerPreviewOpen);
     }
   });
+  refs.previewBtn?.addEventListener('click', () => setComposerPreview(!composerPreviewOpen));
+  refs.composerPreview?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setComposerPreview(false);
+    }
+  });
+  updateComposerCounter();
 
   refs.draftInput?.addEventListener('input', () => {
     draftState.text = refs.draftInput.value.slice(0, APP.limits.maxMessageChars);
@@ -5458,6 +5616,9 @@ function bindEvents() {
   refs.callTeacherBtn.addEventListener('click', handleCallTeacher);
   refs.callTeacherMobile.addEventListener('click', handleCallTeacher);
   refs.viewLastReportBtn.addEventListener('click', () => {
+    if (store.session?.report) presentReport(store.session.report);
+  });
+  refs.viewLastReportMobile?.addEventListener('click', () => {
     if (store.session?.report) presentReport(store.session.report);
   });
 

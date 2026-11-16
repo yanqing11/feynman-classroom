@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261116b">
+  <link rel="stylesheet" href="./styles.css?v=20261116c">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -111,26 +111,42 @@
               <div class="quick-tags" id="quickTags" role="group" aria-label="快捷知识点标签"></div>
             </div>
 
-            <div class="home-persona home-ai-mode">
-              <div class="home-persona-head">
-                <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
-                <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
-              </div>
-              <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
-            </div>
+            <details class="home-advanced" id="homeAdvanced">
+              <summary class="home-advanced-summary">
+                <span class="home-advanced-icon" aria-hidden="true">⚙</span>
+                <span class="home-advanced-title">高级设置</span>
+                <span class="home-advanced-current" id="homeAdvancedCurrent">AI 学生 · 标准追问</span>
+                <span class="home-advanced-toggle" id="homeAdvancedToggle" aria-hidden="true">展开</span>
+              </summary>
+              <div class="home-advanced-body">
+                <div class="home-persona home-ai-mode">
+                  <div class="home-persona-head">
+                    <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
+                    <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
+                  </div>
+                  <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
+                </div>
 
-            <div class="home-persona" id="homePersonaBlock">
-              <div class="home-persona-head">
-                <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
-                <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
-              </div>
-              <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
-            </div>
+                <div class="home-persona" id="homePersonaBlock">
+                  <div class="home-persona-head">
+                    <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
+                    <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
+                  </div>
+                  <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
+                </div>
 
-            <label class="home-note">
-              <span class="sr-only">题目备注</span>
-              <input id="noteInput" type="text" maxlength="1200" placeholder="备注（可选）：易错点、来源或给自己的提醒">
-            </label>
+                <label class="home-advanced-field" for="homeIntensitySelect">
+                  <span class="home-persona-label">追问强度</span>
+                  <select id="homeIntensitySelect"></select>
+                  <small class="home-advanced-hint" id="homeIntensityHint"></small>
+                </label>
+
+                <label class="home-note">
+                  <span class="home-persona-label">备注</span>
+                  <input id="noteInput" type="text" maxlength="1200" placeholder="可选：易错点、来源或给自己的提醒">
+                </label>
+              </div>
+            </details>
 
             <div class="topic-image-preview" id="topicImagePreview" hidden>
               <img id="topicImageThumb" alt="题目图片预览">
@@ -195,6 +211,16 @@
                 <button class="btn btn-ghost btn-sm btn-danger-ghost" id="abandonSessionBtn" type="button" title="放弃本次课堂，不存入学习档案">放弃本次课堂</button>
                 <span class="round-badge" id="roundBadge">第 0 轮</span>
                 <span class="stuck-badge" id="stuckBadge" hidden>卡点 0</span>
+              </div>
+            </div>
+
+            <div class="mobile-teacher-bar" id="mobileTeacherBar">
+              <div class="mobile-teacher-copy">
+                <span class="mobile-teacher-kicker">AI TEACHER · 旁听中</span>
+                <p>卡住了？让陈老师看完对话，指出逻辑漏洞。</p>
+              </div>
+              <div class="mobile-teacher-actions">
+                <button class="btn btn-ghost btn-sm" id="viewLastReportMobile" type="button" hidden>上次报告</button>
                 <button class="btn btn-primary btn-sm mobile-teacher-btn" id="callTeacherMobile" type="button">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="M5.6 5.6 7.8 7.8"/><path d="M3 12h3"/><path d="m18.4 5.6-2.2 2.2"/><path d="M21 12h-3"/><path d="M8 21h8"/><path d="M12 8a4 4 0 0 0-2 7.5V18h4v-2.5A4 4 0 0 0 12 8Z"/></svg>
                   <span id="callTeacherMobileLabel">呼叫老师</span>
@@ -232,9 +258,14 @@
                 <label class="sr-only" for="messageInput">你的讲解</label>
                 <textarea id="messageInput" rows="1" maxlength="4000"
                   placeholder="把你的思路讲出来…… 不用完美，边想边说也可以。"></textarea>
+                <div class="composer-preview" id="composerPreview" role="region" aria-label="讲解排版预览" tabindex="0" hidden></div>
                 <div class="composer-toolbar">
                   <div class="composer-tools">
                     <input type="file" id="chatImageInput" accept="image/*" hidden>
+                    <button class="tool-btn" id="previewBtn" type="button" title="预览排版 (Ctrl+P)" aria-pressed="false">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <span id="previewBtnLabel">预览</span>
+                    </button>
                     <button class="tool-btn" id="attachBtn" type="button" title="添加图片">
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                       <span>图片</span>
@@ -249,7 +280,8 @@
                     </button>
                   </div>
                   <div class="composer-submit">
-                    <span class="send-hint">Ctrl+Enter 发送 · Enter 换行</span>
+                    <span class="composer-counter" id="composerCounter" title="超过 3000 字会提醒精简">0 字</span>
+                    <span class="send-hint">Ctrl+P 预览 · Ctrl+Enter 发送</span>
                     <button class="btn btn-primary btn-send" id="sendBtn" type="submit" aria-label="发送讲解">
                       <span>发送</span>
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>
@@ -392,6 +424,21 @@
         <div class="loader-orb" aria-hidden="true"><span></span><span></span><span></span></div>
         <h2>陈老师正在看你的课……</h2>
         <p>正在对照你的讲解，检查概念、步骤和表达。通常需要 10–20 秒。</p>
+        <div class="report-progress" aria-hidden="true"><i></i></div>
+        <ol class="report-steps" id="reportSteps" aria-live="polite">
+          <li class="report-step is-active">
+            <span class="report-step-index">1</span>
+            <span class="report-step-text">正在阅读对话</span>
+          </li>
+          <li class="report-step">
+            <span class="report-step-index">2</span>
+            <span class="report-step-text">正在核对概念与步骤</span>
+          </li>
+          <li class="report-step">
+            <span class="report-step-index">3</span>
+            <span class="report-step-text">正在生成诊断报告</span>
+          </li>
+        </ol>
         <div class="skeleton-lines" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
 
@@ -1154,6 +1201,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261116b"></script>
+  <script type="module" src="./app.js?v=20261116c"></script>
 </body>
 </html>
