@@ -206,11 +206,6 @@ const refs = {
   tagOptions: $('#tagOptions'),
   quickTags: $('#quickTags'),
   noteInput: $('#noteInput'),
-  homeAdvanced: $('#homeAdvanced'),
-  homeAdvancedCurrent: $('#homeAdvancedCurrent'),
-  homeAdvancedToggle: $('#homeAdvancedToggle'),
-  homeIntensitySelect: $('#homeIntensitySelect'),
-  homeIntensityHint: $('#homeIntensityHint'),
   sourceNote: $('#sourceNote'),
   topicImageInput: $('#topicImageInput'),
   topicCameraInput: $('#topicCameraInput'),
@@ -615,7 +610,6 @@ function populatePracticeControls() {
   populateAiModePicker();
   populateSelect(refs.studentModeSelect, STUDENT_MODES);
   populateSelect(refs.studentIntensitySelect, INTENSITIES);
-  populateSelect(refs.homeIntensitySelect, INTENSITIES);
   populatePersonaPicker();
   populateSelect(refs.chatPersonaSelect, PERSONAS);
   populateSelect(refs.chatModeSelect, STUDENT_MODES);
@@ -839,7 +833,6 @@ function renderPracticeUI() {
   if (refs.studentPersonaSelect) refs.studentPersonaSelect.value = practice.persona;
   if (refs.studentModeSelect) refs.studentModeSelect.value = practice.mode;
   if (refs.studentIntensitySelect) refs.studentIntensitySelect.value = practice.intensity;
-  if (refs.homeIntensitySelect) refs.homeIntensitySelect.value = practice.intensity;
   if (refs.lockSubjectToggle) refs.lockSubjectToggle.checked = practice.lockSubject;
 
   if (refs.personaPicker) {
@@ -886,12 +879,6 @@ function renderPracticeUI() {
     refs.homePersonaHint.textContent = `${persona.label}：${persona.prompt}`;
   }
   const intensity = intensityInfo(practice.intensity);
-  if (refs.homeIntensityHint) {
-    refs.homeIntensityHint.textContent = `${intensity.label}：${intensity.hint}`;
-  }
-  if (refs.homeAdvancedCurrent) {
-    refs.homeAdvancedCurrent.textContent = `${aiMode.label} · ${persona.label} · ${intensity.label}追问`;
-  }
   if (refs.studentPersonaHint) {
     refs.studentPersonaHint.textContent = `${persona.label}：${persona.prompt}`;
   }
@@ -5439,15 +5426,6 @@ function bindEvents() {
 
   refs.difficultySelect?.addEventListener('change', () => {
     store.updatePractice({ difficulty: refs.difficultySelect.value });
-  });
-  refs.homeIntensitySelect?.addEventListener('change', () => {
-    store.updatePractice({ intensity: refs.homeIntensitySelect.value });
-    renderPracticeUI();
-  });
-  refs.homeAdvanced?.addEventListener('toggle', () => {
-    if (refs.homeAdvancedToggle) {
-      refs.homeAdvancedToggle.textContent = refs.homeAdvanced.open ? '收起' : '展开';
-    }
   });
   refs.tagInput?.addEventListener('change', () => {
     refs.tagInput.value = parseTags(refs.tagInput.value).join('、');

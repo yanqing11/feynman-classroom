@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self'; base-uri 'none'; form-action 'self'">
   <title>费曼小课堂 · 讲给一个会追问的学生听</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20261116c">
+  <link rel="stylesheet" href="./styles.css?v=20261117a">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -111,42 +111,26 @@
               <div class="quick-tags" id="quickTags" role="group" aria-label="快捷知识点标签"></div>
             </div>
 
-            <details class="home-advanced" id="homeAdvanced">
-              <summary class="home-advanced-summary">
-                <span class="home-advanced-icon" aria-hidden="true">⚙</span>
-                <span class="home-advanced-title">高级设置</span>
-                <span class="home-advanced-current" id="homeAdvancedCurrent">AI 学生 · 标准追问</span>
-                <span class="home-advanced-toggle" id="homeAdvancedToggle" aria-hidden="true">展开</span>
-              </summary>
-              <div class="home-advanced-body">
-                <div class="home-persona home-ai-mode">
-                  <div class="home-persona-head">
-                    <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
-                    <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
-                  </div>
-                  <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
-                </div>
-
-                <div class="home-persona" id="homePersonaBlock">
-                  <div class="home-persona-head">
-                    <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
-                    <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
-                  </div>
-                  <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
-                </div>
-
-                <label class="home-advanced-field" for="homeIntensitySelect">
-                  <span class="home-persona-label">追问强度</span>
-                  <select id="homeIntensitySelect"></select>
-                  <small class="home-advanced-hint" id="homeIntensityHint"></small>
-                </label>
-
-                <label class="home-note">
-                  <span class="home-persona-label">备注</span>
-                  <input id="noteInput" type="text" maxlength="1200" placeholder="可选：易错点、来源或给自己的提醒">
-                </label>
+            <div class="home-persona home-ai-mode">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homeAiModeLabel">AI 角色</span>
+                <span class="home-persona-hint" id="aiModeHint">AI 学生：你来讲，它像学生一样追问。</span>
               </div>
-            </details>
+              <div class="ai-mode-picker" id="aiModePicker" role="radiogroup" aria-labelledby="homeAiModeLabel"></div>
+            </div>
+
+            <div class="home-persona" id="homePersonaBlock">
+              <div class="home-persona-head">
+                <span class="home-persona-label" id="homePersonaLabel">AI 学生人设</span>
+                <span class="home-persona-hint" id="homePersonaHint">刨根问底型：喜欢纠结概念边界，容易卡定义细节</span>
+              </div>
+              <div class="persona-picker" id="personaPicker" role="radiogroup" aria-labelledby="homePersonaLabel"></div>
+            </div>
+
+            <label class="home-note">
+              <span class="sr-only">题目备注</span>
+              <input id="noteInput" type="text" maxlength="1200" placeholder="备注（可选）：易错点、来源或给自己的提醒">
+            </label>
 
             <div class="topic-image-preview" id="topicImagePreview" hidden>
               <img id="topicImageThumb" alt="题目图片预览">
@@ -1201,6 +1185,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./app.js?v=20261116c"></script>
+  <script type="module" src="./app.js?v=20261117a"></script>
 </body>
 </html>

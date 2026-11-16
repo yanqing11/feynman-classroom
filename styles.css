@@ -5413,8 +5413,17 @@ body.is-chat .topbar-tagline {
 }
 
 .home-teacher-hint span {
-  flex: none;
   line-height: 1.4;
+}
+
+.home-teacher-hint span[aria-hidden="true"] {
+  flex: none;
+}
+
+.home-teacher-hint span:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .home-persona {
@@ -5519,131 +5528,6 @@ body.is-chat .topbar-tagline {
   border-color: rgba(31, 111, 92, 0.45);
   background: var(--card);
   box-shadow: 0 0 0 3px rgba(31, 111, 92, 0.06);
-}
-
-/* 高级设置：默认收起，首页只保留「选题 → 写题目 → 开始讲课」 */
-.home-advanced {
-  margin: 12px 2px 0;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
-  background: var(--card-warm);
-  overflow: hidden;
-}
-
-.home-advanced[open] {
-  border-style: solid;
-  background: var(--card);
-}
-
-.home-advanced-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-
-.home-advanced-summary::-webkit-details-marker {
-  display: none;
-}
-
-.home-advanced-summary:hover {
-  background: rgba(31, 111, 92, 0.05);
-}
-
-.home-advanced-icon {
-  flex: none;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.home-advanced-title {
-  flex: none;
-  color: var(--ink);
-  font-weight: 700;
-}
-
-.home-advanced-current {
-  min-width: 0;
-  margin-left: 2px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10.5px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.home-advanced-toggle {
-  flex: none;
-  margin-left: auto;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.home-advanced-body {
-  padding: 2px 12px 12px;
-  border-top: 1px dashed var(--line);
-}
-
-.home-advanced-body .home-persona {
-  margin-top: 10px;
-  padding-top: 10px;
-}
-
-.home-advanced-body .home-persona:first-child {
-  margin-top: 4px;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.home-advanced-field {
-  display: grid;
-  gap: 5px;
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px dashed var(--line);
-}
-
-.home-advanced-field select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--card-warm);
-  color: var(--ink-soft);
-  font-family: var(--sans);
-  font-size: 12px;
-}
-
-.home-advanced-field select:focus {
-  outline: none;
-  border-color: rgba(31, 111, 92, 0.55);
-  box-shadow: 0 0 0 3px rgba(31, 111, 92, 0.08);
-}
-
-.home-advanced-hint {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.home-advanced .home-note {
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px dashed var(--line);
-}
-
-.home-advanced .home-note .home-persona-label {
-  display: block;
-  margin-bottom: 5px;
 }
 
 .home-bank-row {
