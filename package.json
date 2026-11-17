@@ -1,0 +1,17 @@
+{
+  "name": "feynman-classroom",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "费曼小课堂：讲给别人听，才是最好的学习。",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test:e2e": "playwright test",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "esbuild": "^0.28.2"
+  }
+}

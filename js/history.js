@@ -85,6 +85,16 @@ function trimMessages(messages) {
   return kept;
 }
 
+function sanitizeStuckPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .slice(-20)
+    .map((point) => ({
+      turn: Math.max(0, Math.round(Number(point?.turn) || 0)),
+      at: typeof point?.at === 'string' ? point.at : ''
+    }))
+    .filter((point) => point.turn > 0);
+}
+
 function sanitizeReport(report) {
   if (!report || typeof report !== 'object') return null;
   const scores = {};
@@ -181,6 +191,7 @@ export function archiveSession(session, { model = '', endedAt = new Date().toISO
     questions,
     model,
     report: sanitizeReport(session.report),
+    stuckPoints: sanitizeStuckPoints(session.stuckPoints),
     messages: trimMessages(session.messages)
   };
 

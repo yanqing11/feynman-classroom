@@ -38,6 +38,24 @@ function safeParse(value) {
   }
 }
 
+/** 只存在当前标签页会话里的 Key，关闭浏览器后自动消失。 */
+function readSessionKey() {
+  try {
+    return sessionStorage.getItem(APP.storage.sessionKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeSessionKey(key) {
+  try {
+    if (key) sessionStorage.setItem(APP.storage.sessionKey, key);
+    else sessionStorage.removeItem(APP.storage.sessionKey);
+  } catch {
+    /* Storage may be blocked; the in-memory value is still correct. */
+  }
+}
+
 function normalizeStuckPoints(points) {
   return (Array.isArray(points) ? points : [])
     .filter((point) => point && typeof point === 'object')
@@ -114,8 +132,10 @@ export function loadSettings() {
   const storedProxy = typeof stored.proxyUrl === 'string' ? stored.proxyUrl.trim() : '';
   const retired = (APP.defaults.retiredProxyUrls || []).map((url) => url.replace(/\/+$/, ''));
   const proxyIsRetired = retired.includes(storedProxy.replace(/\/+$/, ''));
+  const sessionKey = readSessionKey();
   const settings = {
-    apiKey: typeof stored.apiKey === 'string' ? stored.apiKey : '',
+    apiKey: sessionKey || (typeof stored.apiKey === 'string' ? stored.apiKey : ''),
+    sessionOnlyKey: Boolean(sessionKey) || stored.sessionOnlyKey === true,
     baseUrl:
       typeof stored.baseUrl === 'string' && stored.baseUrl.trim()
         ? stored.baseUrl.trim()
@@ -149,8 +169,11 @@ export function loadSettings() {
 }
 
 export function saveSettings(settings) {
+  const key = (settings.apiKey || '').trim();
+  const sessionOnly = Boolean(settings.sessionOnlyKey);
   const normalized = {
-    apiKey: (settings.apiKey || '').trim(),
+    apiKey: key,
+    sessionOnlyKey: sessionOnly,
     baseUrl: (settings.baseUrl || APP.defaults.baseUrl).trim().replace(/\/+$/, ''),
     model: (settings.model || APP.defaults.model).trim(),
     temperature: Math.max(0, Math.min(1.2, Number(settings.temperature) || 0)),
@@ -159,15 +182,20 @@ export function saveSettings(settings) {
     theme: settings.theme === 'dark' ? 'dark' : 'light'
   };
   try {
-    localStorage.setItem(APP.storage.settings, JSON.stringify(normalized));
+    localStorage.setItem(
+      APP.storage.settings,
+      JSON.stringify({ ...normalized, apiKey: sessionOnly ? '' : key })
+    );
   } catch {
     /* Storage may be full or blocked; the in-memory value is still correct. */
   }
+  writeSessionKey(sessionOnly ? key : '');
   return normalized;
 }
 
 export function clearSettings() {
   localStorage.removeItem(APP.storage.settings);
+  writeSessionKey('');
 }
 
 export function maskKey(key) {

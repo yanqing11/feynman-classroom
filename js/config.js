@@ -15,7 +15,9 @@ export const APP = {
     storageNotice: 'feynman.storageNotice.v1',
     practice: 'feynman.practice.v1',
     bank: 'feynman.bank.v1',
-    draft: 'feynman.draft.v1'
+    draft: 'feynman.draft.v1',
+    // sessionStorage 专用：勾选「仅本次会话保存 Key」时使用，不写入 localStorage。
+    sessionKey: 'feynman.apiKey.session.v1'
   },
   defaults: {
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -301,155 +303,11 @@ export const SOURCES = {
 };
 
 /**
- * Curated question square. These are read-only samples: teachers can load one
- * directly, or copy it into the local question bank before editing.
+ * The curated question square lives in js/builtin-questions.json and is loaded
+ * on demand, so the first paint does not parse the whole list.
+ * Keep this count in sync when the JSON file changes.
  */
-export const BUILTIN_QUESTIONS = [
-  {
-    id: 'builtin-primary-1',
-    topic: '一根 3/4 米长的绳子，平均剪成 3 段，每段长多少米？',
-    subject: 'primary',
-    difficulty: 'basic',
-    tags: ['分数除法'],
-    note: '先想清楚：把 3/4 米平均分成 3 份，每份是原来的几分之几。'
-  },
-  {
-    id: 'builtin-primary-2',
-    topic: '一个长方形花坛长 8 米、宽 5 米，花坛的面积是多少平方米？',
-    subject: 'primary',
-    difficulty: 'basic',
-    tags: ['长方形面积'],
-    note: '用长乘宽，注意面积的单位是平方米。'
-  },
-  {
-    id: 'builtin-primary-3',
-    topic: '小明骑自行车每小时行 12 千米，从家到学校用了 1/4 小时。家到学校有多少千米？',
-    subject: 'primary',
-    difficulty: 'basic',
-    tags: ['路程问题'],
-    note: '速度 × 时间 = 路程，注意 1/4 小时表示把 1 小时平均分成 4 份。'
-  },
-  {
-    id: 'builtin-primary-4',
-    topic: '笼子里有鸡和兔共 20 只，脚一共有 56 只。鸡和兔各有多少只？',
-    subject: 'primary',
-    difficulty: 'medium',
-    tags: ['鸡兔同笼'],
-    note: '先假设全是鸡，看看脚数差多少，再想每换一只兔会多几只脚。'
-  },
-  {
-    id: 'builtin-primary-5',
-    topic: '一个数既是 6 的倍数，又是 8 的倍数，还是 48 的因数。这个数可能是多少？',
-    subject: 'primary',
-    difficulty: 'medium',
-    tags: ['倍数因数'],
-    note: '先找出 6 和 8 的公倍数，再检查哪些能整除 48。'
-  },
-  {
-    id: 'builtin-primary-6',
-    topic: '三组同学折纸鹤，第一组折了 13 只，第二组折了 15 只，第三组折了 17 只。平均每组折多少只？',
-    subject: 'primary',
-    difficulty: 'basic',
-    tags: ['平均分'],
-    note: '平均数 = 总数 ÷ 组数，先算三组一共折了多少只。'
-  },
-  {
-    id: 'builtin-junior-1',
-    topic: '用配方法解方程 x² - 6x + 5 = 0。',
-    subject: 'junior',
-    difficulty: 'medium',
-    tags: ['一元二次方程'],
-    note: '先把常数项移到右边，再把左边配成完全平方。'
-  },
-  {
-    id: 'builtin-junior-2',
-    topic: '直角三角形的两条直角边分别是 6 和 8，斜边是多少？',
-    subject: 'junior',
-    difficulty: 'basic',
-    tags: ['勾股定理'],
-    note: '两条直角边的平方和等于斜边的平方。'
-  },
-  {
-    id: 'builtin-junior-3',
-    topic: '一次函数 y = -2x + 4 的图象与 x 轴交于点 A，与 y 轴交于点 B，求三角形 AOB 的面积（O 为坐标原点）。',
-    subject: 'junior',
-    difficulty: 'medium',
-    tags: ['一次函数'],
-    note: '先分别求出 A、B 两点的坐标，再算直角三角形的面积。'
-  },
-  {
-    id: 'builtin-junior-4',
-    topic: '解方程 1/(x - 2) = 3/x。',
-    subject: 'junior',
-    difficulty: 'medium',
-    tags: ['分式方程'],
-    note: '先去分母，解完整式方程后别忘了检验增根。'
-  },
-  {
-    id: 'builtin-junior-5',
-    topic: '已知抛物线 y = x² - 4x + 3，求它的顶点坐标和与 x 轴的交点坐标。',
-    subject: 'junior',
-    difficulty: 'medium',
-    tags: ['二次函数'],
-    note: '配方或使用顶点公式，再令 y = 0 求与 x 轴的交点。'
-  },
-  {
-    id: 'builtin-junior-6',
-    topic: '在 △ABC 中，AB = AC，D 是 BC 的中点。求证：AD ⊥ BC。',
-    subject: 'junior',
-    difficulty: 'medium',
-    tags: ['等腰三角形'],
-    note: '可以尝试证明 △ABD 和 △ACD 全等，再利用对应角相等。'
-  },
-  {
-    id: 'builtin-senior-1',
-    topic: '已知集合 A = {x | x² - 3x + 2 < 0}，B = {x | x > a}。若 A ⊆ B，求实数 a 的取值范围。',
-    subject: 'senior',
-    difficulty: 'hard',
-    tags: ['集合'],
-    note: '先解不等式得到集合 A，再比较两个区间的端点。'
-  },
-  {
-    id: 'builtin-senior-2',
-    topic: '已知 sinα = 3/5，且 α ∈ (π/2, π)，求 cosα 和 tanα。',
-    subject: 'senior',
-    difficulty: 'basic',
-    tags: ['三角函数'],
-    note: '先根据角所在象限判断 cosα 的符号，再用平方关系。'
-  },
-  {
-    id: 'builtin-senior-3',
-    topic: '等差数列 {aₙ} 中，a₃ = 7，a₇ = 15，求通项公式和前 10 项和。',
-    subject: 'senior',
-    difficulty: 'medium',
-    tags: ['等差数列'],
-    note: '用两个已知项先求公差 d，再写通项公式和求和公式。'
-  },
-  {
-    id: 'builtin-senior-4',
-    topic: '已知函数 f(x) = x³ - 3x² + 2，求 f(x) 的单调区间和极值。',
-    subject: 'senior',
-    difficulty: 'medium',
-    tags: ['导数'],
-    note: '先求导并解 f′(x) = 0，再用导数符号判断单调性。'
-  },
-  {
-    id: 'builtin-senior-5',
-    topic: '从 1, 2, 3, 4, 5 中任取两个不同的数，求这两个数之和为偶数的概率。',
-    subject: 'senior',
-    difficulty: 'medium',
-    tags: ['古典概型'],
-    note: '先列出所有取法，再想两数之和为偶数需要满足什么条件。'
-  },
-  {
-    id: 'builtin-senior-6',
-    topic: '已知圆 C: x² + y² - 4x + 2y - 4 = 0，求圆心坐标和半径。',
-    subject: 'senior',
-    difficulty: 'basic',
-    tags: ['圆的方程'],
-    note: '先把方程配方成标准形式 (x - a)² + (y - b)² = r²。'
-  }
-];
+export const BUILTIN_QUESTION_COUNT = 18;
 
 export const PERSONAS = [
   {

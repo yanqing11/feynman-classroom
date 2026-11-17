@@ -1,7 +1,7 @@
 import {
   AI_MODES,
   APP,
-  BUILTIN_QUESTIONS,
+  BUILTIN_QUESTION_COUNT,
   DIFFICULTIES,
   INTENSITIES,
   METRICS,
@@ -236,6 +236,7 @@ const refs = {
   topicMeta: $('#topicMeta'),
   topicToggleBtn: $('#topicToggleBtn'),
   messageList: $('#messageList'),
+  chatAnnouncer: $('#chatAnnouncer'),
   typingIndicator: $('#typingIndicator'),
   chatPanel: $('.chat-panel'),
   classroomFab: $('#classroomFab'),
@@ -243,6 +244,8 @@ const refs = {
   markStuckBtn: $('#markStuckBtn'),
   endAndReportBtn: $('#endAndReportBtn'),
   stuckBadge: $('#stuckBadge'),
+  sessionSaveStatus: $('#sessionSaveStatus'),
+  draftSaveStatus: $('#draftSaveStatus'),
   composer: $('#composer'),
   draftCard: $('#draftCard'),
   draftToggleBtn: $('#draftToggleBtn'),
@@ -299,6 +302,7 @@ const refs = {
   strengthList: $('#strengthList'),
   reportEncouragement: $('#reportEncouragement'),
   copyReportBtn: $('#copyReportBtn'),
+  exportReportImageBtn: $('#exportReportImageBtn'),
   restartFromReportBtn: $('#restartFromReportBtn'),
   historyModal: $('#historyModal'),
   historyEmpty: $('#historyEmpty'),
@@ -316,6 +320,8 @@ const refs = {
   historyAdvice: $('#historyAdvice'),
   historyTagStats: $('#historyTagStats'),
   historyTagMeta: $('#historyTagMeta'),
+  historyStuckBlock: $('#historyStuckBlock'),
+  historyStuckReview: $('#historyStuckReview'),
   historyTrendChart: $('#historyTrendChart'),
   historyTrendMeta: $('#historyTrendMeta'),
   historyDimensions: $('#historyDimensions'),
@@ -336,6 +342,7 @@ const refs = {
   settingsForm: $('#settingsForm'),
   apiKeyInput: $('#apiKeyInput'),
   toggleKeyBtn: $('#toggleKeyBtn'),
+  sessionOnlyKey: $('#sessionOnlyKey'),
   modelInput: $('#modelInput'),
   modelPresets: $('#modelPresets'),
   temperatureInput: $('#temperatureInput'),
@@ -466,6 +473,8 @@ let pendingImages = [];
 let topicImage = null;
 let studentAbort = null;
 let teacherAbort = null;
+let streamUpdateTimer = null;
+let streamUpdate = { id: '', text: '' };
 let endingSession = false;
 let activeModalId = null;
 let lastFocused = null;
@@ -490,6 +499,7 @@ let lastStorageToastLevel = '';
 let composerObserver = null;
 let draftState = { sessionId: '', text: '', open: true, mode: 'edit' };
 let draftSaveTimer = null;
+let lastSessionSaveStamp = '';
 let draftDrawerOpen = false;
 let composerPreviewOpen = false;
 let reportStepTimer = null;
@@ -498,6 +508,9 @@ const COMPOSER_WARN_CHARS = 3000;
 let homeSource = 'custom';
 let bankEditingId = '';
 let bankCache = [];
+let builtinQuestions = [];
+let builtinQuestionsPromise = null;
+let builtinQuestionsFailed = false;
 let historyFilter = { subject: 'all', source: 'all', range: 'all' };
 const HISTORY_RANGE_DAYS = { all: 0, 30: 30, 7: 7 };
 let historySelectMode = false;
@@ -557,6 +570,8 @@ function init() {
   setupSpeech();
   bindEvents();
   setupComposerObserver();
+  setupKeyboardInset();
+  registerServiceWorker();
   loadDraft();
   renderHistoryEntry();
   setHomeSource('custom');
@@ -1279,20 +1294,69 @@ function syncDraftSession(sessionId = store.session?.id || '') {
 
 function loadDraft() {
   syncDraftSession(store.session?.id || '');
+  if (refs.draftSaveStatus) {
+    refs.draftSaveStatus.textContent = draftState.text.trim() ? '草稿已恢复' : '暂无草稿';
+    refs.draftSaveStatus.classList.remove('is-saving', 'is-warn');
+  }
 }
 
 function queueDraftSave() {
   clearTimeout(draftSaveTimer);
+  if (refs.draftSaveStatus) {
+    refs.draftSaveStatus.textContent = '保存中…';
+    refs.draftSaveStatus.classList.add('is-saving');
+    refs.draftSaveStatus.classList.remove('is-warn');
+  }
   draftSaveTimer = setTimeout(saveDraft, 220);
 }
 
 function saveDraft() {
   draftSaveTimer = null;
+  let saved = true;
   try {
     localStorage.setItem(APP.storage.draft, JSON.stringify(draftState));
   } catch {
+    saved = false;
     /* Draft is best-effort; never block teaching when storage is full. */
   }
+  if (refs.draftSaveStatus) {
+    refs.draftSaveStatus.classList.remove('is-saving');
+    refs.draftSaveStatus.classList.toggle('is-warn', !saved);
+    if (!saved) {
+      refs.draftSaveStatus.textContent = '草稿未保存';
+    } else if (draftState.text.trim()) {
+      refs.draftSaveStatus.textContent = `草稿已保存 · ${formatTime(new Date())}`;
+    } else {
+      refs.draftSaveStatus.textContent = '暂无草稿';
+    }
+  }
+}
+
+function updateSessionSaveStatus() {
+  const node = refs.sessionSaveStatus;
+  if (!node) return;
+  if (!store.session) {
+    node.hidden = true;
+    lastSessionSaveStamp = '';
+    return;
+  }
+  node.hidden = false;
+  if (store.persistenceWarning) {
+    node.textContent = '未保存到本机';
+    node.classList.add('is-warn');
+    node.classList.remove('is-saving');
+    return;
+  }
+  const stamp = store.session.updatedAt || '';
+  if (!stamp) {
+    node.textContent = '已自动保存';
+    node.classList.remove('is-warn', 'is-saving');
+    return;
+  }
+  if (stamp === lastSessionSaveStamp) return;
+  lastSessionSaveStamp = stamp;
+  node.textContent = `已自动保存 · ${formatTime(stamp)}`;
+  node.classList.remove('is-warn', 'is-saving');
 }
 
 function applyDraftUI() {
@@ -1525,6 +1589,7 @@ function syncChrome() {
   renderPracticeUI();
   renderConnection();
   updateSettingsButtonState();
+  updateSessionSaveStatus();
 }
 
 function renderTopicMeta(session) {
@@ -1888,6 +1953,23 @@ function updateStreamingMessage(id, text) {
   scrollToBottom();
 }
 
+/** 流式回复每 90ms 渲染一次，避免每个 token 都重排整段 Markdown。 */
+function scheduleStreamingMessage(id, text) {
+  streamUpdate.id = id;
+  streamUpdate.text = text;
+  if (streamUpdateTimer) return;
+  streamUpdateTimer = setTimeout(() => {
+    streamUpdateTimer = null;
+    if (streamUpdate.id) updateStreamingMessage(streamUpdate.id, streamUpdate.text);
+  }, 90);
+}
+
+function clearStreamUpdate() {
+  if (streamUpdateTimer) clearTimeout(streamUpdateTimer);
+  streamUpdateTimer = null;
+  streamUpdate = { id: '', text: '' };
+}
+
 function finalizeMessageElement(id) {
   const message = store.session?.messages.find((item) => item.id === id);
   const row = document.getElementById(`msg-${id}`);
@@ -2082,6 +2164,11 @@ async function requestStudent() {
   const name = aiDisplayName(store.session.aiMode);
   store.setBusy(true);
   showTyping(true);
+  if (refs.messageList) {
+    refs.messageList.setAttribute('aria-live', 'off');
+    refs.messageList.setAttribute('aria-busy', 'true');
+  }
+  if (refs.chatAnnouncer) refs.chatAnnouncer.textContent = '';
 
   const controller = new AbortController();
   studentAbort = controller;
@@ -2105,7 +2192,7 @@ async function requestStudent() {
         if (!assistant) return;
         streamedContent += delta;
         store.appendToMessage(assistant.id, delta, { persist: false });
-        updateStreamingMessage(assistant.id, assistant.content);
+        scheduleStreamingMessage(assistant.id, assistant.content);
       }
     });
 
@@ -2130,12 +2217,17 @@ async function requestStudent() {
       const message = store.session?.messages.find((item) => item.id === assistant.id);
       if (message) message.content = message.content.trim();
       store.touch();
+      clearStreamUpdate();
       finalizeMessageElement(assistant.id);
+      if (refs.chatAnnouncer) {
+        refs.chatAnnouncer.textContent = `${name}的回复已完成。`;
+      }
     }
     connectionIssue = false;
     renderConnection();
   } catch (error) {
     const aborted = isAbortError(error);
+    clearStreamUpdate();
     if (assistant) {
       const message = store.session?.messages.find((item) => item.id === assistant.id);
       if (message) message.content = message.content.trim();
@@ -2166,9 +2258,14 @@ async function requestStudent() {
       toast('已停止生成。', 'warm');
     }
   } finally {
+    clearStreamUpdate();
     showTyping(false);
     store.setBusy(false);
     studentAbort = null;
+    if (refs.messageList) {
+      refs.messageList.setAttribute('aria-live', 'polite');
+      refs.messageList.removeAttribute('aria-busy');
+    }
     scrollToBottom();
   }
 }
@@ -2815,12 +2912,277 @@ async function copyText(text) {
   }
 }
 
+/* --- 报告长图导出 ---------------------------------------------------------- */
+
+const REPORT_IMAGE_FONT =
+  '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif';
+
+function wrapCanvasText(ctx, text, maxWidth, limit = 0) {
+  const source = String(text || '').replace(/\r/g, '');
+  const lines = [];
+  for (const paragraph of source.split('\n')) {
+    if (!paragraph.trim()) {
+      if (lines.length) lines.push('');
+      continue;
+    }
+    let line = '';
+    for (const char of paragraph) {
+      const next = line + char;
+      if (ctx.measureText(next).width > maxWidth && line) {
+        lines.push(line.trimEnd());
+        line = char.trimStart();
+        if (limit && lines.length >= limit) return lines;
+      } else {
+        line = next;
+      }
+    }
+    if (line.trim()) lines.push(line.trimEnd());
+    if (limit && lines.length >= limit) return lines.slice(0, limit);
+  }
+  return limit ? lines.slice(0, limit) : lines;
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function exportReportImage() {
+  if (!currentReport) {
+    toast('先生成诊断报告，再保存图片。', 'warm');
+    return;
+  }
+  if (!refs.exportReportImageBtn) return;
+  refs.exportReportImageBtn.disabled = true;
+  try {
+    const report = currentReport;
+    const topic = currentReportTopic || store.session?.topic || '学习诊断报告';
+    const meta = currentReportMeta || '';
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas');
+
+    const W = 1080;
+    const M = 68;
+    const contentWidth = W - M * 2;
+    ctx.font = `600 38px ${REPORT_IMAGE_FONT}`;
+    const topicLines = wrapCanvasText(ctx, topic, contentWidth, 3);
+    ctx.font = `400 23px ${REPORT_IMAGE_FONT}`;
+    const verdictLines = wrapCanvasText(ctx, report.verdict || '', contentWidth, 8);
+    const gaps = (report.misconceptions || []).slice(0, 2);
+    ctx.font = `600 24px ${REPORT_IMAGE_FONT}`;
+    const gapTitleLines = gaps.map((gap) =>
+      wrapCanvasText(ctx, `${gap.title || '理解缺口'}`, contentWidth - 52, 2)
+    );
+    ctx.font = `400 21px ${REPORT_IMAGE_FONT}`;
+    const gapFixLines = gaps.map((gap) =>
+      wrapCanvasText(ctx, gap.fix || gap.why || '', contentWidth - 52, 3)
+    );
+
+    const topicBlock = 40 + topicLines.length * 48;
+    const metricBlock = 3 * 74 + 18;
+    const verdictBlock = 44 + verdictLines.length * 36 + 18;
+    let gapsBlock = 0;
+    gaps.forEach((gap, index) => {
+      gapsBlock += 40 + gapTitleLines[index].length * 32 + gapFixLines[index].length * 30 + 22;
+    });
+    const H = 178 + topicBlock + 38 + Math.max(190, metricBlock) + verdictBlock + (gaps.length ? gapsBlock + 26 : 0) + 168;
+
+    canvas.width = W;
+    canvas.height = H;
+
+    // Background
+    ctx.fillStyle = '#f6f2e9';
+    ctx.fillRect(0, 0, W, H);
+
+    // Top band
+    ctx.fillStyle = '#1f6f5c';
+    roundRectPath(ctx, 0, 0, W, 150, 0);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 253, 248, 0.9)';
+    ctx.font = `700 27px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('费曼小课堂', M, 66);
+    ctx.fillStyle = 'rgba(255, 253, 248, 0.62)';
+    ctx.font = `600 15px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('FEYNMAN CLASSROOM · LEARNING DIAGNOSIS', M, 96);
+    const dateText = new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(new Date());
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255, 253, 248, 0.82)';
+    ctx.font = `500 18px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText(dateText, W - M, 74);
+    ctx.textAlign = 'left';
+
+    let y = 208;
+
+    // Topic
+    ctx.fillStyle = '#4f5c55';
+    ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('本次课题', M, y);
+    y += 34;
+    ctx.fillStyle = '#1f2a2a';
+    ctx.font = `600 38px ${REPORT_IMAGE_FONT}`;
+    for (const line of topicLines) {
+      ctx.fillText(line, M, y);
+      y += 48;
+    }
+    if (meta) {
+      ctx.fillStyle = '#5c6861';
+      ctx.font = `400 19px ${REPORT_IMAGE_FONT}`;
+      ctx.fillText(meta, M, y + 2);
+      y += 34;
+    }
+
+    y += 22;
+
+    // Score card
+    const scoreTop = y;
+    const scoreHeight = Math.max(190, metricBlock);
+    ctx.fillStyle = '#fffdf8';
+    roundRectPath(ctx, M, scoreTop, contentWidth, scoreHeight, 22);
+    ctx.fill();
+    ctx.strokeStyle = '#ded6c6';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const overall = Number(report.overallScore);
+    const scoreText = Number.isFinite(overall) ? `${Math.round(overall)}` : '—';
+    ctx.fillStyle = '#1f6f5c';
+    ctx.font = `700 104px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText(scoreText, M + 44, scoreTop + 118);
+    const scoreWidth = ctx.measureText(scoreText).width;
+    ctx.fillStyle = '#5c6861';
+    ctx.font = `700 26px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('%', M + 44 + scoreWidth + 6, scoreTop + 118);
+    ctx.fillStyle = '#4f5c55';
+    ctx.font = `600 18px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('综合评分', M + 44, scoreTop + 152);
+
+    const barLeft = M + 330;
+    const barWidth = contentWidth - 330 - 46;
+    METRICS.forEach((metric, index) => {
+      const rowY = scoreTop + 44 + index * 54;
+      const value = Number(report.scores?.[metric.key]);
+      ctx.fillStyle = '#45524f';
+      ctx.font = `600 19px ${REPORT_IMAGE_FONT}`;
+      ctx.fillText(metric.label, barLeft, rowY);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#1f6f5c';
+      ctx.font = `700 19px ${REPORT_IMAGE_FONT}`;
+      ctx.fillText(Number.isFinite(value) ? `${Math.round(value)}%` : '—', barLeft + barWidth, rowY);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#efe9dc';
+      roundRectPath(ctx, barLeft, rowY + 12, barWidth, 8, 4);
+      ctx.fill();
+      if (Number.isFinite(value)) {
+        ctx.fillStyle = '#1f6f5c';
+        roundRectPath(ctx, barLeft, rowY + 12, Math.max(8, (barWidth * Math.min(100, Math.max(0, value))) / 100), 8, 4);
+        ctx.fill();
+      }
+    });
+
+    y = scoreTop + scoreHeight + 48;
+
+    // Verdict
+    ctx.fillStyle = '#4f5c55';
+    ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('老师总评', M, y);
+    y += 30;
+    ctx.fillStyle = '#1f2a2a';
+    ctx.font = `400 23px ${REPORT_IMAGE_FONT}`;
+    for (const line of verdictLines) {
+      ctx.fillText(line, M, y);
+      y += 36;
+    }
+
+    y += 20;
+
+    // Misconceptions
+    if (gaps.length) {
+      ctx.fillStyle = '#4f5c55';
+      ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
+      ctx.fillText('关键理解缺口', M, y);
+      y += 30;
+      gaps.forEach((gap, index) => {
+        const top = y;
+        const titleLines = gapTitleLines[index];
+        const fixLines = gapFixLines[index];
+        const boxHeight = 16 + titleLines.length * 32 + fixLines.length * 30 + 12;
+        ctx.fillStyle = '#fbf7ee';
+        roundRectPath(ctx, M, top, contentWidth, boxHeight, 16);
+        ctx.fill();
+        ctx.fillStyle = '#c15b3f';
+        ctx.font = `700 18px ${REPORT_IMAGE_FONT}`;
+        ctx.fillText(String(index + 1).padStart(2, '0'), M + 18, top + 32);
+        ctx.fillStyle = '#1f2a2a';
+        ctx.font = `600 24px ${REPORT_IMAGE_FONT}`;
+        let lineY = top + 34;
+        for (const line of titleLines) {
+          ctx.fillText(line, M + 52, lineY);
+          lineY += 32;
+        }
+        ctx.fillStyle = '#45524f';
+        ctx.font = `400 21px ${REPORT_IMAGE_FONT}`;
+        for (const line of fixLines) {
+          ctx.fillText(line, M + 52, lineY);
+          lineY += 30;
+        }
+        y = top + boxHeight + 18;
+      });
+    }
+
+    // Footer
+    y = H - 92;
+    ctx.fillStyle = '#ded6c6';
+    ctx.fillRect(M, y - 26, contentWidth, 1);
+    ctx.fillStyle = '#5c6861';
+    ctx.font = `600 17px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('费曼小课堂 · 输出，是最好的输入。', M, y + 6);
+    ctx.textAlign = 'right';
+    ctx.font = `400 15px ${REPORT_IMAGE_FONT}`;
+    ctx.fillText('AI 生成，仅用于学习诊断', W - M, y + 6);
+    ctx.textAlign = 'left';
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((result) => (result ? resolve(result) : reject(new Error('blob'))), 'image/png');
+    });
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    downloadBlob(blob, `feynman-report-${stamp}.png`);
+    toast('报告图片已保存，可以直接发给老师或存档。', 'success', 3200);
+  } catch {
+    toast('图片生成失败，请改用「复制 Markdown」。', 'error');
+  } finally {
+    refs.exportReportImageBtn.disabled = false;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Settings                                                                   */
 /* -------------------------------------------------------------------------- */
 
 function fillSettingsForm() {
   refs.apiKeyInput.value = store.settings.apiKey || '';
+  if (refs.sessionOnlyKey) refs.sessionOnlyKey.checked = Boolean(store.settings.sessionOnlyKey);
   refs.modelInput.value = store.settings.model || APP.defaults.model;
   refs.baseUrlInput.value = store.settings.baseUrl || APP.defaults.baseUrl;
   refs.proxyUrlInput.value = store.settings.proxyUrl || '';
@@ -3087,6 +3449,7 @@ function handleStorageWarningEvent(event) {
 function readSettingsForm() {
   return {
     apiKey: refs.apiKeyInput.value.trim(),
+    sessionOnlyKey: Boolean(refs.sessionOnlyKey?.checked),
     model: refs.modelInput.value.trim(),
     baseUrl: refs.baseUrlInput.value.trim(),
     proxyUrl: refs.proxyUrlInput.value.trim(),
@@ -3142,7 +3505,12 @@ function handleSaveSettings(event) {
   store.updateSettings(data);
   connectionIssue = false;
   renderConnection();
-  showSettingsStatus('连接信息已保存在本机浏览器。', 'ok');
+  showSettingsStatus(
+    data.sessionOnlyKey && data.apiKey
+      ? 'Key 只保存在本次会话，关闭浏览器后自动清除。'
+      : '连接信息已保存在本机浏览器。',
+    'ok'
+  );
   const shouldStart = startAfterSettings;
   startAfterSettings = false;
 
@@ -3669,6 +4037,7 @@ function renderHistory() {
   renderSubjectOverview(visible);
   renderHabits(visible);
   renderTagStats(visible);
+  renderStuckReview(visible);
   renderHistoryTrend(visible, summary);
   renderHistoryDimensions(summary);
   renderHistoryAdvice(visible);
@@ -3966,6 +4335,112 @@ function renderTagStats(records) {
     row.append(head, track, el('small', 'tag-stat-count', `${item.sessions} 次练习`));
     refs.historyTagStats.append(row);
   }
+}
+
+function recordStuckQuote(record, turn) {
+  const speakers = (Array.isArray(record.messages) ? record.messages : []).filter(
+    (message) => message.role === 'user' && (message.content || '').trim()
+  );
+  const message = speakers[Math.max(0, Number(turn) - 1)];
+  const text = String(message?.content || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  return text.length > 88 ? `${text.slice(0, 88)}…` : text;
+}
+
+const STUCK_REVIEW_LIMIT = 6;
+
+function renderStuckReview(records) {
+  if (!refs.historyStuckBlock || !refs.historyStuckReview) return;
+  refs.historyStuckReview.replaceChildren();
+
+  const entries = [];
+  for (const record of records) {
+    const points = Array.isArray(record.stuckPoints) ? record.stuckPoints : [];
+    for (const point of points) {
+      if (!point || !(Number(point.turn) > 0)) continue;
+      entries.push({ record, point });
+    }
+  }
+
+  entries.sort((a, b) => {
+    const left = String(a.point.at || a.record.endedAt || '');
+    const right = String(b.point.at || b.record.endedAt || '');
+    return right.localeCompare(left);
+  });
+
+  const visible = entries.slice(0, STUCK_REVIEW_LIMIT);
+  refs.historyStuckBlock.hidden = visible.length === 0;
+  if (!visible.length) return;
+
+  for (const { record, point } of visible) {
+    const card = el('article', 'stuck-review-card');
+    const main = el('div', 'stuck-review-main');
+    main.append(el('p', 'stuck-review-topic', record.topic || '未命名课程'));
+
+    const meta = el('div', 'stuck-review-meta');
+    const subject = subjectInfo(record.subject);
+    if (subject) meta.append(el('span', '', subject.short));
+    if (record.endedAt) meta.append(el('span', '', formatArchiveDate(record.endedAt)));
+    meta.append(el('span', '', `第 ${Number(point.turn)} 次讲解`));
+    main.append(meta);
+
+    const quote = recordStuckQuote(record, point.turn);
+    if (quote) main.append(el('p', 'stuck-review-quote', `“${quote}”`));
+
+    const retry = el('button', 'btn btn-outline btn-sm', '重讲这处');
+    retry.type = 'button';
+    retry.addEventListener('click', () =>
+      startLessonFromRecord(record, { note: quote, turn: Number(point.turn) })
+    );
+
+    card.append(main, retry);
+    refs.historyStuckReview.append(card);
+  }
+}
+
+function startLessonFromRecord(record, { note = '', turn = 0 } = {}) {
+  if (!record) return;
+  if (store.state.status === STATUS.TEACHING) {
+    toast('当前这节课还没结束。先点「结束本次讲课」，再重讲旧课。', 'warm', 5200);
+    return;
+  }
+  if (!isConfigured(store.settings)) {
+    toast('先连接你的 AI，再重讲这一课。', 'warm', 5000);
+    return;
+  }
+
+  if (activeModalId) closeModal(activeModalId);
+  if (store.session) store.end();
+  resetAfterSession();
+
+  const subject = SUBJECT_KEYS.includes(record.subject) ? record.subject : store.practice.subject;
+  const difficulty = DIFFICULTIES.some((item) => item.key === record.difficulty)
+    ? record.difficulty
+    : store.practice.difficulty;
+  store.updatePractice({ subject, difficulty });
+  store.start(record.topic, null, {
+    subject,
+    difficulty,
+    tags: Array.isArray(record.tags) ? record.tags : [],
+    source: record.source || 'custom',
+    studentPersona: record.studentPersona || store.practice.persona,
+    studentIntensity: record.studentIntensity || store.practice.intensity,
+    aiMode: record.aiMode === 'tutor' ? 'tutor' : 'student'
+  });
+  bankEditingId = '';
+
+  if (note && note.trim()) {
+    const label = turn ? `第 ${turn} 次讲解的卡点` : '上次的卡点';
+    store.addMessage('user', `这次我想重点重讲${label}：\n${note.trim()}`);
+    renderSession();
+  }
+
+  showScreen('chat');
+  requestAnimationFrame(() => scrollToBottom(true));
+  toast('已按原来的课题重开一课，这次可以针对卡点讲深一点。', 'success', 4200);
+  requestStudent();
 }
 
 function historyStat(value, unit, label, { accent = false, text = '' } = {}) {
@@ -4570,12 +5045,39 @@ async function openBank(view = 'mine') {
   renderBank();
   openModal('bankModal');
   requestAnimationFrame(() => refs.bankSearch?.focus({ preventScroll: true }));
+  if (bankView === 'square') void ensureBuiltinQuestions();
+}
+
+async function ensureBuiltinQuestions() {
+  if (builtinQuestions.length) return builtinQuestions;
+  if (builtinQuestionsPromise) return builtinQuestionsPromise;
+  const url = new URL('js/builtin-questions.json', document.baseURI).href;
+  builtinQuestionsPromise = fetch(url)
+    .then((response) => {
+      if (!response.ok) throw new Error(`题库加载失败（${response.status}）`);
+      return response.json();
+    })
+    .then((data) => {
+      builtinQuestions = Array.isArray(data) ? data : [];
+      builtinQuestionsFailed = false;
+      return builtinQuestions;
+    })
+    .catch(() => {
+      builtinQuestionsFailed = true;
+      return [];
+    })
+    .finally(() => {
+      builtinQuestionsPromise = null;
+      if (activeModalId === 'bankModal' && bankView === 'square') renderBank();
+    });
+  return builtinQuestionsPromise;
 }
 
 function switchBankView(view, { focus = false } = {}) {
   if (!BANK_COPY[view]) return;
   bankView = view;
   renderBank();
+  if (view === 'square') void ensureBuiltinQuestions();
   if (focus) {
     (view === 'mine' ? refs.bankTabMine : refs.bankTabSquare)?.focus({ preventScroll: true });
   }
@@ -4594,7 +5096,7 @@ function renderBankChrome() {
   if (refs.bankIntro) refs.bankIntro.textContent = copy.intro;
   if (refs.bankNote) refs.bankNote.textContent = copy.note;
   if (refs.bankSearch) refs.bankSearch.placeholder = copy.placeholder;
-  if (refs.bankSquareCount) refs.bankSquareCount.textContent = String(BUILTIN_QUESTIONS.length);
+  if (refs.bankSquareCount) refs.bankSquareCount.textContent = String(BUILTIN_QUESTION_COUNT);
   if (refs.bankMineCount) refs.bankMineCount.textContent = String(bankCache.length);
 
   if (refs.bankTabSquare) {
@@ -4649,9 +5151,23 @@ function renderBankList() {
   if (!refs.bankList) return;
   refs.bankList.replaceChildren();
 
+  if (bankView === 'square' && !builtinQuestions.length) {
+    if (refs.bankEmpty) refs.bankEmpty.hidden = true;
+    refs.bankList.append(
+      el(
+        'p',
+        'tag-stats-empty',
+        builtinQuestionsFailed
+          ? '精选题库暂时没有加载出来，检查网络后再切回「精选题库」重试。'
+          : '正在加载精选题目…'
+      )
+    );
+    return;
+  }
+
   const base =
     bankView === 'square'
-      ? BUILTIN_QUESTIONS.map((item) => ({ ...item, source: 'builtin' }))
+      ? builtinQuestions.map((item) => ({ ...item, source: 'builtin' }))
       : bankCache;
   const query = bankFilter.query.trim().toLowerCase();
   const items = base.filter((item) => {
@@ -5602,6 +6118,7 @@ function bindEvents() {
 
   refs.retryReportBtn.addEventListener('click', handleCallTeacher);
   refs.copyReportBtn.addEventListener('click', copyReport);
+  refs.exportReportImageBtn?.addEventListener('click', exportReportImage);
   refs.restartFromReportBtn.addEventListener('click', handleRestartFromReport);
 
   refs.settingsForm.addEventListener('submit', handleSaveSettings);
@@ -5738,4 +6255,55 @@ function bindEvents() {
     updateTopicToggle();
     if (draftDrawerOpen && window.innerWidth > 980) setDraftDrawer(false);
   });
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  const register = () => {
+    const url = new URL('sw.js', document.baseURI).href;
+    navigator.serviceWorker.register(url, { scope: './' }).catch(() => {
+      /* Offline support is optional; never block the classroom. */
+    });
+  };
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
+}
+
+/** 手机键盘弹出时用 visualViewport 的真实高度约束聊天区，避免输入框被顶出屏幕。 */
+function setupKeyboardInset() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  let frame = 0;
+
+  const apply = () => {
+    frame = 0;
+    const root = document.documentElement;
+    root.style.setProperty('--vvh', `${Math.round(viewport.height)}px`);
+    root.style.setProperty('--vv-top', `${Math.round(viewport.offsetTop)}px`);
+
+    const active = document.activeElement;
+    const editing = Boolean(
+      active && active.matches?.('textarea, input:not([type="checkbox"]):not([type="radio"])')
+    );
+    const inset = window.innerHeight - viewport.height - viewport.offsetTop;
+    const keyboardOpen = editing && inset > 120;
+    document.body.classList.toggle('keyboard-open', keyboardOpen);
+
+    if (keyboardOpen && refs.composer) {
+      const rect = refs.composer.getBoundingClientRect();
+      if (rect.bottom > viewport.height - 6) {
+        refs.composer.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      }
+    }
+  };
+
+  const schedule = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(apply);
+  };
+
+  viewport.addEventListener('resize', schedule);
+  viewport.addEventListener('scroll', schedule);
+  window.addEventListener('orientationchange', schedule);
+  apply();
 }

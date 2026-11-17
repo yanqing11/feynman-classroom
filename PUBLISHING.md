@@ -171,12 +171,17 @@ gh api repos/<owner>/<repo>/pages
 ## 7. 以后更新
 
 ```bash
+npm install          # 首次或依赖变化时
+npm run build        # 重新生成 assets/ 下带哈希的 JS/CSS，并更新 index.html
+npm run test:e2e     # 可选：用系统 Edge 跑一遍端到端测试
 git add .
 git commit -m "Describe the change"
 git push
 ```
 
-GitHub Pages 会自动重新发布。JS/CSS 有更新时，建议在 `index.html` 的资源引用后加版本参数（例如 `./app.js?v=20261103`），避免浏览器缓存旧文件。
+GitHub Pages 会自动重新发布，不需要额外的构建配置。
+
+资源引用使用 `assets/app.<hash>.js` 与 `assets/styles.<hash>.css`：哈希随内容变化，旧缓存会自动失效，因此不需要手动加 `?v=` 版本参数。**务必将构建后的 `assets/` 产物一起提交**，否则线上会 404。
 
 ## 8. 回滚
 

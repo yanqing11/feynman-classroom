@@ -2,7 +2,7 @@
 
 > 把你会的东西，讲给一个听不懂的学生听。
 
-一个**零后端、零构建**的静态数学学习应用，把**费曼学习法**和**苏格拉底式提问**变成一个可量化的练习：
+一个**零后端**的静态数学学习应用，把**费曼学习法**和**苏格拉底式提问**变成一个可量化的练习：
 
 学生扮演老师，把数学题的思路讲给 AI 学生「小问」听；小问只提问、不代答；卡住时，可以随时呼叫 AI 老师「陈老师」，拿到一份三维评分 + 理解缺口 + 下一次怎么讲的诊断报告。
 
@@ -22,7 +22,7 @@
 - **三科独立**：小学数学 / 初中数学 / 高中数学各自拥有快捷知识点标签、误区池、追问风格和档案统计；一节课内可锁定学科。
 - **自定义题库**：内置例题、手动录入、拍照识别都能进入同一套讲课 / 评分 / 档案流程；我的题库支持学科、难度、知识点、备注、编辑和删除。
 - **多模态入口**：文字、图片、手写板、语音输入（Web Speech API）。只上传题目图片也能自动识别题目。
-- **打开即用**：默认走课堂共享代理，学生不需要 API Key；也可以填自己的 Key 直连服务商（Key 只保存在本机 `localStorage`）。
+- **打开即用**：默认走课堂共享代理，学生不需要 API Key；也可以填自己的 Key 直连服务商（Key 默认保存在本机 `localStorage`，也可选择仅本次会话保存）。
 
 ## 快速开始
 
@@ -41,14 +41,21 @@
 直接双击 `index.html` 可以浏览界面，但**语音输入和部分浏览器的 API 调用需要安全上下文**，建议起一个本地静态服务器：
 
 ```bash
-python -m http.server 8000
-# 打开 http://localhost:8000
+npm install
+npm run serve
+# 打开 http://127.0.0.1:4173
 ```
 
-或者使用 Node：
+修改 `app.js` / `styles.css` 等源文件后，发布前运行构建，把带哈希的压缩产物写入 `assets/` 并更新 `index.html`：
 
 ```bash
-npx serve .
+npm run build
+```
+
+端到端测试使用系统 Microsoft Edge（无需额外下载浏览器），并会拦截模型请求：
+
+```bash
+npm run test:e2e
 ```
 
 ### 连接设置
@@ -56,7 +63,8 @@ npx serve .
 点击右上角 **设置** 可以查看当前连接方式：
 
 - 默认：课堂共享代理（不用 Key）；
-- 自定义：填入自己的 API Key，请求直接发往你选择的模型服务商。
+- 自定义：填入自己的 API Key，请求直接发往你选择的模型服务商；
+- 勾选「仅本次会话保存 Key」后，Key 只写入 `sessionStorage`，关闭浏览器后自动清除，不会落到 `localStorage`。
 
 > 旧版默认代理（`*.workers.dev`）在大陆常被 DNS 污染。如果你之前打开过页面，浏览器里可能还存着旧地址；新版会自动把旧默认地址换成 Netlify 代理，你自定义过的代理地址不会被改动。
 
@@ -91,8 +99,10 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 三维评分 | 概念掌握 40% + 逻辑与步骤 40% + 表达清晰度 20%；每个维度带对话证据与改进建议 |
 | 理解缺口 | 每条包含证据、原因、怎么补；可一键针对缺口重新开课 |
 | 下一次这样讲 | 带示范话术的具体建议，可一键复制 Markdown 报告 |
-| 学习档案 | 首页入口；记录学科、主题、时间、三维分数，支持展开详情、课堂回放、单条删除与 Markdown 复制 |
-| 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 存在 `localStorage`，刷新后可直接接着讲；也可以「放弃本次课堂」，确认后清空且不归档 |
+| 学习档案 | 首页入口；记录学科、主题、时间、三维分数，支持展开详情、课堂回放、单条删除与 Markdown 复制；卡点会单独汇总，可一键重讲 |
+| 报告导出 | 报告可复制 Markdown，也可导出 1080px PNG 长图，方便发给老师或存档 |
+| 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 存在 `localStorage`，刷新后可直接接着讲；界面会显示最近一次自动保存时间；也可以「放弃本次课堂」，确认后清空且不归档 |
+| 离线壳 | 注册 Service Worker，断网后仍可打开页面和已缓存的构建资源；已安装时可从桌面图标启动 |
 | 失败重试 | AI 请求失败时保留老师已发送的内容，给出友好提示和「重试」按钮 |
 | 移动端 | 快捷标签自动换行、输入框与按钮全宽 / 加大触控面积 |
 | 图片 | 题目拍照；只传图片也会自动识别成文字题目，再开始讲课 |
@@ -105,9 +115,15 @@ https://feynman-classroom-proxy.netlify.app/v1
 
 ```text
 .
-├── index.html              # 唯一的页面入口（必须位于仓库根目录）
-├── styles.css              # 纸张 / 墨水风格的设计系统
-├── app.js                  # UI 状态机、事件、渲染
+├── index.html              # 页面入口（引用 assets/ 中带哈希的构建产物）
+├── styles.css              # 纸张 / 墨水风格的设计系统（源文件）
+├── app.js                  # UI 状态机、事件、渲染（源文件）
+├── manifest.json           # PWA 清单
+├── sw.js                   # 离线缓存 Service Worker
+├── package.json            # 构建 / 本地预览 / E2E 脚本
+├── playwright.config.js
+├── scripts/                # esbuild 构建、静态服务器、图标生成
+├── tests/                  # Playwright 端到端测试
 ├── netlify.toml            # Netlify 站点配置（默认共享代理）
 ├── netlify/
 │   ├── edge-functions/
@@ -120,6 +136,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   └── README.md
 ├── js/
 │   ├── config.js           # 学科 / 难度 / 人设 / 模式配置、两个 System Prompt、模型预设
+│   ├── builtin-questions.json # 精选题库（打开题库时按需加载）
 │   ├── api.js              # OpenRouter / OpenAI-compatible 客户端（流式 + JSON）
 │   ├── agents.js           # StudentAgent / TeacherAgent、学科上下文与报告归一化
 │   ├── store.js            # 状态机、会话与课堂参数持久化、设置
@@ -127,7 +144,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   ├── bank.js             # 我的题库（IndexedDB + localStorage 回退）
 │   ├── speech.js           # Web Speech API 封装
 │   └── canvas.js           # 手写板（Pointer Events + 压感）
-├── assets/favicon.svg
+├── assets/                 # 构建后的 app.<hash>.js / styles.<hash>.css、图标
 ├── PROMPTS.md              # 两个 Agent 的完整 System Prompt 与报告 Schema
 ├── ARCHITECTURE.md         # 架构、上下文管理、多模态演进方案
 ├── PUBLISHING.md           # Git / GitHub / Pages 发布步骤
@@ -135,7 +152,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 └── .gitignore
 ```
 
-所有资源路径都是相对的（`./styles.css`、`./app.js`、`./assets/favicon.svg`），因此可以直接部署到 `https://<user>.github.io/<repo>/` 这样的子路径。
+所有资源路径都是相对的（`./assets/app.<hash>.js`、`./manifest.json` 等），因此可以直接部署到 `https://<user>.github.io/<repo>/` 这样的子路径。
 
 ## 配置
 
@@ -158,7 +175,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 
 - 页面本身没有数据库、没有日志、没有分析、没有第三方字体或 CDN。
 - 默认请求经过课堂共享代理：代理持有模型 Key，只转发对话内容，不落库。
-- 自己填写的 API Key 仅存于 `localStorage`；不会写入代码、Git 仓库或部署产物。
+- 自己填写的 API Key 默认存于 `localStorage`；勾选「仅本次会话保存」后改存 `sessionStorage`，关闭浏览器即清除。都不会写入代码、Git 仓库或部署产物。
 - 当前对话、课堂参数和学习档案仅存于 `localStorage`；结束讲课时当前会话转为学习档案，可随时清空。
 - 我的题库优先存于 IndexedDB（不可用时回退 `localStorage`），包括题目图片；所有数据都不会上传到本站服务器。
 - 图片在浏览器内压缩后发送给模型服务商；只用于识别题目或回答，不经过本站服务器。
@@ -171,14 +188,15 @@ https://feynman-classroom-proxy.netlify.app/v1
 
 核心步骤：
 
-1. 把仓库根目录的静态文件推送到 `main`。
-2. 仓库 **Settings → Pages → Build and deployment**：
+1. 运行 `npm install && npm run build`，把源文件构建成 `assets/` 下带哈希的静态资源。
+2. 把仓库根目录的静态文件（含 `index.html`、`assets/`、`manifest.json`、`sw.js`）推送到 `main`。
+3. 仓库 **Settings → Pages → Build and deployment**：
    - Source: **Deploy from a branch**
    - Branch: **main**
    - Folder: **/(root)**
-3. 等待 Actions 完成，访问 `https://<username>.github.io/<repo>/`。
+4. 等待 Actions 完成，访问 `https://<username>.github.io/<repo>/`。
 
-因为项目使用相对路径，不需要配置构建命令或 `base` 路径。
+因为项目使用相对路径，不需要配置构建命令或 `base` 路径；GitHub Pages 本身不做构建，所以本地构建产物必须一起提交。
 
 ## 浏览器支持
 

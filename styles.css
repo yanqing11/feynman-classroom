@@ -9,8 +9,8 @@
   --card-warm: #fbf7ee;
   --ink: #1f2a2a;
   --ink-soft: #45524f;
-  --muted: #7d8782;
-  --faint: #a8aea8;
+  --muted: #4f5c55;
+  --faint: #5c6861;
   --line: #ded6c6;
   --line-strong: #c9bfaa;
   --green: #1f6f5c;
@@ -467,17 +467,15 @@ main {
 }
 
 .screen {
-  animation: screen-in 0.45s var(--ease);
+  animation: screen-in 0.35s var(--ease);
 }
 
 @keyframes screen-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
@@ -999,6 +997,55 @@ body.is-chat .footer {
   color: var(--ink-soft);
   font-size: 11px;
   font-weight: 600;
+}
+
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.save-status::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  opacity: 0.7;
+}
+
+.save-status.is-saving::before {
+  background: var(--gold);
+  animation: save-pulse 1s ease infinite;
+}
+
+.save-status.is-warn {
+  color: var(--coral);
+}
+
+.save-status.is-warn::before {
+  background: var(--coral);
+}
+
+@keyframes save-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.save-status-draft {
+  margin-left: auto;
+  margin-top: 3px;
+  font-size: 9.5px;
+  font-weight: 500;
 }
 
 .mobile-teacher-btn {
@@ -3289,6 +3336,24 @@ body.is-chat .footer {
   color: var(--faint);
   font-size: 10.5px;
   line-height: 1.6;
+}
+
+.field-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.field-check input {
+  width: 14px;
+  height: 14px;
+  margin: 2px 0 0;
+  accent-color: var(--green);
+  flex: none;
 }
 
 .key-input-wrap {
@@ -6230,6 +6295,75 @@ body.is-chat .topbar-tagline {
   text-align: center;
 }
 
+/* Stuck-point review */
+.stuck-review {
+  display: grid;
+  gap: 9px;
+}
+
+.stuck-review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 14px;
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--coral);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.stuck-review-main {
+  min-width: 0;
+}
+
+.stuck-review-topic {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.stuck-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin-top: 5px;
+  color: var(--faint);
+  font-size: 9.5px;
+}
+
+.stuck-review-quote {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.stuck-review-card .btn {
+  align-self: start;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .stuck-review-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stuck-review-card .btn {
+    justify-self: start;
+  }
+}
+
 .history-item-chips {
   display: flex;
   flex-wrap: wrap;
@@ -8583,3 +8717,43 @@ body.is-chat .storage-banner {
 [data-theme="dark"] .gap-type-badge.gap-type-jump {
   color: var(--gold);
 }
+
+/* ==========================================================================
+   Mobile ergonomics: sticky start CTA + on-screen keyboard
+   ========================================================================== */
+
+@media (max-width: 760px) {
+  .home-screen {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+
+  .home-input-foot .btn-start {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 30;
+    width: auto;
+    margin: 0;
+    box-shadow: 0 14px 34px rgba(16, 26, 22, 0.32);
+  }
+}
+
+body.keyboard-open .chat-layout {
+  height: calc(var(--vvh, 100dvh) - var(--topbar-h) - 52px);
+}
+
+body.keyboard-open .side-panel {
+  max-height: calc(var(--vvh, 100dvh) - 96px);
+}
+
+body.keyboard-open .chat-body {
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 760px) {
+  body.keyboard-open .chat-layout {
+    height: calc(var(--vvh, 100dvh) - var(--topbar-h) - 22px);
+  }
+}
+
