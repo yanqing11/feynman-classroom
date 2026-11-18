@@ -13,11 +13,12 @@
 ### 1.1 结构
 
 ```text
-index.html              ← 必须在仓库根目录
-styles.css
-app.js
-js/*.js
-assets/favicon.svg
+index.html              ← 必须在仓库根目录，引用 assets/ 下带哈希的构建产物
+styles.css / app.js     ← 源文件
+js/*.js                 ← 含按需加载的 speech.js / canvas.js / report-image.js
+manifest.json           ← PWA 清单（快捷方式 + 安装截图）
+sw.js                   ← 离线 Service Worker，含构建时生成的预缓存清单
+assets/                 ← app.<hash>.js、分包、styles.<hash>.css、图标、PWA 截图
 .nojekyll
 ```
 
@@ -26,10 +27,13 @@ assets/favicon.svg
 `index.html` 中的资源必须形如：
 
 ```html
-<link rel="stylesheet" href="./styles.css">
-<script type="module" src="./app.js"></script>
+<link rel="stylesheet" href="./assets/styles.<hash>.css">
+<script type="module" src="./assets/app.<hash>.js"></script>
 <link rel="icon" href="./assets/favicon.svg">
+<link rel="manifest" href="./manifest.json">
 ```
+
+`npm run build` 会自动改写这两处引用，并同步更新 `sw.js` 里的 `BUILD_ASSETS` 预缓存清单。
 
 不能出现以 `/` 开头的站点根路径、本机绝对路径、`file:///...` 或写死的 `https://<user>.github.io/<repo>/...`。
 
@@ -172,16 +176,17 @@ gh api repos/<owner>/<repo>/pages
 
 ```bash
 npm install          # 首次或依赖变化时
-npm run build        # 重新生成 assets/ 下带哈希的 JS/CSS，并更新 index.html
-npm run test:e2e     # 可选：用系统 Edge 跑一遍端到端测试
+npm run build        # 重新生成 assets/ 下的分包与哈希文件，并更新 index.html + sw.js
+npm run screenshots  # 仅在首页视觉变化时重新生成 PWA 安装截图
+npm run test:e2e     # 用系统 Edge 跑端到端测试；CI 自动改用 Chromium
 git add .
 git commit -m "Describe the change"
 git push
 ```
 
-GitHub Pages 会自动重新发布，不需要额外的构建配置。
+GitHub Pages 会自动重新发布，不需要额外的构建配置。仓库的 `.github/workflows/verify.yml` 也会在每次 push / PR 上重复 `npm run build`，并用 `git diff --exit-code -- assets index.html sw.js` 阻止忘记构建的提交。
 
-资源引用使用 `assets/app.<hash>.js` 与 `assets/styles.<hash>.css`：哈希随内容变化，旧缓存会自动失效，因此不需要手动加 `?v=` 版本参数。**务必将构建后的 `assets/` 产物一起提交**，否则线上会 404。
+资源引用使用 `assets/app.<hash>.js`、`assets/styles.<hash>.css` 以及按需加载的 `*-<hash>.js` 分包：哈希随内容变化，旧缓存会自动失效，因此不需要手动加 `?v=` 版本参数。**务必将构建后的 `assets/` 产物和 `sw.js` 一起提交**，否则线上会 404 或离线失效。
 
 ## 8. 回滚
 
@@ -289,3 +294,13 @@ git push --force-with-lease
 ```
 
 注意：`--force-with-lease` 会改写公开历史，仅在确认没有其他人基于该提交工作时使用。
+
+## 11. 第二轮优化记录
+
+本轮在同一站点上完成并随本次提交发布：
+
+- **真正的离线**：`sw.js` 在安装时按 `BUILD_ASSETS` 预缓存全部 JS/CSS（含语音、手写板、报告渲染分包），已用「清 HTTP 缓存 + 断网刷新」的端到端用例验证。
+- **对比度与字号**：深色主题 `--faint` 调到 `#85938b`（对卡片背景 4.95:1）；所有中文标签与说明不低于 12px，装饰性英文 kicker 例外。
+- **备份导入**：设置里新增「导入备份 JSON」，档案按 ID 合并、题库按 ID 合并，API Key 不被覆盖；同时新增多标签页数据变更提示。
+- **PWA**：清单加入 `shortcuts`（开课 / 档案）与 `screenshots`；截图由 `npm run screenshots` 生成。
+- **构建与测试**：esbuild 拆分首屏与懒加载分包；CI 校验构建产物一致性；E2E 覆盖 PNG 真实下载、离线、深色对比度、中文字号、备份导入和 PWA 快捷方式，共 8 项全部通过。

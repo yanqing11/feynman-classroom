@@ -46,17 +46,25 @@ npm run serve
 # 打开 http://127.0.0.1:4173
 ```
 
-修改 `app.js` / `styles.css` 等源文件后，发布前运行构建，把带哈希的压缩产物写入 `assets/` 并更新 `index.html`：
+修改 `app.js` / `styles.css` 等源文件后，发布前运行构建，把带哈希的压缩产物写入 `assets/` 并更新 `index.html` 和 `sw.js` 的预缓存清单：
 
 ```bash
 npm run build
 ```
 
-端到端测试使用系统 Microsoft Edge（无需额外下载浏览器），并会拦截模型请求：
+构建会按内容拆包：首屏只加载主包和共享包，语音、手写板、报告长图渲染器在首次使用时才下载。需要重新生成 PWA 安装截图时运行：
+
+```bash
+npm run screenshots
+```
+
+端到端测试默认使用系统 Microsoft Edge（无需额外下载浏览器），并会拦截模型请求；CI 环境会自动改用 Playwright 自带的 Chromium：
 
 ```bash
 npm run test:e2e
 ```
+
+每次推送 / PR 都会由 `.github/workflows/verify.yml` 执行 `npm run build` 并检查产物与提交一致，然后再跑端到端测试。
 
 ### 连接设置
 
@@ -100,9 +108,10 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 理解缺口 | 每条包含证据、原因、怎么补；可一键针对缺口重新开课 |
 | 下一次这样讲 | 带示范话术的具体建议，可一键复制 Markdown 报告 |
 | 学习档案 | 首页入口；记录学科、主题、时间、三维分数，支持展开详情、课堂回放、单条删除与 Markdown 复制；卡点会单独汇总，可一键重讲 |
-| 报告导出 | 报告可复制 Markdown，也可导出 1080px PNG 长图，方便发给老师或存档 |
+| 报告导出 | 报告可复制 Markdown，也可导出 1080px 宽、至少 1200px 高的 PNG 长图，渲染器按需加载；方便发给老师或存档 |
+| 备份与恢复 | 设置里可导出全部 JSON，也可导入备份：档案按记录 ID 合并，题库按题目 ID 合并；导入不会覆盖当前 API Key |
 | 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 存在 `localStorage`，刷新后可直接接着讲；界面会显示最近一次自动保存时间；也可以「放弃本次课堂」，确认后清空且不归档 |
-| 离线壳 | 注册 Service Worker，断网后仍可打开页面和已缓存的构建资源；已安装时可从桌面图标启动 |
+| 离线壳 | Service Worker 在安装时预缓存全部 JS/CSS 分包（含语音、手写板、报告渲染器），清掉 HTTP 缓存后断网仍可用；支持桌面图标与「开始讲课 / 学习档案」快捷方式 |
 | 失败重试 | AI 请求失败时保留老师已发送的内容，给出友好提示和「重试」按钮 |
 | 移动端 | 快捷标签自动换行、输入框与按钮全宽 / 加大触控面积 |
 | 图片 | 题目拍照；只传图片也会自动识别成文字题目，再开始讲课 |
@@ -110,6 +119,8 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 语音输入 | Web Speech API，中文识别，可中途停止 |
 | 题库存储 | 我的题库优先用 IndexedDB，不可用时退回 `localStorage`；图片不离开本机 |
 | 键盘 | `Ctrl/Cmd+Enter` 发送讲解或开始讲课、`Enter` 换行、`Esc` 关闭弹窗 |
+| 多标签页 | 另一个标签页改动课堂 / 档案 / 设置时显示同步提示，避免两边静默互相覆盖 |
+| 无障碍 | 课中流式输出不逐句播报，结束后统一播报；中文标签与说明字号不低于 12px，深色主题次要文字对比度 ≥ 4.5:1 |
 
 ## 文件结构
 
@@ -118,11 +129,12 @@ https://feynman-classroom-proxy.netlify.app/v1
 ├── index.html              # 页面入口（引用 assets/ 中带哈希的构建产物）
 ├── styles.css              # 纸张 / 墨水风格的设计系统（源文件）
 ├── app.js                  # UI 状态机、事件、渲染（源文件）
-├── manifest.json           # PWA 清单
-├── sw.js                   # 离线缓存 Service Worker
-├── package.json            # 构建 / 本地预览 / E2E 脚本
+├── manifest.json           # PWA 清单（快捷方式 + 安装截图）
+├── sw.js                   # 离线缓存 Service Worker（预缓存全部构建分包）
+├── package.json            # 构建 / 本地预览 / E2E / 截图脚本
 ├── playwright.config.js
-├── scripts/                # esbuild 构建、静态服务器、图标生成
+├── .github/workflows/verify.yml # CI：构建一致性 + E2E
+├── scripts/                # esbuild 构建、静态服务器、图标与截图生成
 ├── tests/                  # Playwright 端到端测试
 ├── netlify.toml            # Netlify 站点配置（默认共享代理）
 ├── netlify/
@@ -142,9 +154,10 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   ├── store.js            # 状态机、会话与课堂参数持久化、设置
 │   ├── history.js          # 学习档案、分学科 / 来源 / 知识点统计
 │   ├── bank.js             # 我的题库（IndexedDB + localStorage 回退）
-│   ├── speech.js           # Web Speech API 封装
-│   └── canvas.js           # 手写板（Pointer Events + 压感）
-├── assets/                 # 构建后的 app.<hash>.js / styles.<hash>.css、图标
+│   ├── speech.js           # Web Speech API 封装（按需加载）
+│   ├── canvas.js           # 手写板（Pointer Events + 压感，按需加载）
+│   └── report-image.js     # 报告 PNG 渲染器（按需加载）
+├── assets/                 # 构建后的 app.<hash>.js / 分包 / styles.<hash>.css、图标与 PWA 截图
 ├── PROMPTS.md              # 两个 Agent 的完整 System Prompt 与报告 Schema
 ├── ARCHITECTURE.md         # 架构、上下文管理、多模态演进方案
 ├── PUBLISHING.md           # Git / GitHub / Pages 发布步骤
@@ -177,6 +190,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 - 默认请求经过课堂共享代理：代理持有模型 Key，只转发对话内容，不落库。
 - 自己填写的 API Key 默认存于 `localStorage`；勾选「仅本次会话保存」后改存 `sessionStorage`，关闭浏览器即清除。都不会写入代码、Git 仓库或部署产物。
 - 当前对话、课堂参数和学习档案仅存于 `localStorage`；结束讲课时当前会话转为学习档案，可随时清空。
+- 导出的 JSON 备份会自动移除 API Key；导入时按记录 ID 合并档案与题库，不会覆盖本机现有 Key。
 - 我的题库优先存于 IndexedDB（不可用时回退 `localStorage`），包括题目图片；所有数据都不会上传到本站服务器。
 - 图片在浏览器内压缩后发送给模型服务商；只用于识别题目或回答，不经过本站服务器。
 - 若浏览器存储空间不足，应用会保留文字并丢弃图片，同时在界面提示。

@@ -483,6 +483,19 @@ export class ClassroomStore {
     }
   }
 
+  /** Restore a session from a backup only when no lesson is currently open. */
+  importSession(session) {
+    if (this.session || !session || typeof session.topic !== 'string' || !Array.isArray(session.messages)) {
+      return false;
+    }
+    try {
+      localStorage.setItem(APP.storage.session, JSON.stringify(session));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   end() {
     this.state.session = null;
     this.state.status = STATUS.HOME;

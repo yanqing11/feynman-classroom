@@ -227,6 +227,49 @@ export function clearHistory() {
   }
 }
 
+/**
+ * Merge a JSON backup into the local archive, keyed by record id. Records in
+ * the backup win so a restored backup really restores the older snapshot.
+ */
+export function importRecords(records) {
+  const current = loadHistory();
+  const byId = new Map(current.map((record) => [record.id, record]));
+  let added = 0;
+  let updated = 0;
+
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record || typeof record.id !== 'string' || !record.id) continue;
+    if (typeof record.topic !== 'string' || !record.topic.trim()) continue;
+
+    const messages = trimMessages(record.messages);
+    const clean = {
+      ...record,
+      id: record.id,
+      topic: record.topic.trim().slice(0, APP.limits.maxTopicChars),
+      subject: subjectInfo(record.subject) ? record.subject : null,
+      difficulty: difficultyInfo(record.difficulty) ? record.difficulty : null,
+      tags: normalizeTags(record.tags),
+      source: sourceInfo(record.source).key,
+      report: sanitizeReport(record.report),
+      stuckPoints: sanitizeStuckPoints(record.stuckPoints),
+      messages,
+      turns: Number.isFinite(Number(record.turns))
+        ? Math.max(0, Math.round(Number(record.turns)))
+        : messages.filter((message) => message.role === 'user').length,
+      questions: Number.isFinite(Number(record.questions))
+        ? Math.max(0, Math.round(Number(record.questions)))
+        : messages.filter((message) => message.role === 'assistant').length
+    };
+
+    if (byId.has(clean.id)) updated += 1;
+    else added += 1;
+    byId.set(clean.id, clean);
+  }
+
+  const list = persist([...byId.values()]);
+  return { added, updated, total: list.length };
+}
+
 export function summarizeHistory(records) {
   const scored = records.filter((record) => record.report && Number.isFinite(record.report.overallScore));
   const scores = scored.map((record) => record.report.overallScore);

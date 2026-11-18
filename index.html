@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="费曼小课堂">
-  <link rel="stylesheet" href="./assets/styles.9f96aec742.css">
+  <link rel="stylesheet" href="./assets/styles.VGVVPJTU.css">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -66,6 +66,20 @@
           <button class="btn btn-primary btn-sm" id="storageBannerExport" type="button">导出备份</button>
           <button class="btn btn-outline btn-sm" id="storageBannerManage" type="button">去清理</button>
           <button class="icon-btn storage-banner-close" id="storageBannerClose" type="button" aria-label="关闭存储提醒">×</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="storage-banner" id="syncBanner" hidden role="status" aria-live="polite">
+      <div class="storage-banner-inner">
+        <span class="storage-banner-mark" aria-hidden="true">↻</span>
+        <div class="storage-banner-copy">
+          <strong>另一个标签页更新了本机数据</strong>
+          <p id="syncBannerText">刷新后才能看到最新内容；继续在当前页保存可能覆盖另一边的改动。</p>
+        </div>
+        <div class="storage-banner-actions">
+          <button class="btn btn-primary btn-sm" id="syncReloadBtn" type="button">刷新同步</button>
+          <button class="icon-btn storage-banner-close" id="syncDismissBtn" type="button" aria-label="暂不刷新">×</button>
         </div>
       </div>
     </div>
@@ -323,7 +337,7 @@
                   <span class="side-kicker">DRAFT BOARD</span>
                   <h3>草稿板</h3>
                 </div>
-                <span class="save-status save-status-draft" id="draftSaveStatus" role="status" aria-live="polite">已保存</span>
+                <span class="save-status save-status-draft" id="draftSaveStatus" role="status" aria-live="off">已保存</span>
                 <button class="draft-toggle" id="draftToggleBtn" type="button" aria-expanded="true" aria-controls="draftBody" title="收起草稿板" aria-label="收起草稿板">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
@@ -625,6 +639,8 @@
           <p class="field-hint">所有配置、课堂与档案只保存在当前浏览器，不会上传服务器；无痕模式或清理浏览器缓存会丢失全部本地数据，请定期导出 JSON 备份。</p>
           <div class="data-actions">
             <button class="btn btn-outline btn-sm" id="exportDataBtn" type="button">导出全部 JSON</button>
+            <button class="btn btn-outline btn-sm" id="importDataBtn" type="button">导入备份 JSON</button>
+            <input class="sr-only" id="importDataFile" type="file" accept="application/json,.json" aria-label="选择备份 JSON 文件">
             <button class="btn btn-danger-ghost btn-sm" id="clearArchiveDataBtn" type="button">清空学习档案</button>
           </div>
           <div class="storage-panel" id="storagePanel">
@@ -638,7 +654,7 @@
             <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
             <p class="storage-hint" id="storageHint" hidden></p>
           </div>
-          <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。</p>
+          <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。导入时按记录 ID 合并到现有档案，不会覆盖本机的 API Key。</p>
         </fieldset>
 
         <details class="advanced">
@@ -1208,6 +1224,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./assets/app.cfba1a7ac1.js"></script>
+  <script type="module" src="./assets/app.WRRKBQBE.js"></script>
 </body>
 </html>

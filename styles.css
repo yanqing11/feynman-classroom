@@ -45,7 +45,7 @@
   --ink: #e9efe9;
   --ink-soft: #c3cdc5;
   --muted: #93a098;
-  --faint: #7b8880;
+  --faint: #85938b;
   --line: #2c3833;
   --line-strong: #3d4b44;
   --green: #67bda1;
@@ -8757,3 +8757,38 @@ body.keyboard-open .chat-body {
   }
 }
 
+
+/* 中文最小字号：装饰性英文 kicker 可以保持紧凑，中文标签与说明至少 12px。 */
+.side-kicker,
+.quick-tag-label,
+.home-persona-label,
+.home-meta-field > span,
+.chat-kicker,
+.chat-problem-label,
+.compare-kicker,
+.verdict-label,
+.report-stamp,
+.score-ring-inner small,
+.session-stats small,
+.range-labels,
+.home-source-note,
+.composer-counter,
+.send-hint,
+.tiny-note,
+.save-status,
+.save-status-draft,
+.storage-badge,
+.report-disclaimer,
+.draft-hint,
+.eyebrow.home-eyebrow,
+.topbar-tagline,
+.home-subject-hint,
+.home-teacher-hint,
+.home-persona-hint,
+.home-card .image-hint,
+.home-card .privacy-note,
+.history-entry-text small,
+.footer span,
+.quick-tag {
+  font-size: 12px;
+}

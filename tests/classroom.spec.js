@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 
 const SSE_HEADERS = {
@@ -109,6 +110,15 @@ test('完整课堂：讲课 → 标记卡点 → 诊断报告 → 档案复习�
   await expect(page.locator('#metricGrid .metric-card')).toHaveCount(3);
   await expect(page.locator('#exportReportImageBtn')).toBeVisible();
 
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportReportImageBtn').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.png$/);
+  const png = fs.readFileSync(await download.path());
+  expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(png.readUInt32BE(16)).toBe(1080);
+  expect(png.readUInt32BE(20)).toBeGreaterThan(1080);
+
   await page.locator('#restartFromReportBtn').click();
   await expect(page.locator('#homeScreen')).toBeVisible();
 
@@ -151,4 +161,137 @@ test('PWA 清单与图标可访问', async ({ page, request }) => {
     expect(response.headers()['content-type']).toContain('image/png');
   }
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', './manifest.json');
+  expect(data.shortcuts?.length).toBeGreaterThan(0);
+  for (const shortcut of data.shortcuts || []) {
+    const response = await request.get(shortcut.url.replace('./', '/').split('?')[0]);
+    expect(response.ok()).toBeTruthy();
+  }
+  for (const screenshot of data.screenshots || []) {
+    const response = await request.get(screenshot.src.replace('./', '/'));
+    expect(response.ok()).toBeTruthy();
+  }
+});
+
+test('PWA 真正离线：清掉 HTTP 缓存后仍能加载打包资源', async ({ page, context }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    return true;
+  });
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        for (const name of await caches.keys()) {
+          const keys = await (await caches.open(name)).keys();
+          if (keys.some((request) => /\/assets\/app\.[A-Z0-9]+\.js$/.test(request.url))) return true;
+        }
+        return false;
+      })
+    )
+    .toBe(true);
+
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Network.clearBrowserCache');
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  await expect(page.locator('#startBtn')).toBeVisible();
+  const styled = await page.locator('.home-screen').evaluate(
+    (node) => getComputedStyle(node).maxWidth !== 'none'
+  );
+  expect(styled).toBeTruthy();
+});
+
+test('深色主题次要文字对比度不低于 4.5:1', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.setItem('feynman.settings.v1', JSON.stringify({ theme: 'dark' }));
+  });
+  await page.reload();
+
+  const result = await page.evaluate(() => {
+    const styles = getComputedStyle(document.documentElement);
+    const luminance = (hex) => {
+      const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      return channels
+        .map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    };
+    const faint = styles.getPropertyValue('--faint').trim();
+    const card = styles.getPropertyValue('--card').trim();
+    const [high, low] = [luminance(faint), luminance(card)].sort((a, b) => b - a);
+    return { faint, card, ratio: (high + 0.05) / (low + 0.05) };
+  });
+  expect(result.ratio).toBeGreaterThanOrEqual(4.5);
+});
+
+test('可见中文文本不小于 12px', async ({ page }) => {
+  const small = await page.evaluate(() => {
+    const found = [];
+    for (const node of document.querySelectorAll('body *')) {
+      if (!node.getClientRects().length) continue;
+      const own = [...node.childNodes]
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent.trim())
+        .join(' ');
+      if (!/[\u4e00-\u9fff]/.test(own)) continue;
+      const size = parseFloat(getComputedStyle(node).fontSize);
+      if (size < 12) found.push({ text: own.slice(0, 32), size });
+    }
+    return found;
+  });
+  expect(small).toEqual([]);
+});
+
+test('备份 JSON 可以导入并合并学习档案', async ({ page }) => {
+  const backup = {
+    app: 'Feynman Classroom',
+    schema: 1,
+    exportedAt: new Date().toISOString(),
+    settings: { theme: 'light', model: 'backup-model' },
+    practice: { subject: 'primary', difficulty: 'basic' },
+    history: [
+      {
+        id: 'restored-record',
+        topic: '分数除法恢复测试',
+        subject: 'primary',
+        difficulty: 'basic',
+        tags: ['分数除法'],
+        source: 'custom',
+        endedAt: new Date().toISOString(),
+        turns: 1,
+        questions: 1,
+        report: null,
+        stuckPoints: [{ turn: 1, at: new Date().toISOString() }],
+        messages: [{ role: 'user', content: '我把分数平均分成三份。' }]
+      }
+    ],
+    questions: []
+  };
+
+  await page.locator('#settingsBtn').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#importDataFile').setInputFiles({
+    name: 'backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+
+  await expect(page.locator('#settingsStatus')).toContainText('导入完成');
+  await expect(page.locator('#settingsStatus')).toContainText('档案新增 1 条');
+  const stored = await page.evaluate(() => ({
+    history: JSON.parse(localStorage.getItem('feynman.history.v1') || '[]'),
+    settings: JSON.parse(localStorage.getItem('feynman.settings.v1') || '{}')
+  }));
+  expect(stored.history).toHaveLength(1);
+  expect(stored.history[0].topic).toBe('分数除法恢复测试');
+  expect(stored.settings.model).toBe('backup-model');
+});
+
+test('PWA 快捷方式直达开课与学习档案', async ({ page }) => {
+  await page.goto('/?history=1');
+  await expect(page.locator('#historyModal')).toBeVisible();
+  await page.locator('#historyModal button.modal-close').click();
+
+  await page.goto('/?start=1');
+  await expect(page.locator('#topicInput')).toBeFocused();
 });

@@ -30,16 +30,18 @@ import {
   ClassroomStore,
   STATUS,
   clearSettings,
+  loadPractice,
   loadSettings,
-  maskKey
+  maskKey,
+  savePractice,
+  saveSettings
 } from './js/store.js';
-import { SpeechInput } from './js/speech.js';
-import { HandwritingPad } from './js/canvas.js';
 import {
   archiveSession,
   clearHistory,
   deleteRecord,
   deleteRecords,
+  importRecords,
   loadHistory,
   reportToText,
   summarizeActivity,
@@ -364,6 +366,8 @@ const refs = {
   lockSubjectToggle: $('#lockSubjectToggle'),
   themeSwitch: $('#themeSwitch'),
   exportDataBtn: $('#exportDataBtn'),
+  importDataBtn: $('#importDataBtn'),
+  importDataFile: $('#importDataFile'),
   clearArchiveDataBtn: $('#clearArchiveDataBtn'),
   storageUsage: $('#storageUsage'),
   storagePanel: $('#storagePanel'),
@@ -378,6 +382,10 @@ const refs = {
   storageBannerExport: $('#storageBannerExport'),
   storageBannerManage: $('#storageBannerManage'),
   storageBannerClose: $('#storageBannerClose'),
+  syncBanner: $('#syncBanner'),
+  syncBannerText: $('#syncBannerText'),
+  syncReloadBtn: $('#syncReloadBtn'),
+  syncDismissBtn: $('#syncDismissBtn'),
   replayOnboardingBtn: $('#replayOnboardingBtn'),
   onboardingModal: $('#onboardingModal'),
   onboardingDots: $('#onboardingDots'),
@@ -567,7 +575,6 @@ function init() {
   populateModelPresets();
   populatePracticeControls();
   fillSettingsForm();
-  setupSpeech();
   bindEvents();
   setupComposerObserver();
   setupKeyboardInset();
@@ -590,6 +597,7 @@ function init() {
 
   renderConnection();
   store.subscribe(onStoreChange);
+  handleShortcut();
   maybeOnboard();
   setTimeout(() => checkStoragePressure(), 1000);
 }
@@ -1163,6 +1171,44 @@ function maybeOnboard() {
     if (activeModalId || store.session) return;
     openOnboarding();
   }, 700);
+}
+
+const CROSS_TAB_LABELS = {
+  [APP.storage.session]: '当前课堂',
+  [APP.storage.history]: '学习档案',
+  [APP.storage.settings]: '连接设置',
+  [APP.storage.practice]: '课堂设置'
+};
+
+/** 另一个标签页改动了共享的本机数据时给出提示，避免两边静默互相覆盖。 */
+function handleCrossTabStorage(event) {
+  const key = event.key || '';
+  const label = CROSS_TAB_LABELS[key];
+  if (!label || !refs.syncBanner) return;
+  refs.syncBanner.hidden = false;
+  if (refs.syncBannerText) {
+    refs.syncBannerText.textContent =
+      key === APP.storage.session
+        ? '另一个标签页修改了当前课堂。刷新后才能看到最新内容；继续保存可能覆盖另一边的改动。'
+        : `另一个标签页更新了${label}。刷新后才能看到最新内容；继续保存可能覆盖另一边的改动。`;
+  }
+}
+
+/** PWA 快捷方式：?start=1 定位题目输入，?history=1 直接打开学习档案。 */
+function handleShortcut() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('start') && !params.has('history')) return;
+  markOnboardingSeen();
+  history.replaceState(null, '', location.pathname);
+
+  requestAnimationFrame(() => {
+    if (params.has('history')) {
+      openHistory();
+      return;
+    }
+    showScreen('home');
+    refs.topicInput?.focus({ preventScroll: true });
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2912,46 +2958,7 @@ async function copyText(text) {
   }
 }
 
-/* --- 报告长图导出 ---------------------------------------------------------- */
-
-const REPORT_IMAGE_FONT =
-  '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif';
-
-function wrapCanvasText(ctx, text, maxWidth, limit = 0) {
-  const source = String(text || '').replace(/\r/g, '');
-  const lines = [];
-  for (const paragraph of source.split('\n')) {
-    if (!paragraph.trim()) {
-      if (lines.length) lines.push('');
-      continue;
-    }
-    let line = '';
-    for (const char of paragraph) {
-      const next = line + char;
-      if (ctx.measureText(next).width > maxWidth && line) {
-        lines.push(line.trimEnd());
-        line = char.trimStart();
-        if (limit && lines.length >= limit) return lines;
-      } else {
-        line = next;
-      }
-    }
-    if (line.trim()) lines.push(line.trimEnd());
-    if (limit && lines.length >= limit) return lines.slice(0, limit);
-  }
-  return limit ? lines.slice(0, limit) : lines;
-}
-
-function roundRectPath(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
-}
+/* --- 报告长图导出（渲染器按需加载，不拖慢首屏）---------------------------- */
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -2972,199 +2979,10 @@ async function exportReportImage() {
   if (!refs.exportReportImageBtn) return;
   refs.exportReportImageBtn.disabled = true;
   try {
-    const report = currentReport;
-    const topic = currentReportTopic || store.session?.topic || '学习诊断报告';
-    const meta = currentReportMeta || '';
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas');
-
-    const W = 1080;
-    const M = 68;
-    const contentWidth = W - M * 2;
-    ctx.font = `600 38px ${REPORT_IMAGE_FONT}`;
-    const topicLines = wrapCanvasText(ctx, topic, contentWidth, 3);
-    ctx.font = `400 23px ${REPORT_IMAGE_FONT}`;
-    const verdictLines = wrapCanvasText(ctx, report.verdict || '', contentWidth, 8);
-    const gaps = (report.misconceptions || []).slice(0, 2);
-    ctx.font = `600 24px ${REPORT_IMAGE_FONT}`;
-    const gapTitleLines = gaps.map((gap) =>
-      wrapCanvasText(ctx, `${gap.title || '理解缺口'}`, contentWidth - 52, 2)
-    );
-    ctx.font = `400 21px ${REPORT_IMAGE_FONT}`;
-    const gapFixLines = gaps.map((gap) =>
-      wrapCanvasText(ctx, gap.fix || gap.why || '', contentWidth - 52, 3)
-    );
-
-    const topicBlock = 40 + topicLines.length * 48;
-    const metricBlock = 3 * 74 + 18;
-    const verdictBlock = 44 + verdictLines.length * 36 + 18;
-    let gapsBlock = 0;
-    gaps.forEach((gap, index) => {
-      gapsBlock += 40 + gapTitleLines[index].length * 32 + gapFixLines[index].length * 30 + 22;
-    });
-    const H = 178 + topicBlock + 38 + Math.max(190, metricBlock) + verdictBlock + (gaps.length ? gapsBlock + 26 : 0) + 168;
-
-    canvas.width = W;
-    canvas.height = H;
-
-    // Background
-    ctx.fillStyle = '#f6f2e9';
-    ctx.fillRect(0, 0, W, H);
-
-    // Top band
-    ctx.fillStyle = '#1f6f5c';
-    roundRectPath(ctx, 0, 0, W, 150, 0);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 253, 248, 0.9)';
-    ctx.font = `700 27px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('费曼小课堂', M, 66);
-    ctx.fillStyle = 'rgba(255, 253, 248, 0.62)';
-    ctx.font = `600 15px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('FEYNMAN CLASSROOM · LEARNING DIAGNOSIS', M, 96);
-    const dateText = new Intl.DateTimeFormat('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }).format(new Date());
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255, 253, 248, 0.82)';
-    ctx.font = `500 18px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText(dateText, W - M, 74);
-    ctx.textAlign = 'left';
-
-    let y = 208;
-
-    // Topic
-    ctx.fillStyle = '#4f5c55';
-    ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('本次课题', M, y);
-    y += 34;
-    ctx.fillStyle = '#1f2a2a';
-    ctx.font = `600 38px ${REPORT_IMAGE_FONT}`;
-    for (const line of topicLines) {
-      ctx.fillText(line, M, y);
-      y += 48;
-    }
-    if (meta) {
-      ctx.fillStyle = '#5c6861';
-      ctx.font = `400 19px ${REPORT_IMAGE_FONT}`;
-      ctx.fillText(meta, M, y + 2);
-      y += 34;
-    }
-
-    y += 22;
-
-    // Score card
-    const scoreTop = y;
-    const scoreHeight = Math.max(190, metricBlock);
-    ctx.fillStyle = '#fffdf8';
-    roundRectPath(ctx, M, scoreTop, contentWidth, scoreHeight, 22);
-    ctx.fill();
-    ctx.strokeStyle = '#ded6c6';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    const overall = Number(report.overallScore);
-    const scoreText = Number.isFinite(overall) ? `${Math.round(overall)}` : '—';
-    ctx.fillStyle = '#1f6f5c';
-    ctx.font = `700 104px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText(scoreText, M + 44, scoreTop + 118);
-    const scoreWidth = ctx.measureText(scoreText).width;
-    ctx.fillStyle = '#5c6861';
-    ctx.font = `700 26px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('%', M + 44 + scoreWidth + 6, scoreTop + 118);
-    ctx.fillStyle = '#4f5c55';
-    ctx.font = `600 18px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('综合评分', M + 44, scoreTop + 152);
-
-    const barLeft = M + 330;
-    const barWidth = contentWidth - 330 - 46;
-    METRICS.forEach((metric, index) => {
-      const rowY = scoreTop + 44 + index * 54;
-      const value = Number(report.scores?.[metric.key]);
-      ctx.fillStyle = '#45524f';
-      ctx.font = `600 19px ${REPORT_IMAGE_FONT}`;
-      ctx.fillText(metric.label, barLeft, rowY);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#1f6f5c';
-      ctx.font = `700 19px ${REPORT_IMAGE_FONT}`;
-      ctx.fillText(Number.isFinite(value) ? `${Math.round(value)}%` : '—', barLeft + barWidth, rowY);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#efe9dc';
-      roundRectPath(ctx, barLeft, rowY + 12, barWidth, 8, 4);
-      ctx.fill();
-      if (Number.isFinite(value)) {
-        ctx.fillStyle = '#1f6f5c';
-        roundRectPath(ctx, barLeft, rowY + 12, Math.max(8, (barWidth * Math.min(100, Math.max(0, value))) / 100), 8, 4);
-        ctx.fill();
-      }
-    });
-
-    y = scoreTop + scoreHeight + 48;
-
-    // Verdict
-    ctx.fillStyle = '#4f5c55';
-    ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('老师总评', M, y);
-    y += 30;
-    ctx.fillStyle = '#1f2a2a';
-    ctx.font = `400 23px ${REPORT_IMAGE_FONT}`;
-    for (const line of verdictLines) {
-      ctx.fillText(line, M, y);
-      y += 36;
-    }
-
-    y += 20;
-
-    // Misconceptions
-    if (gaps.length) {
-      ctx.fillStyle = '#4f5c55';
-      ctx.font = `700 15px ${REPORT_IMAGE_FONT}`;
-      ctx.fillText('关键理解缺口', M, y);
-      y += 30;
-      gaps.forEach((gap, index) => {
-        const top = y;
-        const titleLines = gapTitleLines[index];
-        const fixLines = gapFixLines[index];
-        const boxHeight = 16 + titleLines.length * 32 + fixLines.length * 30 + 12;
-        ctx.fillStyle = '#fbf7ee';
-        roundRectPath(ctx, M, top, contentWidth, boxHeight, 16);
-        ctx.fill();
-        ctx.fillStyle = '#c15b3f';
-        ctx.font = `700 18px ${REPORT_IMAGE_FONT}`;
-        ctx.fillText(String(index + 1).padStart(2, '0'), M + 18, top + 32);
-        ctx.fillStyle = '#1f2a2a';
-        ctx.font = `600 24px ${REPORT_IMAGE_FONT}`;
-        let lineY = top + 34;
-        for (const line of titleLines) {
-          ctx.fillText(line, M + 52, lineY);
-          lineY += 32;
-        }
-        ctx.fillStyle = '#45524f';
-        ctx.font = `400 21px ${REPORT_IMAGE_FONT}`;
-        for (const line of fixLines) {
-          ctx.fillText(line, M + 52, lineY);
-          lineY += 30;
-        }
-        y = top + boxHeight + 18;
-      });
-    }
-
-    // Footer
-    y = H - 92;
-    ctx.fillStyle = '#ded6c6';
-    ctx.fillRect(M, y - 26, contentWidth, 1);
-    ctx.fillStyle = '#5c6861';
-    ctx.font = `600 17px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('费曼小课堂 · 输出，是最好的输入。', M, y + 6);
-    ctx.textAlign = 'right';
-    ctx.font = `400 15px ${REPORT_IMAGE_FONT}`;
-    ctx.fillText('AI 生成，仅用于学习诊断', W - M, y + 6);
-    ctx.textAlign = 'left';
-
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((result) => (result ? resolve(result) : reject(new Error('blob'))), 'image/png');
+    const { renderReportImage } = await import('./js/report-image.js');
+    const blob = await renderReportImage(currentReport, {
+      topic: currentReportTopic || store.session?.topic || '学习诊断报告',
+      meta: currentReportMeta || ''
     });
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
     downloadBlob(blob, `feynman-report-${stamp}.png`);
@@ -3622,6 +3440,95 @@ async function handleExportData() {
   }
 }
 
+async function handleImportData() {
+  const input = refs.importDataFile;
+  if (!input) return;
+  if (!input.files?.length) {
+    input.click();
+    return;
+  }
+
+  const file = input.files[0];
+  if (file.size > 8 * 1024 * 1024) {
+    showSettingsStatus('备份文件超过 8 MB，请先拆分再导入。', 'error');
+    toast('备份文件太大了。', 'error', 4200);
+    input.value = '';
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(await file.text());
+    if (payload?.app !== 'Feynman Classroom' || payload?.schema !== 1) {
+      throw new Error('不是本应用导出的备份文件。');
+    }
+    const recordCount = Array.isArray(payload.history) ? payload.history.length : 0;
+    const questionCount = Array.isArray(payload.questions) ? payload.questions.length : 0;
+    if (
+      !window.confirm(
+        `导入这份备份？\n学习档案 ${recordCount} 条、题库 ${questionCount} 道，将按记录 ID 合并到当前数据。` +
+          '相同 ID 的记录以备份为准；当前 API Key 不会被覆盖。'
+      )
+    ) {
+      input.value = '';
+      return;
+    }
+
+    refs.importDataBtn.disabled = true;
+    refs.importDataBtn.textContent = '正在导入…';
+    showSettingsStatus('正在恢复备份…', 'busy');
+
+    const currentSettings = loadSettings();
+    if (payload.settings && typeof payload.settings === 'object') {
+      saveSettings({
+        ...currentSettings,
+        ...payload.settings,
+        apiKey: currentSettings.apiKey,
+        sessionOnlyKey: currentSettings.sessionOnlyKey
+      });
+      store.settings = loadSettings();
+      store.emit();
+      applyTheme(store.settings.theme);
+      renderThemeSwitch();
+      renderConnection();
+      fillSettingsForm();
+    }
+
+    if (payload.practice && typeof payload.practice === 'object') {
+      store.practice = savePractice(payload.practice);
+      renderPracticeUI();
+    }
+
+    let restoredSession = false;
+    if (!store.session && payload.session) {
+      restoredSession = store.importSession(payload.session);
+    }
+
+    const archive = importRecords(payload.history);
+    let questions = null;
+    if (Array.isArray(payload.questions)) {
+      questions = await importQuestions(payload.questions);
+    }
+
+    renderHistoryEntry();
+    renderHistory();
+    updateStorageUsage();
+
+    const parts = [`档案新增 ${archive.added} 条、覆盖 ${archive.updated} 条`];
+    if (questions) parts.push(`题库新增 ${questions.added} 道`);
+    if (payload.session && !restoredSession) parts.push('当前有课堂，未导入备份中的会话');
+    if (restoredSession) parts.push('已恢复上次课堂，刷新后继续');
+    showSettingsStatus(`导入完成：${parts.join('；')}。`, 'ok');
+    toast('备份已导入。', 'success', 3600);
+  } catch (error) {
+    showSettingsStatus(error.message || '导入失败，请检查备份文件。', 'error');
+    toast('导入失败，请检查备份文件。', 'error', 4200);
+  } finally {
+    refs.importDataBtn.disabled = false;
+    refs.importDataBtn.textContent = '导入备份 JSON';
+    input.value = '';
+  }
+}
+
 function handleClearArchiveData() {
   const records = loadHistory();
   if (!records.length) {
@@ -3897,62 +3804,84 @@ function renderPendingImages() {
   });
 }
 
-function setupSpeech() {
-  speech = new SpeechInput({
-    lang: 'zh-CN',
-    onFinal: (text) => {
-      speechBase = `${speechBase}${text}`;
-      refs.messageInput.value = speechBase;
-      autoGrowMessage();
-    },
-    onInterim: (text) => {
-      refs.messageInput.value = `${speechBase}${text}`;
-      autoGrowMessage();
-    },
-    onStateChange: (listening) => {
-      refs.micBtn.classList.toggle('is-listening', listening);
-      refs.micBtn.setAttribute('aria-pressed', String(listening));
-      refs.micLabel.textContent = listening ? '聆听中' : '语音';
-      if (listening) {
-        speechBase = refs.messageInput.value;
-      }
-      if (!listening) {
-        refs.messageInput.value = speechBase.trim();
-        autoGrowMessage();
-      }
-    },
-    onError: (message) => {
-      toast(message, 'error');
-      refs.micBtn.classList.remove('is-listening');
-      refs.micLabel.textContent = '语音';
-    }
-  });
+let speechLoading = null;
+
+/** 语音模块按需加载：首次点击麦克风才下载 js/speech.js。 */
+async function ensureSpeech() {
+  if (speech) return speech;
+  if (!speechLoading) {
+    speechLoading = import('./js/speech.js')
+      .then(({ SpeechInput }) => {
+        speech = new SpeechInput({
+          lang: 'zh-CN',
+          onFinal: (text) => {
+            speechBase = `${speechBase}${text}`;
+            refs.messageInput.value = speechBase;
+            autoGrowMessage();
+          },
+          onInterim: (text) => {
+            refs.messageInput.value = `${speechBase}${text}`;
+            autoGrowMessage();
+          },
+          onStateChange: (listening) => {
+            refs.micBtn.classList.toggle('is-listening', listening);
+            refs.micBtn.setAttribute('aria-pressed', String(listening));
+            refs.micLabel.textContent = listening ? '聆听中' : '语音';
+            if (listening) {
+              speechBase = refs.messageInput.value;
+            }
+            if (!listening) {
+              refs.messageInput.value = speechBase.trim();
+              autoGrowMessage();
+            }
+          },
+          onError: (message) => {
+            toast(message, 'error');
+            refs.micBtn.classList.remove('is-listening');
+            refs.micLabel.textContent = '语音';
+          }
+        });
+        return speech;
+      })
+      .finally(() => {
+        speechLoading = null;
+      });
+  }
+  return speechLoading;
 }
 
-function handleMic() {
-  if (!speech) return;
+async function handleMic() {
   if (!isConfigured(store.settings)) {
     ensureKey();
     return;
   }
-  if (speech.listening) {
-    speech.stop();
-  } else {
-    speechBase = refs.messageInput.value;
-    speech.start();
+  try {
+    const instance = await ensureSpeech();
+    if (instance.listening) {
+      instance.stop();
+    } else {
+      speechBase = refs.messageInput.value;
+      instance.start();
+    }
+  } catch {
+    toast('语音功能加载失败，请稍后再试。', 'error');
   }
 }
 
-function openHandwriting() {
+async function openHandwriting() {
   openModal('handwritingModal');
   // The modal is already visible, so the canvas has a measurable layout.
-  // Initialize synchronously instead of relying on requestAnimationFrame,
-  // which is paused in background tabs.
   if (!pad) {
-    pad = new HandwritingPad(refs.handwritingCanvas, {
-      placeholder: refs.padPlaceholder,
-      onChange: () => {}
-    });
+    try {
+      const { HandwritingPad } = await import('./js/canvas.js');
+      pad = new HandwritingPad(refs.handwritingCanvas, {
+        placeholder: refs.padPlaceholder,
+        onChange: () => {}
+      });
+    } catch {
+      toast('手写板加载失败，请稍后再试。', 'error');
+      return;
+    }
   }
   pad.resize();
   pad.updatePlaceholder();
@@ -6131,6 +6060,8 @@ function bindEvents() {
   });
   refs.themeSwitch?.addEventListener('keydown', handleThemeKeydown);
   refs.exportDataBtn?.addEventListener('click', handleExportData);
+  refs.importDataBtn?.addEventListener('click', handleImportData);
+  refs.importDataFile?.addEventListener('change', handleImportData);
   refs.clearArchiveDataBtn?.addEventListener('click', handleClearArchiveData);
   refs.studentPersonaSelect?.addEventListener('change', () => {
     store.updatePractice({ persona: refs.studentPersonaSelect.value });
@@ -6249,6 +6180,12 @@ function bindEvents() {
   window.addEventListener('online', () => {
     connectionIssue = false;
     renderConnection();
+  });
+
+  window.addEventListener('storage', handleCrossTabStorage);
+  refs.syncReloadBtn?.addEventListener('click', () => location.reload());
+  refs.syncDismissBtn?.addEventListener('click', () => {
+    if (refs.syncBanner) refs.syncBanner.hidden = true;
   });
 
   window.addEventListener('resize', () => {

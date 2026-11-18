@@ -11,6 +11,38 @@
   "background_color": "#f6f2e9",
   "theme_color": "#1f6f5c",
   "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "开始讲课",
+      "short_name": "开课",
+      "description": "直接打开题目输入框，开始一次新的讲解。",
+      "url": "./?start=1",
+      "icons": [{ "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "学习档案",
+      "short_name": "档案",
+      "description": "查看以往课程与诊断报告。",
+      "url": "./?history=1",
+      "icons": [{ "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./assets/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "首页：讲解主题与课堂设置"
+    },
+    {
+      "src": "./assets/screenshot-narrow.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "手机端首页与固定开始按钮"
+    }
+  ],
   "icons": [
     {
       "src": "./assets/icon-192.png",
