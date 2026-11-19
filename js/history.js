@@ -14,10 +14,30 @@ import {
   sourceInfo,
   subjectInfo
 } from './config.js';
+import { dbClear, dbDelete, dbGetAll, dbPutMany } from './db.js';
 
 const MAX_RECORDS = 60;
 const MAX_MESSAGE_CHARS = 8000;
 const MAX_STORAGE_CHARS = 1_800_000;
+
+// 同步读取仍来自内存缓存；IndexedDB 只在写入和水合时访问。
+let historyCache = null;
+
+function normalizeRecords(value) {
+  return (Array.isArray(value) ? value : [])
+    .filter((record) => record && typeof record.topic === 'string' && record.topic.trim())
+    .sort((a, b) => String(b.endedAt || '').localeCompare(String(a.endedAt || '')));
+}
+
+function readHistory() {
+  if (historyCache) return historyCache;
+  historyCache = normalizeRecords(safeParse(localStorage.getItem(APP.storage.history)));
+  return historyCache;
+}
+
+function snapshotHistory() {
+  return readHistory().map((record) => ({ ...record }));
+}
 
 function safeParse(value) {
   try {
@@ -126,15 +146,32 @@ function sanitizeReport(report) {
 }
 
 export function loadHistory() {
-  const stored = safeParse(localStorage.getItem(APP.storage.history));
-  if (!Array.isArray(stored)) return [];
-  return stored
-    .filter((record) => record && typeof record.topic === 'string' && record.topic.trim())
-    .sort((a, b) => String(b.endedAt || '').localeCompare(String(a.endedAt || '')));
+  return snapshotHistory();
+}
+
+/** 让数据库里的档案与当前 localStorage 快照保持一致（异步，不阻断课堂）。 */
+async function mirrorHistory(records) {
+  try {
+    const stored = await dbGetAll('history');
+    const ids = new Set(records.map((record) => record.id));
+    for (const item of stored) {
+      if (!ids.has(item.id)) await dbDelete('history', item.id);
+    }
+    await dbPutMany('history', records);
+  } catch {
+    /* 数据库不可用时 localStorage 仍是完整档案。 */
+  }
+}
+
+/** 数据库写入成功后更新同步缓存，避免调用方读到旧快照。 */
+function commitHistory(records) {
+  historyCache = records;
+  void mirrorHistory(records);
+  return snapshotHistory();
 }
 
 function persist(records) {
-  let list = records.slice(0, MAX_RECORDS);
+  let list = normalizeRecords(records).slice(0, MAX_RECORDS);
 
   const tryStore = (payload) => {
     try {
@@ -147,20 +184,47 @@ function persist(records) {
     }
   };
 
-  if (tryStore(list)) return list;
+  if (tryStore(list)) return commitHistory(list);
 
   // 空间不够时先丢最早的对话原文，只留下报告和统计。
   notifyStorageIssue('warn', '学习档案体积或本机空间不足，已自动省略较早的对话原文，只保留报告和统计。');
   list = list.map((record) => ({ ...record, messages: [] }));
-  if (tryStore(list)) return list;
+  if (tryStore(list)) return commitHistory(list);
 
   // 还不够就只保留最近 20 课。
   notifyStorageIssue('critical', '学习档案空间不足，只保留了最近 20 课。请先导出备份，再清理旧档案。');
   list = list.slice(0, 20);
-  if (tryStore(list)) return list;
+  if (tryStore(list)) return commitHistory(list);
 
   notifyStorageIssue('critical', '学习档案无法保存到本机。请先导出备份并清理旧档案，避免新记录继续丢失。');
-  return loadHistory();
+  return snapshotHistory();
+}
+
+/**
+ * 从数据库补齐档案：localStorage 被清理但数据库仍在时，已有档案不会丢失。
+ * 应用启动时调用一次；同步调用方无需改动。
+ */
+export async function hydrateHistory() {
+  readHistory();
+  const stored = await dbGetAll('history');
+  if (!stored.length) return snapshotHistory();
+
+  const byId = new Map(readHistory().map((record) => [record.id, record]));
+  let added = 0;
+  for (const record of stored) {
+    if (!record || typeof record.id !== 'string' || !record.id) continue;
+    if (!byId.has(record.id)) {
+      byId.set(record.id, record);
+      added += 1;
+    }
+  }
+  if (!added) return snapshotHistory();
+  return persist([...byId.values()]);
+}
+
+/** 其他标签页改了 localStorage 后丢弃旧缓存。 */
+export function refreshHistoryFromStorage() {
+  historyCache = null;
 }
 
 /**
@@ -220,11 +284,13 @@ export function deleteRecords(ids) {
 }
 
 export function clearHistory() {
+  historyCache = [];
   try {
     localStorage.removeItem(APP.storage.history);
   } catch {
     /* Ignore. */
   }
+  void dbClear('history');
 }
 
 /**

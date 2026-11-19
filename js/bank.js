@@ -6,40 +6,14 @@
  */
 
 import { APP, normalizeTags, subjectInfo } from './config.js';
+import { dbDelete, dbGetAll, dbPut } from './db.js';
 
-const DB_NAME = 'feynman-classroom';
-const DB_VERSION = 1;
-const STORE_NAME = 'questions';
 const MAX_QUESTIONS = 300;
-
-let dbPromise = null;
 
 function newId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `q-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB unavailable'));
-      return;
-    }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('updatedAt', 'updatedAt');
-        store.createIndex('subject', 'subject');
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
-  });
-  return dbPromise;
 }
 
 function readFallback() {
@@ -95,34 +69,17 @@ function sortItems(items) {
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
 }
 
-async function idbAll() {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const request = transaction.objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
-  });
+function idbAll() {
+  return dbGetAll('questions', { strict: true });
 }
 
 async function idbPut(item) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put(item);
-    transaction.oncomplete = () => resolve(item);
-    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB write failed'));
-  });
+  await dbPut('questions', item, { strict: true });
+  return item;
 }
 
-async function idbDelete(id) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).delete(id);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB delete failed'));
-  });
+function idbDelete(id) {
+  return dbDelete('questions', id, { strict: true });
 }
 
 export async function listQuestions() {

@@ -295,3 +295,161 @@ test('PWA 快捷方式直达开课与学习档案', async ({ page }) => {
   await page.goto('/?start=1');
   await expect(page.locator('#topicInput')).toBeFocused();
 });
+
+test('本机数据库包含五张对象仓库，并在设置中显示状态', async ({ page }) => {
+  await expect(page.locator('#dbStatus')).toContainText('已就绪', { timeout: 5000 });
+
+  const info = await page.evaluate(async () => {
+    const request = indexedDB.open('feynman-classroom');
+    const db = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return { version: db.version, stores: [...db.objectStoreNames].sort() };
+  });
+  expect(info.version).toBeGreaterThanOrEqual(2);
+  expect(info.stores).toEqual(['drafts', 'history', 'kv', 'questions', 'sessions']);
+
+  await page.locator('#settingsBtn').click();
+  await expect(page.locator('#dbStatus')).toContainText('题库');
+  await page.locator('#dbRefreshBtn').click();
+  await expect(page.locator('#dbStatus')).toContainText('已就绪');
+});
+
+test('首次打开会把旧 localStorage 数据迁移进数据库', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('feynman.onboarding.v1', '1');
+    localStorage.setItem(
+      'feynman.history.v1',
+      JSON.stringify([
+        {
+          id: 'legacy-record',
+          topic: '旧版档案迁移测试',
+          subject: 'primary',
+          endedAt: new Date().toISOString(),
+          turns: 1,
+          questions: 1,
+          messages: [{ role: 'user', content: '旧档案' }]
+        }
+      ])
+    );
+    localStorage.setItem(
+      'feynman.bank.v1',
+      JSON.stringify([
+        {
+          id: 'legacy-question',
+          topic: '旧版题库迁移测试',
+          subject: 'primary',
+          difficulty: 'basic',
+          tags: [],
+          source: 'custom',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ])
+    );
+  });
+
+  try {
+    await page.goto('/');
+    await expect(page.locator('#dbStatus')).toContainText('档案 1 条', { timeout: 5000 });
+    await expect(page.locator('#dbStatus')).toContainText('题库 1 道');
+
+    const counts = await page.evaluate(async () => {
+      const request = indexedDB.open('feynman-classroom');
+      const db = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const all = (store) =>
+        new Promise((resolve, reject) => {
+          const query = db.transaction(store, 'readonly').objectStore(store).getAll();
+          query.onsuccess = () => resolve(query.result || []);
+          query.onerror = () => reject(query.error);
+        });
+      return { history: (await all('history')).length, questions: (await all('questions')).length };
+    });
+    expect(counts.history).toBe(1);
+    expect(counts.questions).toBe(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test('localStorage 中的课堂丢失时可从本机数据库恢复', async ({ page }) => {
+  await page.locator('#topicInput').fill('数据库恢复测试：分数平均分');
+  await page.locator('#startBtn').click();
+  await expect(page.locator('#chatScreen')).toBeVisible();
+
+  const readSessions = () =>
+    page.evaluate(async () => {
+      const request = indexedDB.open('feynman-classroom');
+      const db = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return new Promise((resolve, reject) => {
+        const query = db.transaction('sessions', 'readonly').objectStore('sessions').getAll();
+        query.onsuccess = () => resolve(query.result || []);
+        query.onerror = () => reject(query.error);
+      });
+    });
+
+  await expect.poll(async () => (await readSessions()).length).toBe(1);
+  await page.evaluate(() => localStorage.removeItem('feynman.session.v1'));
+  await page.reload();
+
+  await expect(page.locator('#chatScreen')).toBeVisible();
+  await expect(page.locator('#topbarTopic')).toContainText('数据库恢复测试');
+});
+
+test('档案导入与清空会同步写入本机数据库', async ({ page }) => {
+  const backup = {
+    app: 'Feynman Classroom',
+    schema: 1,
+    exportedAt: new Date().toISOString(),
+    history: [
+      {
+        id: 'db-record',
+        topic: '数据库同步测试',
+        subject: 'primary',
+        endedAt: new Date().toISOString(),
+        turns: 1,
+        questions: 1,
+        messages: [{ role: 'user', content: '把分数平均分成三份。' }]
+      }
+    ]
+  };
+
+  const readHistory = () =>
+    page.evaluate(async () => {
+      const request = indexedDB.open('feynman-classroom');
+      const db = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return new Promise((resolve, reject) => {
+        const query = db.transaction('history', 'readonly').objectStore('history').getAll();
+        query.onsuccess = () => resolve(query.result || []);
+        query.onerror = () => reject(query.error);
+      });
+    });
+
+  await page.locator('#settingsBtn').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#importDataFile').setInputFiles({
+    name: 'db-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#settingsStatus')).toContainText('导入完成');
+  await expect.poll(async () => (await readHistory()).length).toBe(1);
+  expect((await readHistory())[0].topic).toBe('数据库同步测试');
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#clearArchiveDataBtn').click();
+  await expect.poll(async () => (await readHistory()).length).toBe(0);
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem('feynman.history.v1') || '[]'))).toEqual([]);
+});

@@ -10,6 +10,7 @@ import {
   kickoffMessage,
   normalizeTags
 } from './config.js';
+import { dbDelete, dbGetAll, dbPut } from './db.js';
 
 export const STATUS = Object.freeze({
   HOME: 'home',
@@ -120,6 +121,7 @@ export function savePractice(practice) {
   } catch {
     /* Storage may be blocked; the in-memory value is still correct. */
   }
+  void dbPut('kv', { key: 'practice', value: normalized });
   return normalized;
 }
 
@@ -181,20 +183,20 @@ export function saveSettings(settings) {
     accessCode: (settings.accessCode || '').trim(),
     theme: settings.theme === 'dark' ? 'dark' : 'light'
   };
+  const persisted = { ...normalized, apiKey: sessionOnly ? '' : key };
   try {
-    localStorage.setItem(
-      APP.storage.settings,
-      JSON.stringify({ ...normalized, apiKey: sessionOnly ? '' : key })
-    );
+    localStorage.setItem(APP.storage.settings, JSON.stringify(persisted));
   } catch {
     /* Storage may be full or blocked; the in-memory value is still correct. */
   }
+  void dbPut('kv', { key: 'settings', value: persisted });
   writeSessionKey(sessionOnly ? key : '');
   return normalized;
 }
 
 export function clearSettings() {
   localStorage.removeItem(APP.storage.settings);
+  void dbDelete('kv', 'settings');
   writeSessionKey('');
 }
 
@@ -235,8 +237,7 @@ function createSession(topic, topicImage, meta = {}) {
   };
 }
 
-function restoreSession() {
-  const stored = safeParse(localStorage.getItem(APP.storage.session));
+function normalizeSession(stored) {
   if (!stored || typeof stored !== 'object' || !stored.topic || !Array.isArray(stored.messages)) {
     return null;
   }
@@ -275,6 +276,10 @@ function restoreSession() {
   };
 }
 
+function restoreSession() {
+  return normalizeSession(safeParse(localStorage.getItem(APP.storage.session)));
+}
+
 export class ClassroomStore {
   constructor() {
     const session = restoreSession();
@@ -283,6 +288,8 @@ export class ClassroomStore {
     this.busy = false;
     this.listeners = new Set();
     this.persistenceWarning = '';
+    this.dbSessionId = '';
+    this.dbSyncQueue = Promise.resolve();
     this.state = {
       status: session ? STATUS.TEACHING : STATUS.HOME,
       session
@@ -455,9 +462,70 @@ export class ClassroomStore {
     this.emit();
   }
 
+  /** 把当前课堂同步到数据库；多次调用串行执行，避免旧快照覆盖新快照。 */
+  queueDbSessionSync() {
+    this.dbSyncQueue = this.dbSyncQueue
+      .then(() => this.syncDbSession())
+      .catch(() => {
+        /* 数据库不可用时不阻断课堂。 */
+      });
+  }
+
+  async syncDbSession() {
+    const session = this.state.session;
+    const previous = this.dbSessionId;
+    try {
+      if (!session) {
+        if (previous) await dbDelete('sessions', previous);
+        this.dbSessionId = '';
+        return;
+      }
+      if (previous && previous !== session.id) await dbDelete('sessions', previous);
+      if (await dbPut('sessions', session)) this.dbSessionId = session.id;
+    } catch {
+      /* 数据库不可用时 localStorage 已保存当前课堂。 */
+    }
+  }
+
+  /**
+   * localStorage 为空时从数据库恢复上次课堂；同时清理数据库中的旧会话。
+   * 应用启动时调用，不改变同步 API。
+   */
+  async hydrateFromDb() {
+    const sessions = await dbGetAll('sessions');
+    if (this.session) {
+      for (const item of sessions) {
+        if (item?.id && item.id !== this.session.id) await dbDelete('sessions', item.id);
+      }
+      this.queueDbSessionSync();
+      return false;
+    }
+    if (!sessions.length) return false;
+
+    const valid = sessions
+      .filter((item) => item && item.topic && Array.isArray(item.messages))
+      .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    const restored = valid.length ? normalizeSession(valid[0]) : null;
+    if (!restored) return false;
+
+    try {
+      localStorage.setItem(APP.storage.session, JSON.stringify(restored));
+    } catch {
+      /* 数据库里仍有课堂，即使 localStorage 写不进去也能在本标签页继续。 */
+    }
+    this.state.session = restored;
+    this.state.status = STATUS.TEACHING;
+    this.restored = true;
+    this.dbSessionId = restored.id;
+    this.persist();
+    this.emit();
+    return true;
+  }
+
   persist() {
     if (!this.session) {
       localStorage.removeItem(APP.storage.session);
+      this.queueDbSessionSync();
       return;
     }
     try {
@@ -481,6 +549,7 @@ export class ClassroomStore {
         }
       }
     }
+    this.queueDbSessionSync();
   }
 
   /** Restore a session from a backup only when no lesson is currently open. */
@@ -490,6 +559,16 @@ export class ClassroomStore {
     }
     try {
       localStorage.setItem(APP.storage.session, JSON.stringify(session));
+      this.dbSyncQueue = this.dbSyncQueue
+        .then(async () => {
+          if (this.dbSessionId && this.dbSessionId !== session.id) {
+            await dbDelete('sessions', this.dbSessionId);
+          }
+          if (await dbPut('sessions', session)) this.dbSessionId = session.id;
+        })
+        .catch(() => {
+          /* Ignore. */
+        });
       return true;
     } catch {
       return false;
@@ -505,6 +584,7 @@ export class ClassroomStore {
     } catch {
       /* Ignore. */
     }
+    this.queueDbSessionSync();
     this.emit();
   }
 }

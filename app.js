@@ -41,8 +41,10 @@ import {
   clearHistory,
   deleteRecord,
   deleteRecords,
+  hydrateHistory,
   importRecords,
   loadHistory,
+  refreshHistoryFromStorage,
   reportToText,
   summarizeActivity,
   summarizeBySubject,
@@ -50,6 +52,16 @@ import {
   summarizeInteractions,
   summarizeTags
 } from './js/history.js';
+import {
+  DB_NAME,
+  DRAFT_KEY,
+  dbGet,
+  dbPut,
+  getDatabaseStats,
+  isDatabaseAvailable,
+  migrateLocalData,
+  openDatabase
+} from './js/db.js';
 import {
   buildQuestionsExport,
   deleteQuestion,
@@ -371,6 +383,8 @@ const refs = {
   clearArchiveDataBtn: $('#clearArchiveDataBtn'),
   storageUsage: $('#storageUsage'),
   storagePanel: $('#storagePanel'),
+  dbStatus: $('#dbStatus'),
+  dbRefreshBtn: $('#dbRefreshBtn'),
   storageBadge: $('#storageBadge'),
   storageMeter: $('#storageMeter'),
   storageMeterFill: $('#storageMeterFill'),
@@ -569,7 +583,7 @@ const DRAFT_SYMBOLS = {
 
 init();
 
-function init() {
+async function init() {
   applyTheme(store.settings.theme);
   populateExamples();
   populateModelPresets();
@@ -580,6 +594,11 @@ function init() {
   setupKeyboardInset();
   registerServiceWorker();
   loadDraft();
+  store.subscribe(onStoreChange);
+
+  // 先完成数据库迁移与水合，再决定显示首页还是恢复课堂。
+  await bootDatabase();
+
   renderHistoryEntry();
   setHomeSource('custom');
 
@@ -596,10 +615,73 @@ function init() {
   }
 
   renderConnection();
-  store.subscribe(onStoreChange);
   handleShortcut();
   maybeOnboard();
   setTimeout(() => checkStoragePressure(), 1000);
+}
+
+/** 启动数据库：打开 → 迁移旧 localStorage → 水合档案/课堂/草稿 → 显示状态。 */
+async function bootDatabase() {
+  if (!isDatabaseAvailable()) {
+    renderDbStatus({ available: false });
+    return;
+  }
+  try {
+    await openDatabase();
+    await migrateLocalData();
+    await hydrateHistory();
+    await store.hydrateFromDb();
+    await hydrateDraftFromDb();
+    loadDraft();
+    renderHistoryEntry();
+    renderDbStatus(await getDatabaseStats());
+  } catch (error) {
+    console.warn('[Feynman] 本机数据库启动失败', error);
+    renderDbStatus({ available: false });
+  }
+}
+
+function renderDbStatus(stats) {
+  if (!refs.dbStatus) return;
+  if (!stats?.available) {
+    refs.dbStatus.textContent = `本机数据库（${DB_NAME}）不可用；数据仍保存在浏览器本地存储中。`;
+    refs.dbStatus.dataset.level = 'warn';
+    return;
+  }
+  const counts = stats.counts || {};
+  const parts = [
+    `题库 ${counts.questions ?? 0} 道`,
+    `档案 ${counts.history ?? 0} 条`,
+    `课堂 ${counts.sessions ?? 0} 个`,
+    `草稿 ${counts.drafts ?? 0} 份`
+  ];
+  refs.dbStatus.textContent = `已就绪 · v${stats.version} · ${parts.join(' · ')}`;
+  refs.dbStatus.dataset.level = 'ok';
+}
+
+async function refreshDbStatus() {
+  if (!refs.dbRefreshBtn) return;
+  refs.dbRefreshBtn.disabled = true;
+  try {
+    renderDbStatus(await getDatabaseStats());
+  } finally {
+    refs.dbRefreshBtn.disabled = false;
+  }
+}
+
+/** localStorage 里的草稿丢失时，从数据库草稿表恢复（仅同一次课堂）。 */
+async function hydrateDraftFromDb() {
+  const stored = await dbGet('drafts', DRAFT_KEY);
+  const value = stored?.value;
+  if (!value || typeof value !== 'object') return;
+  if (readDraftRecord()?.sessionId === value.sessionId) return;
+  const currentId = store.session?.id || '';
+  if (value.sessionId && value.sessionId !== currentId) return;
+  try {
+    localStorage.setItem(APP.storage.draft, JSON.stringify(value));
+  } catch {
+    /* 数据库里仍有草稿，本标签页可继续使用。 */
+  }
 }
 
 function populateExamples() {
@@ -1184,6 +1266,7 @@ const CROSS_TAB_LABELS = {
 function handleCrossTabStorage(event) {
   const key = event.key || '';
   const label = CROSS_TAB_LABELS[key];
+  if (key === APP.storage.history) refreshHistoryFromStorage();
   if (!label || !refs.syncBanner) return;
   refs.syncBanner.hidden = false;
   if (refs.syncBannerText) {
@@ -1365,6 +1448,7 @@ function saveDraft() {
     saved = false;
     /* Draft is best-effort; never block teaching when storage is full. */
   }
+  void dbPut('drafts', { key: DRAFT_KEY, value: draftState });
   if (refs.draftSaveStatus) {
     refs.draftSaveStatus.classList.remove('is-saving');
     refs.draftSaveStatus.classList.toggle('is-warn', !saved);
@@ -5831,6 +5915,7 @@ function bindEvents() {
 
   refs.storageBannerExport?.addEventListener('click', handleExportData);
   refs.storageBannerManage?.addEventListener('click', openStorageSettings);
+  refs.dbRefreshBtn?.addEventListener('click', () => void refreshDbStatus());
   refs.storageBannerClose?.addEventListener('click', dismissStorageBanner);
   window.addEventListener('feynman:storage-warning', handleStorageWarningEvent);
 

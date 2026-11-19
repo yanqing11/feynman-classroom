@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="费曼小课堂">
-  <link rel="stylesheet" href="./assets/styles.VGVVPJTU.css">
+  <link rel="stylesheet" href="./assets/styles.7S6YS4ZE.css">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -654,7 +654,14 @@
             <p class="storage-usage" id="storageUsage">正在统计本机占用…</p>
             <p class="storage-hint" id="storageHint" hidden></p>
           </div>
-          <p class="field-hint">导出的 JSON 会自动移除 API Key，不会带走你的密钥。导入时按记录 ID 合并到现有档案，不会覆盖本机的 API Key。</p>
+          <div class="storage-panel">
+            <div class="storage-panel-head">
+              <span class="storage-panel-title">本机数据库</span>
+              <button class="btn btn-ghost btn-sm" id="dbRefreshBtn" type="button">刷新状态</button>
+            </div>
+            <p class="storage-usage db-status" id="dbStatus" role="status" aria-live="polite">正在检查本机数据库…</p>
+          </div>
+          <p class="field-hint">题库、学习档案与当前课堂会同步写入本机 IndexedDB 数据库；首次打开时自动迁移旧数据，浏览器本地存储仍保留一份镜像。导出的 JSON 会自动移除 API Key，不会带走你的密钥。</p>
         </fieldset>
 
         <details class="advanced">
@@ -1224,6 +1231,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./assets/app.WRRKBQBE.js"></script>
+  <script type="module" src="./assets/app.YBW2FQKL.js"></script>
 </body>
 </html>

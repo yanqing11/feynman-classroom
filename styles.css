@@ -8270,6 +8270,10 @@ body.is-chat .storage-banner {
   font-weight: 600;
 }
 
+.db-status[data-level="warn"] {
+  color: #9a6b1d;
+}
+
 [data-theme="dark"] .storage-banner {
   border-bottom-color: rgba(196, 150, 58, 0.34);
   background: rgba(196, 150, 58, 0.13);
@@ -8345,6 +8349,10 @@ body.is-chat .storage-banner {
 
 [data-theme="dark"] .storage-panel.is-critical .storage-hint {
   color: var(--coral);
+}
+
+[data-theme="dark"] .db-status[data-level="warn"] {
+  color: #e0bd7a;
 }
 
 @media (max-width: 760px) {

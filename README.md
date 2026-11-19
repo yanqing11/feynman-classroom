@@ -110,14 +110,15 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 学习档案 | 首页入口；记录学科、主题、时间、三维分数，支持展开详情、课堂回放、单条删除与 Markdown 复制；卡点会单独汇总，可一键重讲 |
 | 报告导出 | 报告可复制 Markdown，也可导出 1080px 宽、至少 1200px 高的 PNG 长图，渲染器按需加载；方便发给老师或存档 |
 | 备份与恢复 | 设置里可导出全部 JSON，也可导入备份：档案按记录 ID 合并，题库按题目 ID 合并；导入不会覆盖当前 API Key |
-| 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 存在 `localStorage`，刷新后可直接接着讲；界面会显示最近一次自动保存时间；也可以「放弃本次课堂」，确认后清空且不归档 |
+| 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 同步写入 `localStorage` 与本机数据库，刷新后可直接接着讲；界面会显示最近一次自动保存时间；也可以「放弃本次课堂」，确认后清空且不归档 |
+| 本机数据库 | 浏览器 IndexedDB `feynman-classroom` v2，含 `questions / history / sessions / drafts / kv` 五张表；旧数据首次打开自动迁移，设置里可查看库状态与记录数 |
 | 离线壳 | Service Worker 在安装时预缓存全部 JS/CSS 分包（含语音、手写板、报告渲染器），清掉 HTTP 缓存后断网仍可用；支持桌面图标与「开始讲课 / 学习档案」快捷方式 |
 | 失败重试 | AI 请求失败时保留老师已发送的内容，给出友好提示和「重试」按钮 |
 | 移动端 | 快捷标签自动换行、输入框与按钮全宽 / 加大触控面积 |
 | 图片 | 题目拍照；只传图片也会自动识别成文字题目，再开始讲课 |
 | 手写板 | Pointer Events，支持鼠标 / 触控 / Apple Pencil |
 | 语音输入 | Web Speech API，中文识别，可中途停止 |
-| 题库存储 | 我的题库优先用 IndexedDB，不可用时退回 `localStorage`；图片不离开本机 |
+| 题库存储 | 我的题库写入统一的 IndexedDB 数据库，不可用时退回 `localStorage`；图片不离开本机 |
 | 键盘 | `Ctrl/Cmd+Enter` 发送讲解或开始讲课、`Enter` 换行、`Esc` 关闭弹窗 |
 | 多标签页 | 另一个标签页改动课堂 / 档案 / 设置时显示同步提示，避免两边静默互相覆盖 |
 | 无障碍 | 课中流式输出不逐句播报，结束后统一播报；中文标签与说明字号不低于 12px，深色主题次要文字对比度 ≥ 4.5:1 |
@@ -153,7 +154,8 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   ├── agents.js           # StudentAgent / TeacherAgent、学科上下文与报告归一化
 │   ├── store.js            # 状态机、会话与课堂参数持久化、设置
 │   ├── history.js          # 学习档案、分学科 / 来源 / 知识点统计
-│   ├── bank.js             # 我的题库（IndexedDB + localStorage 回退）
+│   ├── db.js               # 统一本机数据库（IndexedDB v2，五张表 + 一次性迁移）
+│   ├── bank.js             # 我的题库（统一 IndexedDB + localStorage 回退）
 │   ├── speech.js           # Web Speech API 封装（按需加载）
 │   ├── canvas.js           # 手写板（Pointer Events + 压感，按需加载）
 │   └── report-image.js     # 报告 PNG 渲染器（按需加载）
@@ -186,12 +188,13 @@ https://feynman-classroom-proxy.netlify.app/v1
 
 ## 数据与隐私
 
-- 页面本身没有数据库、没有日志、没有分析、没有第三方字体或 CDN。
+- 页面本身没有后端数据库、没有日志、没有分析、没有第三方字体或 CDN；唯一的数据库是浏览器本机 IndexedDB。
 - 默认请求经过课堂共享代理：代理持有模型 Key，只转发对话内容，不落库。
 - 自己填写的 API Key 默认存于 `localStorage`；勾选「仅本次会话保存」后改存 `sessionStorage`，关闭浏览器即清除。都不会写入代码、Git 仓库或部署产物。
-- 当前对话、课堂参数和学习档案仅存于 `localStorage`；结束讲课时当前会话转为学习档案，可随时清空。
-- 导出的 JSON 备份会自动移除 API Key；导入时按记录 ID 合并档案与题库，不会覆盖本机现有 Key。
-- 我的题库优先存于 IndexedDB（不可用时回退 `localStorage`），包括题目图片；所有数据都不会上传到本站服务器。
+- 当前对话、课堂参数和学习档案同时写入 `localStorage` 和本机 IndexedDB 数据库；同步读取仍走内存缓存 / `localStorage`，所以刷新后可以直接接着讲。结束讲课时当前会话转为学习档案，可随时清空（两处一起清）。
+- 本机数据库名 `feynman-classroom`，版本 2，包含 `questions / history / sessions / drafts / kv` 五张表。旧版题库数据与 `localStorage` 档案、会话、草稿首次打开时一次性迁移进数据库，已有记录不会被覆盖。
+- 导出的 JSON 备份会自动移除 API Key；导入时按记录 ID 合并档案与题库，不会覆盖本机现有 Key，导入结果同步写入数据库。
+- 我的题库、学习档案和当前课堂都优先存于 IndexedDB（不可用时回退 `localStorage`），包括题目图片；所有数据都不会上传到本站服务器。
 - 图片在浏览器内压缩后发送给模型服务商；只用于识别题目或回答，不经过本站服务器。
 - 若浏览器存储空间不足，应用会保留文字并丢弃图片，同时在界面提示。
 - 报告由 AI 生成，仅用于学习诊断，不替代真人老师的判断。
