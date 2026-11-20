@@ -4617,6 +4617,222 @@ function teacherCard(title, note, items) {
   return card;
 }
 
+const TEACHER_SVG_NS = 'http://www.w3.org/2000/svg';
+
+function teacherSvg(tag, attrs = {}, text) {
+  const node = document.createElementNS(TEACHER_SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+/** 概念掌握度与综合评分随课时变化，老师先看走向再看单次分数。 */
+function teacherTrendChart(records) {
+  const card = el('div', 'teacher-chart-card');
+  card.append(
+    el('h4', '', '掌握度随时间趋势'),
+    el('p', 'teacher-card-note', '最近 12 节有诊断的课，按时间从早到晚')
+  );
+  const scored = records
+    .filter(
+      (record) =>
+        Number.isFinite(record.report?.overallScore) &&
+        Number.isFinite(record.report?.scores?.conceptMastery)
+    )
+    .slice(-12);
+  if (scored.length < 2) {
+    card.append(el('p', 'teacher-card-empty', '至少两节带诊断的课后显示趋势。'));
+    return card;
+  }
+
+  const W = 320;
+  const H = 142;
+  const left = 14;
+  const right = 14;
+  const top = 12;
+  const bottom = 26;
+  const x = (index) => left + (index * (W - left - right)) / Math.max(1, scored.length - 1);
+  const y = (value) =>
+    top + ((100 - Math.max(0, Math.min(100, value))) / 100) * (H - top - bottom);
+  const svg = teacherSvg('svg', {
+    viewBox: `0 0 ${W} ${H}`,
+    role: 'img',
+    'aria-label': '概念掌握度与综合评分走势'
+  });
+
+  for (const level of [0, 50, 100]) {
+    svg.append(
+      teacherSvg('line', {
+        x1: left,
+        x2: W - right,
+        y1: y(level),
+        y2: y(level),
+        class: 'teacher-trend-grid'
+      })
+    );
+    svg.append(teacherSvg('text', { x: left, y: y(level) - 4, class: 'teacher-trend-tick' }, String(level)));
+  }
+  for (const series of [
+    { key: 'overallScore', className: 'is-overall' },
+    { key: 'conceptMastery', className: 'is-mastery' }
+  ]) {
+    const points = scored
+      .map((record, index) => {
+        const value =
+          series.key === 'overallScore'
+            ? record.report.overallScore
+            : record.report.scores.conceptMastery;
+        return `${x(index)},${y(value)}`;
+      })
+      .join(' ');
+    svg.append(teacherSvg('polyline', { points, class: `teacher-trend-line ${series.className}` }));
+  }
+  scored.forEach((record, index) => {
+    const dot = teacherSvg('circle', {
+      cx: x(index),
+      cy: y(record.report.scores.conceptMastery),
+      r: 3.2,
+      class: 'teacher-trend-dot'
+    });
+    dot.append(
+      teacherSvg('title', {}, `${record.topic || '课时'} · 概念掌握 ${record.report.scores.conceptMastery}%`)
+    );
+    svg.append(dot);
+  });
+  svg.append(
+    teacherSvg('text', { x: left, y: H - 6, class: 'teacher-trend-axis' }, (scored[0].topic || '最早').slice(0, 8))
+  );
+  svg.append(
+    teacherSvg(
+      'text',
+      { x: W - right, y: H - 6, class: 'teacher-trend-axis', 'text-anchor': 'end' },
+      (scored[scored.length - 1].topic || '最近').slice(0, 8)
+    )
+  );
+  card.append(svg);
+  const legend = el('div', 'teacher-chart-legend');
+  legend.append(
+    el('span', 'teacher-legend is-mastery', '概念掌握'),
+    el('span', 'teacher-legend is-overall', '综合评分')
+  );
+  card.append(legend);
+  return card;
+}
+
+/** 三维能力雷达：外圈 100%，同时画出总体平均与最近 5 课。 */
+function teacherRadarChart(view) {
+  const card = el('div', 'teacher-chart-card');
+  card.append(
+    el('h4', '', '三维能力雷达'),
+    el('p', 'teacher-card-note', '外圈 100%，对比总体平均与最近 5 课')
+  );
+  const axes = METRICS.map((metric) => ({
+    label: metric.label,
+    average: view.summary.metricAverages?.[metric.key],
+    recent: view.metricTrends[metric.key]?.current
+  }));
+  if (!axes.some((axis) => Number.isFinite(axis.average))) {
+    card.append(el('p', 'teacher-card-empty', '有诊断数据后显示三维能力。'));
+    return card;
+  }
+
+  const cx = 120;
+  const cy = 96;
+  const radius = 64;
+  const angle = (index) => -Math.PI / 2 + (index * 2 * Math.PI) / axes.length;
+  const point = (index, value) => {
+    const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    return [
+      cx + (Math.cos(angle(index)) * radius * safe) / 100,
+      cy + (Math.sin(angle(index)) * radius * safe) / 100
+    ];
+  };
+  const polygon = (values, className) =>
+    teacherSvg(
+      'polygon',
+      { points: values.map((value, index) => point(index, value).join(',')).join(' '), class: className },
+      ''
+    );
+  const svg = teacherSvg('svg', {
+    viewBox: '0 0 240 190',
+    role: 'img',
+    'aria-label': '三维能力雷达图'
+  });
+  for (const level of [25, 50, 75, 100]) svg.append(polygon(axes.map(() => level), 'teacher-radar-grid'));
+  axes.forEach((axis, index) => {
+    const [px, py] = point(index, 100);
+    svg.append(
+      teacherSvg('line', { x1: cx, y1: cy, x2: px, y2: py, class: 'teacher-radar-axis' })
+    );
+  });
+  svg.append(polygon(axes.map((axis) => axis.average), 'teacher-radar-average'));
+  if (axes.some((axis) => Number.isFinite(axis.recent))) {
+    svg.append(polygon(axes.map((axis) => axis.recent), 'teacher-radar-recent'));
+  }
+  axes.forEach((axis, index) => {
+    const [px, py] = point(index, 122);
+    const anchor = px < cx - 6 ? 'end' : px > cx + 6 ? 'start' : 'middle';
+    svg.append(
+      teacherSvg(
+        'text',
+        { x: px, y: py + 4, class: 'teacher-radar-label', 'text-anchor': anchor },
+        axis.label
+      )
+    );
+  });
+  card.append(svg);
+  const legend = el('div', 'teacher-chart-legend');
+  legend.append(
+    el('span', 'teacher-legend is-average', '总体平均'),
+    el('span', 'teacher-legend is-recent', '最近 5 课')
+  );
+  card.append(legend);
+  return card;
+}
+
+function teacherStuckQuestions(view) {
+  const box = el('div', 'teacher-deep-list');
+  box.append(
+    el('h4', '', '卡点题目复盘'),
+    el('p', 'teacher-card-note', '由手动标记的卡点推导，不代表自动判题')
+  );
+  if (!view.stuckQuestions.length) {
+    box.append(el('p', 'teacher-card-empty', '暂无卡点记录。讲课时点「卡住了」后会按提问聚合在这里。'));
+    return box;
+  }
+  for (const item of view.stuckQuestions.slice(0, 5)) {
+    const row = el('div', 'teacher-deep-row');
+    const head = el('div', 'teacher-deep-row-head');
+    head.append(
+      el('strong', '', item.question ? `问：${item.question}` : '某一步讲解'),
+      el('span', 'teacher-deep-count', `卡住 ${item.count} 次`)
+    );
+    row.append(head);
+    if (item.answer) row.append(el('span', 'teacher-item-quote', `学生答：「${item.answer}」`));
+    const meta = [subjectInfo(item.subject)?.short || '未分科'];
+    if (item.topics.length) meta.push(item.topics.join('、'));
+    row.append(el('span', 'teacher-deep-meta', meta.join(' · ')));
+    box.append(row);
+  }
+  return box;
+}
+
+function teacherAdvice(view) {
+  const box = el('div', 'teacher-deep-list');
+  box.append(
+    el('h4', '', '下一步教学建议'),
+    el('p', 'teacher-card-note', '综合趋势、薄弱维度与反复卡点生成')
+  );
+  view.advice.forEach((item, index) => {
+    const row = el('div', 'teacher-deep-row is-advice');
+    const head = el('div', 'teacher-deep-row-head');
+    head.append(el('strong', '', `${index + 1}. ${item.title}`));
+    row.append(head, el('span', 'teacher-deep-meta', item.detail));
+    box.append(row);
+  });
+  return box;
+}
+
 /** 教师视角：把档案里分散的分数、缺口和建议，整理成可直接行动的三张卡片。 */
 function renderTeacherView(records, summary) {
   if (!refs.teacherInsight) return;
@@ -4734,6 +4950,14 @@ function renderTeacherView(records, summary) {
   focus.append(focusHead, controls, el('div', 'teacher-focus-list'));
   refs.teacherInsight.append(focus);
   renderTeacherFocus(records);
+
+  const deep = el('section', 'teacher-deep');
+  const deepHead = el('div', 'teacher-deep-head');
+  deepHead.append(el('h4', '', '深度学情分析'), el('span', 'teacher-card-note', '基于本机历史推导'));
+  const chartGrid = el('div', 'teacher-deep-grid');
+  chartGrid.append(teacherTrendChart(records), teacherRadarChart(view));
+  deep.append(deepHead, chartGrid, teacherStuckQuestions(view), teacherAdvice(view));
+  refs.teacherInsight.append(deep);
 }
 
 /** 只刷新重点课时列表，避免筛选时整块面板闪烁。 */

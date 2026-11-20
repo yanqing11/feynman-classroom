@@ -96,6 +96,23 @@ export async function renderTeacherImage(records) {
       action: wrapCanvasText(ctx, item.action || item.example || '', CW - 30, 2)
     };
   });
+  const stuckItems = view.stuckQuestions.slice(0, 3).map((item) => {
+    ctx.font = `400 18px ${IMAGE_FONT}`;
+    return {
+      item,
+      question: wrapCanvasText(
+        ctx,
+        item.question ? `问：「${item.question}」（卡住 ${item.count} 次）` : '某一步讲解',
+        CW - 30,
+        2
+      ),
+      answer: wrapCanvasText(ctx, item.answer ? `答：「${item.answer}」` : '', CW - 30, 2)
+    };
+  });
+  const adviceItems = view.advice.slice(0, 3).map((item) => {
+    ctx.font = `400 18px ${IMAGE_FONT}`;
+    return { item, detail: wrapCanvasText(ctx, item.detail, CW - 30, 2) };
+  });
 
   const headlineH = 34 + headlineLines.length * 38 + 24;
   const weekH = 184;
@@ -110,6 +127,12 @@ export async function renderTeacherImage(records) {
   const stepH = steps.length
     ? 44 + steps.reduce((sum, row) => sum + 30 + row.action.length * 27 + 16, 0)
     : 0;
+  const stuckH = stuckItems.length
+    ? 44 + stuckItems.reduce((sum, row) => sum + row.question.length * 26 + row.answer.length * 25 + 16, 0)
+    : 0;
+  const adviceH = adviceItems.length
+    ? 44 + adviceItems.reduce((sum, row) => sum + 28 + row.detail.length * 25 + 14, 0)
+    : 0;
 
   const H = Math.max(
     1200,
@@ -123,6 +146,8 @@ export async function renderTeacherImage(records) {
       (weakH ? 24 + weakH : 0) +
       (gapH ? 24 + gapH : 0) +
       (stepH ? 24 + stepH : 0) +
+      (stuckH ? 24 + stuckH : 0) +
+      (adviceH ? 24 + adviceH : 0) +
       168
   );
 
@@ -356,6 +381,45 @@ export async function renderTeacherImage(records) {
         y += 27;
       }
       y += 16;
+    });
+  }
+
+  if (stuckItems.length) {
+    sectionTitle(ctx, '卡点题目复盘', M, y);
+    y += 34;
+    stuckItems.forEach((row) => {
+      ctx.fillStyle = '#45524f';
+      ctx.font = `600 19px ${IMAGE_FONT}`;
+      for (const line of row.question) {
+        ctx.fillText(line, M + 8, y);
+        y += 26;
+      }
+      ctx.fillStyle = '#8a6d32';
+      ctx.font = `400 18px ${IMAGE_FONT}`;
+      for (const line of row.answer) {
+        ctx.fillText(line, M + 24, y);
+        y += 25;
+      }
+      y += 16;
+    });
+    y += 24;
+  }
+
+  if (adviceItems.length) {
+    sectionTitle(ctx, '下一步教学建议', M, y);
+    y += 34;
+    adviceItems.forEach((row, index) => {
+      ctx.fillStyle = '#1f6f5c';
+      ctx.font = `700 19px ${IMAGE_FONT}`;
+      ctx.fillText(`${index + 1}. ${row.item.title}`, M + 8, y);
+      y += 28;
+      ctx.fillStyle = '#45524f';
+      ctx.font = `400 18px ${IMAGE_FONT}`;
+      for (const line of row.detail) {
+        ctx.fillText(line, M + 24, y);
+        y += 25;
+      }
+      y += 14;
     });
   }
 

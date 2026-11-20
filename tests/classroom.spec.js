@@ -495,12 +495,24 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   await page.locator('.teacher-band-tabs .filter-tab[data-band="all"]').click();
   await expect(page.locator('.teacher-focus-row')).toHaveCount(2);
 
+  // 深度学情分析：趋势图、雷达图、卡点题目与教学建议
+  await expect(page.locator('.teacher-deep')).toBeVisible();
+  await expect(page.locator('.teacher-deep')).toContainText('掌握度随时间趋势');
+  await expect(page.locator('.teacher-deep')).toContainText('三维能力雷达');
+  expect(await page.locator('.teacher-deep svg').count()).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('.teacher-deep')).toContainText('卡点题目复盘');
+  await expect(page.locator('.teacher-deep')).toContainText('学生答：「我把 3/4 米平均分成三份。」');
+  await expect(page.locator('.teacher-deep')).toContainText('下一步教学建议');
+  await expect(page.locator('.teacher-deep')).toContainText('补概念掌握');
+
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#teacherCopyBtn').click();
   await expect(page.getByText('学情摘要已复制到剪贴板。')).toBeVisible();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toContain('# 学情摘要 · 教师视角');
   expect(copied).toContain('把除数的份数当成被除数');
+  expect(copied).toContain('## 反复卡住的提问');
+  expect(copied).toContain('## 深度分析建议');
 
   await page.locator('#teacherWeekBtn').click();
   await expect(page.getByText('本周学情报告已复制。')).toBeVisible();
@@ -508,6 +520,7 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   expect(weekly).toContain('# 本周学情周报');
   expect(weekly).toContain('近 7 天：2 课');
   expect(weekly).toContain('学生原话：「我把 3/4 米平均分成三份。」');
+  expect(weekly).toContain('## 下周重点建议');
 
   // 导出学情摘要 Markdown 文件
   const mdPromise = page.waitForEvent('download');
@@ -517,6 +530,7 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   const mdText = fs.readFileSync(await md.path(), 'utf8');
   expect(mdText).toContain('# 学情摘要 · 教师视角');
   expect(mdText).toContain('分数除法');
+  expect(mdText).toContain('## 深度分析建议');
 
   // 导出本周周报 Markdown 文件
   const weeklyMdPromise = page.waitForEvent('download');
@@ -526,6 +540,7 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   const weeklyMdText = fs.readFileSync(await weeklyMd.path(), 'utf8');
   expect(weeklyMdText).toContain('# 本周学情周报');
   expect(weeklyMdText).toContain('学生原话：「我把 3/4 米平均分成三份。」');
+  expect(weeklyMdText).toContain('## 下周重点建议');
 
   // 导出学情长图 PNG
   const imagePromise = page.waitForEvent('download');

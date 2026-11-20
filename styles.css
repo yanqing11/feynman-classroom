@@ -4168,6 +4168,206 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.teacher-deep {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.teacher-deep-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.teacher-deep-head h4,
+.teacher-chart-card h4,
+.teacher-deep-list h4 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.teacher-deep-head .teacher-card-note,
+.teacher-chart-card .teacher-card-note,
+.teacher-deep-list .teacher-card-note {
+  margin: 0;
+}
+
+.teacher-deep-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.teacher-chart-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.teacher-chart-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.teacher-trend-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.teacher-trend-tick,
+.teacher-trend-axis {
+  fill: var(--faint);
+  font-size: 9px;
+}
+
+.teacher-trend-line {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.teacher-trend-line.is-mastery {
+  stroke: var(--green);
+}
+
+.teacher-trend-line.is-overall {
+  stroke: var(--gold);
+  stroke-dasharray: 4 4;
+}
+
+.teacher-trend-dot {
+  fill: var(--green);
+  stroke: var(--card);
+  stroke-width: 1.5;
+}
+
+.teacher-radar-grid {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.teacher-radar-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.teacher-radar-average {
+  fill: rgba(217, 164, 65, 0.14);
+  stroke: var(--gold);
+  stroke-width: 1.6;
+}
+
+.teacher-radar-recent {
+  fill: rgba(31, 111, 92, 0.18);
+  stroke: var(--green);
+  stroke-width: 2;
+}
+
+.teacher-radar-label {
+  fill: var(--ink-soft);
+  font-size: 10px;
+}
+
+.teacher-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.teacher-legend {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.teacher-legend::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: var(--line);
+  vertical-align: middle;
+}
+
+.teacher-legend.is-mastery,
+.teacher-legend.is-recent {
+  color: var(--green-deep);
+}
+
+.teacher-legend.is-mastery::before,
+.teacher-legend.is-recent::before {
+  background: var(--green);
+}
+
+.teacher-legend.is-overall,
+.teacher-legend.is-average {
+  color: #8a6d32;
+}
+
+.teacher-legend.is-overall::before,
+.teacher-legend.is-average::before {
+  background: var(--gold);
+}
+
+.teacher-deep-list {
+  display: grid;
+  gap: 8px;
+}
+
+.teacher-deep-row {
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+}
+
+.teacher-deep-row.is-advice {
+  border-color: rgba(31, 111, 92, 0.24);
+  background: var(--green-pale);
+}
+
+.teacher-deep-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.teacher-deep-row-head strong {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.teacher-deep-count {
+  flex: none;
+  color: var(--coral);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-deep-meta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .trend-chart {
   position: relative;
   min-height: 132px;
@@ -5110,6 +5310,10 @@ input[type="range"] {
 
   .teacher-week-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-deep-grid {
+    grid-template-columns: 1fr;
   }
 
   .teacher-week-delta {

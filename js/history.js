@@ -568,6 +568,135 @@ function weekStats(records, from, to) {
   };
 }
 
+/** 把手动标记的卡点还原成「老师当时问了什么、学生当时答了什么」。 */
+function stuckQuestionPairs(record) {
+  const messages = Array.isArray(record?.messages) ? record.messages : [];
+  const pairs = [];
+  for (const point of Array.isArray(record?.stuckPoints) ? record.stuckPoints : []) {
+    const turn = Number(point?.turn);
+    if (!Number.isInteger(turn) || turn < 1) continue;
+    let seen = 0;
+    let userIndex = -1;
+    for (let index = 0; index < messages.length; index += 1) {
+      const message = messages[index];
+      if (message?.role === 'user' && tidyText(message.content)) {
+        seen += 1;
+        if (seen === turn) {
+          userIndex = index;
+          break;
+        }
+      }
+    }
+    if (userIndex < 0) continue;
+    let question = '';
+    for (let index = userIndex - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.role === 'assistant' && tidyText(message.content)) {
+        question = tidyText(message.content, 160);
+        break;
+      }
+    }
+    const answer = tidyText(messages[userIndex].content, 160);
+    if (!question && !answer) continue;
+    pairs.push({ question, answer, at: point.at || record.endedAt || '' });
+  }
+  return pairs;
+}
+
+/** 按提问文本聚合卡点，找出反复卡住的「题目」。无自动判题数据，故只做卡点推导。 */
+export function summarizeStuckQuestions(records) {
+  const map = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    for (const pair of stuckQuestionPairs(record)) {
+      const key = (pair.question || pair.answer).toLocaleLowerCase().slice(0, 120);
+      if (!map.has(key)) {
+        map.set(key, {
+          question: pair.question,
+          answer: pair.answer,
+          count: 0,
+          topics: new Set(),
+          at: pair.at,
+          recordId: record.id,
+          subject: record.subject
+        });
+      }
+      const item = map.get(key);
+      item.count += 1;
+      if (record.topic) item.topics.add(record.topic);
+      if (String(pair.at || '').localeCompare(String(item.at || '')) > 0) {
+        item.at = pair.at;
+        item.answer = pair.answer;
+        item.recordId = record.id;
+        item.subject = record.subject;
+      }
+    }
+  }
+  return [...map.values()]
+    .map((item) => ({ ...item, topics: [...item.topics].slice(0, 3) }))
+    .sort((a, b) => b.count - a.count || String(b.at || '').localeCompare(String(a.at || '')))
+    .slice(0, 8);
+}
+
+/** 依据历史趋势、薄弱维度和反复卡点生成下一步教学动作。 */
+function buildTeacherAdvice({ summary, week, bands, weakTags, metricTrends, stuckQuestions }) {
+  const advice = [];
+  if (
+    week.recent.sessions &&
+    Number.isFinite(week.recent.average) &&
+    Number.isFinite(week.previous.average) &&
+    week.recent.average < week.previous.average
+  ) {
+    const gap = Math.round(week.previous.average - week.recent.average);
+    advice.push({
+      title: '先止住下滑',
+      detail: `近 7 天均分比前 7 天低 ${gap} 分，下一课先用 5 分钟回看最近两次的卡点。`
+    });
+  }
+  const weakest = METRICS.map((metric) => ({
+    label: metric.label,
+    value: metricTrends[metric.key]?.current
+  }))
+    .filter((item) => Number.isFinite(item.value))
+    .sort((a, b) => a.value - b.value)[0];
+  if (weakest && weakest.value < 75) {
+    advice.push({
+      title: `补${weakest.label}`,
+      detail: `最近 5 课该项平均 ${weakest.value}%，是三维中最弱的一项；多给一步示范，再让学生复述。`
+    });
+  }
+  if (stuckQuestions.length) {
+    const top = stuckQuestions[0];
+    advice.push({
+      title: '重讲反复卡住的提问',
+      detail: top.question
+        ? `「${top.question}」已卡住 ${top.count} 次，下次换一种问法或给半成品提示。`
+        : `同一处回答已卡住 ${top.count} 次，下次先拆成两步再问。`
+    });
+  }
+  if (bands.retake > 0) {
+    advice.push({
+      title: '安排重讲课时',
+      detail: `当前有 ${bands.retake} 课低于 60 分，建议按分数从低到高各重讲开场 5 分钟。`
+    });
+  }
+  if (weakTags.length && Number.isFinite(weakTags[0].average)) {
+    advice.push({
+      title: `先补「${weakTags[0].tag}」`,
+      detail: `该知识点平均 ${weakTags[0].average}%，练过 ${weakTags[0].sessions} 次，优先做同类变式练习。`
+    });
+  }
+  if (!advice.length) {
+    advice.push({
+      title: '保持当前节奏',
+      detail:
+        summary.sessions < 3
+          ? '历史数据还不多，继续按现有讲法练习，每周回看一次趋势即可。'
+          : '各项表现稳定，保持每周复盘的节奏即可。'
+    });
+  }
+  return advice.slice(0, 4);
+}
+
 function lowestScoredRecord(records, tag) {
   const matches = records.filter(
     (record) => Number.isFinite(record.report?.overallScore) && normalizeTags(record.tags).includes(tag)
@@ -719,6 +848,16 @@ export function summarizeTeacherView(records) {
     ? `${headlineParts.join('，')}。`
     : '诊断数据还不多。讲完一课并生成报告后，这里会给出学情结论。';
 
+  const stuckQuestions = summarizeStuckQuestions(list);
+  const advice = buildTeacherAdvice({
+    summary,
+    week,
+    bands,
+    weakTags,
+    metricTrends,
+    stuckQuestions
+  });
+
   return {
     sessions: list.length,
     scored: summary.scored,
@@ -730,6 +869,8 @@ export function summarizeTeacherView(records) {
     stuckTotal,
     stuckSubjects,
     prioritySteps,
+    stuckQuestions,
+    advice,
     week,
     headline
   };
@@ -771,6 +912,19 @@ export function teacherViewToText(view) {
     }
   } else {
     lines.push('- 暂无诊断建议');
+  }
+  lines.push('', '## 反复卡住的提问');
+  if (view.stuckQuestions.length) {
+    for (const item of view.stuckQuestions.slice(0, 3)) {
+      lines.push(`- ${item.question ? `「${item.question}」` : '某一步讲解'}（卡住 ${item.count} 次）`);
+      if (item.answer) lines.push(`  学生回答：「${item.answer}」`);
+    }
+  } else {
+    lines.push('- 暂无手动标记的卡点');
+  }
+  lines.push('', '## 深度分析建议');
+  for (const item of view.advice) {
+    lines.push(`- ${item.title}：${item.detail}`);
   }
   lines.push('', `课时分布：需重讲 ${view.bands.retake} 课，待巩固 ${view.bands.reinforce} 课，已掌握 ${view.bands.mastered} 课。`);
   return lines.join('\n');
@@ -849,7 +1003,21 @@ export function teacherWeeklyReport(records) {
     lines.push('- 暂无诊断建议');
   }
 
-  lines.push('', '数据来自本机浏览器档案，仅供教学参考。');
+  lines.push('', '## 反复卡住的提问');
+  if (view.stuckQuestions.length) {
+    for (const item of view.stuckQuestions.slice(0, 3)) {
+      lines.push(`- ${item.question ? `「${item.question}」` : '某一步讲解'}（卡住 ${item.count} 次）`);
+      if (item.answer) lines.push(`  学生回答：「${item.answer}」`);
+    }
+  } else {
+    lines.push('- 暂无手动标记的卡点');
+  }
+  lines.push('', '## 下周重点建议');
+  for (const item of view.advice) {
+    lines.push(`- ${item.title}：${item.detail}`);
+  }
+
+  lines.push('', '数据来自本机浏览器档案，卡点题目由手动标记推导，仅供教学参考。');
   return lines.join('\n');
 }
 
