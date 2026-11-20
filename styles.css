@@ -3987,6 +3987,187 @@ input[type="range"] {
   color: var(--faint);
 }
 
+.teacher-week {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.teacher-week-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-week-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-week-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.teacher-week-cell small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.teacher-week-cell strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.teacher-week-cell strong em {
+  color: var(--green-deep);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.teacher-week-cell > span {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.teacher-week-delta {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.teacher-week-delta.is-up {
+  background: var(--green-soft);
+  color: var(--green-deep);
+}
+
+.teacher-week-delta.is-down {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.teacher-item-quote {
+  display: block;
+  padding-left: 8px;
+  border-left: 2px solid var(--gold);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-focus {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.teacher-focus-head h4 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.teacher-focus-head p {
+  margin: 4px 0 0;
+}
+
+.teacher-focus-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-focus-select {
+  min-height: 32px;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.teacher-band-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.teacher-band-tabs .filter-tab {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.teacher-focus-list {
+  display: grid;
+  gap: 7px;
+}
+
+.teacher-focus-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.teacher-focus-row:hover {
+  border-color: var(--green);
+  background: var(--green-pale);
+}
+
+.teacher-focus-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.teacher-focus-row-head strong {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.teacher-focus-score {
+  flex: none;
+  color: var(--green-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-focus-meta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-focus-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
 .trend-chart {
   position: relative;
   min-height: 132px;
@@ -4925,6 +5106,20 @@ input[type="range"] {
 
   .teacher-cards {
     grid-template-columns: 1fr;
+  }
+
+  .teacher-week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-week-delta {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .teacher-focus-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .history-item-main {

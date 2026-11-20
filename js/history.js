@@ -542,6 +542,32 @@ function tidyText(value, max = 140) {
   return value.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** 从档案里取学生最后一次可见的发言，作为教师可直接引用的原话。 */
+export function studentQuote(record, max = 120) {
+  const visible = (Array.isArray(record?.messages) ? record.messages : [])
+    .filter((message) => message && message.role === 'user' && !message.hidden)
+    .map((message) => tidyText(message.content, max))
+    .filter(Boolean);
+  return visible.length ? visible[visible.length - 1] : '';
+}
+
+function weekStats(records, from, to) {
+  const items = records.filter((record) => {
+    const time = new Date(record.endedAt || 0).getTime();
+    return Number.isFinite(time) && time >= from && time < to;
+  });
+  const scored = items.filter((record) => Number.isFinite(record.report?.overallScore));
+  const stuck = items.reduce(
+    (total, record) => total + (Array.isArray(record.stuckPoints) ? record.stuckPoints.length : 0),
+    0
+  );
+  return {
+    sessions: items.length,
+    average: average(scored.map((record) => record.report.overallScore)),
+    stuck
+  };
+}
+
 function lowestScoredRecord(records, tag) {
   const matches = records.filter(
     (record) => Number.isFinite(record.report?.overallScore) && normalizeTags(record.tags).includes(tag)
@@ -577,7 +603,10 @@ export function summarizeTeacherView(records) {
   const weakTags = summarizeTags(list)
     .filter((item) => Number.isFinite(item.average))
     .slice(0, 3)
-    .map((item) => ({ ...item, record: lowestScoredRecord(list, item.tag) }));
+    .map((item) => {
+      const record = lowestScoredRecord(list, item.tag);
+      return { ...item, record, quote: studentQuote(record) };
+    });
 
   const misconceptionMap = new Map();
   for (const record of list) {
@@ -610,7 +639,8 @@ export function summarizeTeacherView(records) {
       ...entry,
       subjects: [...entry.subjects],
       recordId: entry.record.id,
-      recordTopic: entry.record.topic
+      recordTopic: entry.record.topic,
+      quote: studentQuote(entry.record)
     }))
     .sort((a, b) => b.count - a.count || String(b.record.endedAt || '').localeCompare(String(a.record.endedAt || '')))
     .slice(0, 4);
@@ -649,6 +679,7 @@ export function summarizeTeacherView(records) {
         score: record.report.overallScore,
         recordId: record.id,
         recordTopic: record.topic,
+        quote: studentQuote(record),
         record
       });
     }
@@ -657,7 +688,20 @@ export function summarizeTeacherView(records) {
     .sort((a, b) => a.score - b.score || String(b.record.endedAt || '').localeCompare(String(a.record.endedAt || '')))
     .slice(0, 3);
 
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const week = {
+    recent: weekStats(list, now - weekMs, now + 1),
+    previous: weekStats(list, now - 2 * weekMs, now - weekMs)
+  };
+
   const headlineParts = [];
+  if (week.recent.sessions) {
+    headlineParts.push(`近 7 天讲了 ${week.recent.sessions} 课`);
+    if (Number.isFinite(week.recent.average)) {
+      headlineParts.push(`平均 ${week.recent.average}%`);
+    }
+  }
   if (Number.isFinite(summary.recent)) headlineParts.push(`最近 5 课平均 ${summary.recent}%`);
   if (summary.delta !== null) {
     headlineParts.push(
@@ -686,6 +730,7 @@ export function summarizeTeacherView(records) {
     stuckTotal,
     stuckSubjects,
     prioritySteps,
+    week,
     headline
   };
 }
@@ -728,6 +773,83 @@ export function teacherViewToText(view) {
     lines.push('- 暂无诊断建议');
   }
   lines.push('', `课时分布：需重讲 ${view.bands.retake} 课，待巩固 ${view.bands.reinforce} 课，已掌握 ${view.bands.mastered} 课。`);
+  return lines.join('\n');
+}
+
+/** 可复制给家长或真人老师的本周学情周报，只使用本机档案。 */
+export function teacherWeeklyReport(records) {
+  const view = summarizeTeacherView(records);
+  const list = Array.isArray(records) ? records : [];
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const thisWeek = list
+    .filter((record) => {
+      const time = new Date(record.endedAt || 0).getTime();
+      return Number.isFinite(time) && time >= now - weekMs && time <= now;
+    })
+    .sort((a, b) => String(b.endedAt || '').localeCompare(String(a.endedAt || '')));
+
+  const lines = [
+    '# 本周学情周报',
+    '',
+    `生成时间：${new Date(now).toLocaleDateString('zh-CN')}`,
+    '',
+    view.headline,
+    '',
+    '## 本周对比',
+    `近 7 天：${view.week.recent.sessions} 课 · 平均 ${
+      Number.isFinite(view.week.recent.average) ? `${view.week.recent.average}%` : '—'
+    } · 卡点 ${view.week.recent.stuck} 个`,
+    `前 7 天：${view.week.previous.sessions} 课 · 平均 ${
+      Number.isFinite(view.week.previous.average) ? `${view.week.previous.average}%` : '—'
+    } · 卡点 ${view.week.previous.stuck} 个`,
+    '',
+    '## 本周课程'
+  ];
+
+  if (thisWeek.length) {
+    for (const record of thisWeek) {
+      const score = Number.isFinite(record.report?.overallScore)
+        ? ` · ${record.report.overallScore}%`
+        : '';
+      const tags = normalizeTags(record.tags).join('、');
+      lines.push(`- ${record.topic}${score}${tags ? ` · ${tags}` : ''}`);
+    }
+  } else {
+    lines.push('- 本周还没有讲课记录');
+  }
+
+  lines.push('', '## 优先补的知识点');
+  if (view.weakTags.length) {
+    for (const tag of view.weakTags) {
+      lines.push(`- ${tag.tag}：平均 ${tag.average ?? '—'}%，练过 ${tag.sessions} 次`);
+      if (tag.quote) lines.push(`  学生原话：「${tag.quote}」`);
+    }
+  } else {
+    lines.push('- 暂无带知识点的记录');
+  }
+
+  lines.push('', '## 需要关注的理解缺口');
+  if (view.misconceptions.length) {
+    for (const item of view.misconceptions) {
+      lines.push(`- ${item.title}（出现 ${item.count} 次）`);
+      if (item.quote) lines.push(`  学生原话：「${item.quote}」`);
+      if (item.fix) lines.push(`  建议：${item.fix}`);
+    }
+  } else {
+    lines.push('- 暂无记录到的理解缺口');
+  }
+
+  lines.push('', '## 下周教学动作');
+  if (view.prioritySteps.length) {
+    for (const step of view.prioritySteps) {
+      lines.push(`- ${step.title}：${step.action || step.example || '见对应诊断报告'}`);
+    }
+  } else {
+    lines.push('- 暂无诊断建议');
+  }
+
+  lines.push('', '数据来自本机浏览器档案，仅供教学参考。');
   return lines.join('\n');
 }
 

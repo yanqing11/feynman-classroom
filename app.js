@@ -51,8 +51,10 @@ import {
   summarizeHistory,
   summarizeInteractions,
   summarizeTags,
+  studentQuote,
   summarizeTeacherView,
-  teacherViewToText
+  teacherViewToText,
+  teacherWeeklyReport
 } from './js/history.js';
 import {
   DB_NAME,
@@ -327,6 +329,7 @@ const refs = {
   teacherInsight: $('#teacherInsight'),
   teacherMeta: $('#teacherMeta'),
   teacherCopyBtn: $('#teacherCopyBtn'),
+  teacherWeekBtn: $('#teacherWeekBtn'),
   historySummary: $('#historySummary'),
   historySubjectFilter: $('#historySubjectFilter'),
   historyRangeFilter: $('#historyRangeFilter'),
@@ -540,6 +543,8 @@ let builtinQuestions = [];
 let builtinQuestionsPromise = null;
 let builtinQuestionsFailed = false;
 let historyFilter = { subject: 'all', source: 'all', range: 'all' };
+let teacherFocus = { tag: 'all', band: 'all' };
+let teacherRecords = [];
 const HISTORY_RANGE_DAYS = { all: 0, 30: 30, 7: 7 };
 let historySelectMode = false;
 let historySelection = new Set();
@@ -4514,7 +4519,32 @@ function teacherBands(bands, scored) {
   return wrap;
 }
 
-function teacherItem({ title, meta = '', detail = '', foot = '', onClick }) {
+/** 本周 / 上周的课时、均分与卡点对比，让老师先看变化再看细节。 */
+function teacherWeek(week) {
+  const wrap = el('div', 'teacher-week');
+  wrap.append(el('span', 'teacher-week-label', '近 7 天对比'));
+  const grid = el('div', 'teacher-week-grid');
+  const cell = (label, stats) => {
+    const item = el('div', 'teacher-week-cell');
+    item.append(el('small', '', label));
+    const value = el('strong', '', `${stats?.sessions || 0} 课`);
+    if (Number.isFinite(stats?.average)) {
+      value.append(el('em', '', ` · ${stats.average}%`));
+    }
+    item.append(value, el('span', '', `卡点 ${stats?.stuck || 0} 个`));
+    return item;
+  };
+  grid.append(cell('本周', week.recent), cell('上周', week.previous));
+  if (Number.isFinite(week.recent.average) && Number.isFinite(week.previous.average)) {
+    const diff = week.recent.average - week.previous.average;
+    const level = diff >= 0 ? 'is-up' : 'is-down';
+    grid.append(el('span', `teacher-week-delta ${level}`, `均分 ${diff >= 0 ? '+' : ''}${diff}`));
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+function teacherItem({ title, meta = '', detail = '', quote = '', foot = '', onClick }) {
   const button = el('button', 'teacher-item');
   button.type = 'button';
   const head = el('span', 'teacher-item-head');
@@ -4522,6 +4552,7 @@ function teacherItem({ title, meta = '', detail = '', foot = '', onClick }) {
   if (meta) head.append(el('span', 'teacher-item-meta', meta));
   button.append(head);
   if (detail) button.append(el('span', 'teacher-item-detail', detail));
+  if (quote) button.append(el('span', 'teacher-item-quote', `「${quote}」`));
   if (foot) button.append(el('span', 'teacher-item-foot', foot));
   button.addEventListener('click', onClick);
   return button;
@@ -4572,7 +4603,7 @@ function renderTeacherView(records, summary) {
     }
     headline.append(chips);
   }
-  refs.teacherInsight.append(headline);
+  refs.teacherInsight.append(headline, teacherWeek(view.week));
 
   const metrics = el('div', 'teacher-metrics');
   metrics.append(
@@ -4591,6 +4622,7 @@ function renderTeacherView(records, summary) {
       title: tag.tag,
       meta: tag.average == null ? '—' : `${tag.average}%`,
       detail: `${subjectInfo(tag.subject)?.short || '未分科'} · 练过 ${tag.sessions} 次`,
+      quote: tag.quote,
       foot: '看最低分那节课',
       onClick: () => openRecord(tag.record || byId(tag.recordId))
     })
@@ -4600,6 +4632,7 @@ function renderTeacherView(records, summary) {
       title: item.title,
       meta: `${item.count} 次`,
       detail: item.evidence || item.why || '',
+      quote: item.quote,
       foot: item.fix ? `怎么补：${item.fix}` : '查看对应报告',
       onClick: () => openRecord(byId(item.recordId))
     })
@@ -4609,6 +4642,7 @@ function renderTeacherView(records, summary) {
       title: step.title,
       meta: `那课 ${step.score}%`,
       detail: step.action || step.example || '',
+      quote: step.quote,
       foot: step.recordTopic,
       onClick: () => openRecord(step.record || byId(step.recordId))
     })
@@ -4621,6 +4655,100 @@ function renderTeacherView(records, summary) {
     teacherCard('下一次教学动作', '来自低分课的诊断建议，点开看完整报告', stepItems)
   );
   refs.teacherInsight.append(grid);
+
+  teacherRecords = records;
+  const focus = el('section', 'teacher-focus');
+  const focusHead = el('div', 'teacher-focus-head');
+  focusHead.append(
+    el('h4', '', '重点课时'),
+    el('p', 'teacher-card-note', '按知识点和分数段筛选，最多列出 6 节课；点开查看完整诊断。')
+  );
+  const controls = el('div', 'teacher-focus-controls');
+  const select = el('select', 'teacher-focus-select');
+  select.setAttribute('aria-label', '按知识点筛选重点课时');
+  select.append(new Option('全部知识点', 'all'));
+  const tags = [...new Set(records.flatMap((record) => normalizeTags(record.tags)))].sort();
+  for (const tag of tags) select.append(new Option(tag, tag));
+  teacherFocus.tag = tags.includes(teacherFocus.tag) ? teacherFocus.tag : 'all';
+  select.value = teacherFocus.tag;
+  const tabs = el('div', 'teacher-band-tabs');
+  for (const [key, label] of [
+    ['all', '全部'],
+    ['retake', '需重讲'],
+    ['reinforce', '待巩固'],
+    ['mastered', '已掌握']
+  ]) {
+    const tab = el('button', `filter-tab${teacherFocus.band === key ? ' is-active' : ''}`, label);
+    tab.type = 'button';
+    tab.dataset.band = key;
+    tab.setAttribute('aria-pressed', String(teacherFocus.band === key));
+    tabs.append(tab);
+  }
+  controls.append(select, tabs);
+  focus.append(focusHead, controls, el('div', 'teacher-focus-list'));
+  refs.teacherInsight.append(focus);
+  renderTeacherFocus(records);
+}
+
+/** 只刷新重点课时列表，避免筛选时整块面板闪烁。 */
+function renderTeacherFocus(records) {
+  const list = refs.teacherInsight?.querySelector('.teacher-focus-list');
+  if (!list) return;
+  list.replaceChildren();
+  const matches = records.filter((record) => {
+    if (teacherFocus.tag !== 'all' && !normalizeTags(record.tags).includes(teacherFocus.tag)) {
+      return false;
+    }
+    if (teacherFocus.band === 'all') return true;
+    const score = Number(record.report?.overallScore);
+    if (!Number.isFinite(score)) return false;
+    if (teacherFocus.band === 'retake') return score < 60;
+    if (teacherFocus.band === 'reinforce') return score < 80;
+    return score >= 80;
+  });
+  const shown = matches
+    .slice()
+    .sort((a, b) => {
+      const sa = Number(a.report?.overallScore);
+      const sb = Number(b.report?.overallScore);
+      if (Number.isFinite(sa) && Number.isFinite(sb) && sa !== sb) return sa - sb;
+      return String(b.endedAt || '').localeCompare(String(a.endedAt || ''));
+    })
+    .slice(0, 6);
+
+  if (!shown.length) {
+    list.append(el('p', 'teacher-focus-empty', '当前筛选下没有课时，换个知识点或分数段看看。'));
+    return;
+  }
+  for (const record of shown) {
+    const row = el('button', 'teacher-focus-row');
+    row.type = 'button';
+    const head = el('span', 'teacher-focus-row-head');
+    const score = Number(record.report?.overallScore);
+    head.append(
+      el('strong', '', record.topic || '未命名课时'),
+      el('span', 'teacher-focus-score', Number.isFinite(score) ? `${score}%` : '暂无评分')
+    );
+    row.append(head);
+    const meta = [subjectInfo(record.subject)?.short || '未分科'];
+    if (normalizeTags(record.tags).length) meta.push(normalizeTags(record.tags).join('、'));
+    if (Array.isArray(record.stuckPoints) && record.stuckPoints.length) {
+      meta.push(`卡点 ${record.stuckPoints.length} 个`);
+    }
+    row.append(el('span', 'teacher-focus-meta', meta.join(' · ')));
+    const quote = studentQuote(record);
+    if (quote) row.append(el('span', 'teacher-item-quote', `「${quote}」`));
+    row.addEventListener('click', () => {
+      if (!record.report) return;
+      presentReport(record.report, {
+        topic: record.topic,
+        archived: true,
+        meta: formatRecordMeta(record),
+        record
+      });
+    });
+    list.append(row);
+  }
 }
 
 function renderHistorySummary(summary) {
@@ -6074,6 +6202,26 @@ function bindEvents() {
     const view = summarizeTeacherView(filterHistoryRecords(loadHistory()));
     const ok = await copyText(teacherViewToText(view));
     toast(ok ? '学情摘要已复制到剪贴板。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
+  });
+  refs.teacherWeekBtn?.addEventListener('click', async () => {
+    const ok = await copyText(teacherWeeklyReport(filterHistoryRecords(loadHistory())));
+    toast(ok ? '本周学情报告已复制。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
+  });
+  refs.teacherInsight?.addEventListener('change', (event) => {
+    if (!event.target.matches('.teacher-focus-select')) return;
+    teacherFocus.tag = event.target.value;
+    renderTeacherFocus(teacherRecords);
+  });
+  refs.teacherInsight?.addEventListener('click', (event) => {
+    const tab = event.target.closest('.teacher-band-tabs .filter-tab');
+    if (!tab) return;
+    teacherFocus.band = tab.dataset.band || 'all';
+    for (const button of refs.teacherInsight.querySelectorAll('.teacher-band-tabs .filter-tab')) {
+      const active = button === tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+    renderTeacherFocus(teacherRecords);
   });
   refs.storageBannerClose?.addEventListener('click', dismissStorageBanner);
   window.addEventListener('feynman:storage-warning', handleStorageWarningEvent);

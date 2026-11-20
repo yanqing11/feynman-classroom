@@ -476,12 +476,38 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   await expect(page.locator('#teacherInsight')).toContainText('用线段图再讲一次');
   await expect(page.locator('#teacherInsight')).toContainText('卡点分布');
 
+  // 近 7 天对比与学生原话证据
+  await expect(page.locator('.teacher-week')).toContainText('近 7 天对比');
+  await expect(page.locator('.teacher-week')).toContainText('本周');
+  await expect(page.locator('.teacher-week')).toContainText('2 课 · 65%');
+  await expect(page.locator('.teacher-week')).toContainText('卡点 2 个');
+  await expect(page.locator('#teacherInsight')).toContainText('「我把 3/4 米平均分成三份。」');
+
+  // 按知识点 / 分数段筛选重点课时
+  await expect(page.locator('.teacher-focus-row')).toHaveCount(2);
+  await page.locator('.teacher-focus-select').selectOption('分数加法');
+  await expect(page.locator('.teacher-focus-row')).toHaveCount(1);
+  await expect(page.locator('.teacher-focus-row')).toContainText('分数加减');
+  await page.locator('.teacher-focus-select').selectOption('all');
+  await page.locator('.teacher-band-tabs .filter-tab[data-band="retake"]').click();
+  await expect(page.locator('.teacher-focus-row')).toHaveCount(1);
+  await expect(page.locator('.teacher-focus-row')).toContainText('分数除法');
+  await page.locator('.teacher-band-tabs .filter-tab[data-band="all"]').click();
+  await expect(page.locator('.teacher-focus-row')).toHaveCount(2);
+
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#teacherCopyBtn').click();
   await expect(page.getByText('学情摘要已复制到剪贴板。')).toBeVisible();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toContain('# 学情摘要 · 教师视角');
   expect(copied).toContain('把除数的份数当成被除数');
+
+  await page.locator('#teacherWeekBtn').click();
+  await expect(page.getByText('本周学情报告已复制。')).toBeVisible();
+  const weekly = await page.evaluate(() => navigator.clipboard.readText());
+  expect(weekly).toContain('# 本周学情周报');
+  expect(weekly).toContain('近 7 天：2 课');
+  expect(weekly).toContain('学生原话：「我把 3/4 米平均分成三份。」');
 });
 
 test('档案导入与清空会同步写入本机数据库', async ({ page }) => {
