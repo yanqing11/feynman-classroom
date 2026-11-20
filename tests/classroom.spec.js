@@ -109,7 +109,7 @@ test('完整课堂：讲课 → 标记卡点 → 诊断报告 → 档案复习�
   await expect(page.locator('#reportVerdict')).toContainText('分数除法的意义');
   await expect(page.locator('#metricGrid .metric-card')).toHaveCount(3);
   await expect(page.locator('#exportReportImageBtn')).toBeVisible();
-  await expect(page.locator('.report-disclaimer')).toContainText('请不要直接复制 AI 生成内容作为作业答案');
+  await expect(page.locator('.report-disclaimer')).toContainText('请勿照搬作为作业答案');
 
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#exportReportImageBtn').click();
@@ -243,19 +243,16 @@ test('可见中文文本不小于 12px', async ({ page }) => {
   expect(small).toEqual([]);
 });
 
-test('首页明确工具定位与直接复制 AI 内容的风险提醒', async ({ page }) => {
-  await expect(page.locator('#homeGuidance')).toBeVisible();
-  await expect(page.locator('#homeGuidance')).toContainText('用来复盘，不用来代写作业');
-  await expect(page.locator('#homeGuidance')).toContainText('暴露理解盲区');
-  await expect(page.locator('#homeGuidance')).toContainText('不要直接复制 AI 生成的内容');
-  await expect(page.locator('#homeGuidance')).toContainText('作业抄袭');
-  await expect(page.locator('#homeGuidance')).toContainText('仍需学校与家庭共同引导');
+test('页脚简洁提示工具定位与直接复制 AI 内容的风险', async ({ page }) => {
+  const note = page.locator('#homeGuidance');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('不代写作业');
+  await expect(note).toContainText('请勿照搬 AI 内容');
+  await expect(note).toContainText('提示不能消除依赖');
+  await expect(note).toContainText('仍需学校与家庭引导');
 
-  const sizes = await page.locator('#homeGuidance h2, #homeGuidance p').evaluateAll((nodes) =>
-    nodes.map((node) => parseFloat(getComputedStyle(node).fontSize))
-  );
-  expect(sizes.length).toBeGreaterThan(0);
-  expect(Math.min(...sizes)).toBeGreaterThanOrEqual(12);
+  const size = await note.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+  expect(size).toBeGreaterThanOrEqual(12);
 });
 
 test('备份 JSON 可以导入并合并学习档案', async ({ page }) => {
