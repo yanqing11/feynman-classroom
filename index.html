@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="费曼小课堂">
-  <link rel="stylesheet" href="./assets/styles.B3W5GTQ3.css">
+  <link rel="stylesheet" href="./assets/styles.RMHQENMN.css">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -195,6 +195,15 @@
           <span class="history-entry-text">
             <strong>学习档案</strong>
             <small id="homeHistoryMeta">还没有记录，讲完一课就会自动保存</small>
+          </span>
+          <span class="history-entry-arrow" aria-hidden="true">→</span>
+        </button>
+
+        <button class="history-entry workspace-entry" id="homeWorkspaceBtn" type="button">
+          <span class="history-entry-mark workspace-entry-mark" aria-hidden="true">师</span>
+          <span class="history-entry-text">
+            <strong>教师工作台</strong>
+            <small>并排对比课时、批量导出与打印视图</small>
           </span>
           <span class="history-entry-arrow" aria-hidden="true">→</span>
         </button>
@@ -1000,6 +1009,7 @@
               <button class="text-link" id="teacherMdBtn" type="button">导出摘要 .md</button>
               <button class="text-link" id="teacherWeekMdBtn" type="button">导出周报 .md</button>
               <button class="text-link" id="teacherImageBtn" type="button">导出长图</button>
+              <button class="text-link" id="teacherWorkspaceBtn" type="button">打开工作台</button>
             </div>
           </div>
           <div class="teacher-insight" id="teacherInsight"></div>
@@ -1083,6 +1093,66 @@
         </section>
 
         <p class="history-note">档案只保存在当前浏览器，不会上传服务器，也不包含聊天图片。清除浏览器数据会同时清除档案。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TEACHER WORKSPACE MODAL ============ -->
+  <div class="modal-layer teacher-workspace-layer" id="teacherWorkspaceModal" hidden>
+    <div class="modal-backdrop" data-close="teacherWorkspaceModal"></div>
+    <div class="modal teacher-workspace" role="dialog" aria-modal="true" aria-labelledby="teacherWorkspaceTitle" tabindex="-1">
+      <div class="workspace-head">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span>TEACHER WORKSPACE</p>
+          <h2 id="teacherWorkspaceTitle">教师工作台</h2>
+          <p class="workspace-head-desc">并排看两节课的差别，按时间线挑出要重讲的课时；全部基于本机档案。</p>
+        </div>
+        <div class="workspace-head-actions workspace-no-print">
+          <button class="btn btn-outline btn-sm" id="workspacePrintBtn" type="button">打印视图</button>
+          <button class="icon-btn modal-close" data-close="teacherWorkspaceModal" type="button" aria-label="关闭教师工作台">×</button>
+        </div>
+      </div>
+
+      <div class="workspace-empty" id="workspaceEmpty" hidden>
+        <div class="history-empty-mark" aria-hidden="true">师</div>
+        <h3>还没有可分析的课时</h3>
+        <p>讲完一课并生成诊断报告后，这里就能并排对比、按时间线复盘。</p>
+      </div>
+
+      <div class="workspace-content" id="workspaceContent">
+        <section class="workspace-block">
+          <div class="history-section-head">
+            <h3>课时并排对比</h3>
+            <div class="history-section-actions workspace-no-print">
+              <label class="workspace-select-label" for="workspaceCompareA">课时 A</label>
+              <select class="workspace-select" id="workspaceCompareA"></select>
+              <label class="workspace-select-label" for="workspaceCompareB">课时 B</label>
+              <select class="workspace-select" id="workspaceCompareB"></select>
+            </div>
+          </div>
+          <div class="workspace-compare" id="workspaceCompare"></div>
+        </section>
+
+        <section class="workspace-block">
+          <div class="history-section-head">
+            <h3>学情时间线</h3>
+            <div class="history-section-actions workspace-no-print">
+              <span class="history-section-meta" id="workspaceBulkCount">已选 0 课</span>
+              <button class="text-link" id="workspaceSelectAllBtn" type="button">全选</button>
+              <button class="text-link" id="workspaceBatchMdBtn" type="button">导出所选 .md</button>
+              <button class="text-link" id="workspaceClearBtn" type="button">清空选择</button>
+            </div>
+          </div>
+          <div class="workspace-timeline" id="workspaceTimeline"></div>
+        </section>
+
+        <section class="workspace-block">
+          <div class="history-section-head">
+            <h3>整体学情</h3>
+            <span class="history-section-meta">基于当前全部本机档案</span>
+          </div>
+          <div class="teacher-insight" id="workspaceSummary"></div>
+        </section>
       </div>
     </div>
   </div>
@@ -1246,6 +1316,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./assets/app.GBNE4TWT.js"></script>
+  <script type="module" src="./assets/app.TM6K4TNN.js"></script>
 </body>
 </html>

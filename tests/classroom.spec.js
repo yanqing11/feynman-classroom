@@ -553,6 +553,123 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   expect(imagePng.readUInt32BE(20)).toBeGreaterThan(1080);
 });
 
+test('教师工作台：并排对比、时间线批量导出与打印视图', async ({ page }) => {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const records = [
+    {
+      id: 'teacher-1',
+      topic: '分数除法',
+      subject: 'primary',
+      tags: ['分数除法'],
+      source: 'custom',
+      endedAt: new Date(now).toISOString(),
+      turns: 3,
+      questions: 5,
+      stuckPoints: [{ turn: 1, at: new Date(now).toISOString() }],
+      report: {
+        overallScore: 58,
+        scores: { conceptMastery: 52, logicIntegrity: 60, clarity: 62 },
+        dimensions: {},
+        misconceptions: [{ title: '把除数的份数当成被除数', fix: '先画线段图。' }],
+        nextSteps: [{ title: '用线段图再讲一次', action: '标出每一份。' }],
+        generatedAt: new Date(now).toISOString()
+      },
+      messages: [{ role: 'user', content: '我把 3/4 米平均分成三份。' }]
+    },
+    {
+      id: 'teacher-2',
+      topic: '分数加减',
+      subject: 'primary',
+      tags: ['分数加法'],
+      source: 'custom',
+      endedAt: new Date(now - day).toISOString(),
+      turns: 2,
+      questions: 2,
+      stuckPoints: [{ turn: 2, at: new Date(now - day).toISOString() }],
+      report: {
+        overallScore: 72,
+        scores: { conceptMastery: 70, logicIntegrity: 74, clarity: 72 },
+        dimensions: {},
+        misconceptions: [{ title: '把除数的份数当成被除数', fix: '对齐单位“1”。' }],
+        nextSteps: [{ title: '先通分再相加', action: '用同样的分母。' }],
+        generatedAt: new Date(now - day).toISOString()
+      },
+      messages: [{ role: 'user', content: '分母不一样也能直接加吗？' }]
+    }
+  ];
+
+  await page.evaluate((items) => {
+    localStorage.setItem('feynman.history.v1', JSON.stringify(items));
+  }, records);
+  await page.reload();
+
+  // 首页入口
+  await page.locator('#homeWorkspaceBtn').click();
+  await expect(page.locator('#teacherWorkspaceModal')).toBeVisible();
+  await expect(page.locator('#teacherWorkspaceModal')).toContainText('教师工作台');
+  await expect(page.locator('.workspace-compare-column')).toHaveCount(2);
+  await expect(page.locator('.workspace-compare')).toContainText('综合评分 A − B：-14 分');
+  await expect(page.locator('.workspace-timeline-row')).toHaveCount(2);
+  await expect(page.locator('#workspaceSummary')).toContainText('最近 5 课平均 65%');
+
+  // 并排对比：切换下拉后差值随之变化
+  await page.locator('#workspaceCompareA').selectOption('teacher-2');
+  await expect(page.locator('#workspaceCompareB')).toHaveValue('');
+  await page.locator('#workspaceCompareB').selectOption('teacher-1');
+  await expect(page.locator('.workspace-compare')).toContainText('综合评分 A − B：+14 分');
+
+  // 时间线点击可依次填入 A / B
+  await page.locator('.workspace-timeline-main').first().click();
+  await expect(page.locator('#workspaceCompareA')).toHaveValue('teacher-1');
+  await expect(page.locator('#workspaceCompareB')).toHaveValue('');
+  await page.locator('.workspace-timeline-main').nth(1).click();
+  await expect(page.locator('#workspaceCompareB')).toHaveValue('teacher-2');
+
+  // 批量全选、导出所选 Markdown、清空选择
+  await page.locator('#workspaceSelectAllBtn').click();
+  await expect(page.locator('#workspaceBulkCount')).toHaveText('已选 2 课');
+  await expect(page.locator('.workspace-timeline-row.is-selected')).toHaveCount(2);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#workspaceBatchMdBtn').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^feynman-workspace-.*\.md$/);
+  const mdText = fs.readFileSync(await download.path(), 'utf8');
+  expect(mdText).toContain('# 教师工作台 · 所选课时');
+  expect(mdText).toContain('# 学情摘要 · 教师视角');
+  expect(mdText).toContain('分数除法');
+  await page.locator('#workspaceClearBtn').click();
+  await expect(page.locator('#workspaceBulkCount')).toHaveText('已选 0 课');
+  await expect(page.locator('.workspace-timeline-row.is-selected')).toHaveCount(0);
+
+  // 打印按钮调用 window.print，打印视图只保留工作台
+  await page.evaluate(() => {
+    window.__printCalls = 0;
+    window.print = () => {
+      window.__printCalls += 1;
+    };
+  });
+  await page.locator('#workspacePrintBtn').click();
+  expect(await page.evaluate(() => window.__printCalls)).toBe(1);
+  await page.emulateMedia({ media: 'print' });
+  const printState = await page.evaluate(() => {
+    const modal = document.getElementById('teacherWorkspaceModal');
+    return {
+      workspace: getComputedStyle(modal).display,
+      backdrop: getComputedStyle(modal.querySelector('.modal-backdrop')).display,
+      actions: getComputedStyle(modal.querySelector('.workspace-head-actions')).display,
+      report: getComputedStyle(document.getElementById('reportModal')).display,
+      timeline: getComputedStyle(document.getElementById('workspaceTimeline')).display
+    };
+  });
+  expect(printState.workspace).not.toBe('none');
+  expect(printState.backdrop).toBe('none');
+  expect(printState.actions).toBe('none');
+  expect(printState.report).toBe('none');
+  expect(printState.timeline).not.toBe('none');
+  await page.emulateMedia({ media: 'screen' });
+});
+
 test('档案导入与清空会同步写入本机数据库', async ({ page }) => {
   const backup = {
     app: 'Feynman Classroom',

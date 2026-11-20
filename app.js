@@ -358,6 +358,21 @@ const refs = {
   historySelectAllBtn: $('#historySelectAllBtn'),
   historyBulkDeleteBtn: $('#historyBulkDeleteBtn'),
   historyBulkCancelBtn: $('#historyBulkCancelBtn'),
+  homeWorkspaceBtn: $('#homeWorkspaceBtn'),
+  teacherWorkspaceBtn: $('#teacherWorkspaceBtn'),
+  teacherWorkspaceModal: $('#teacherWorkspaceModal'),
+  workspaceEmpty: $('#workspaceEmpty'),
+  workspaceContent: $('#workspaceContent'),
+  workspacePrintBtn: $('#workspacePrintBtn'),
+  workspaceCompareA: $('#workspaceCompareA'),
+  workspaceCompareB: $('#workspaceCompareB'),
+  workspaceCompare: $('#workspaceCompare'),
+  workspaceBulkCount: $('#workspaceBulkCount'),
+  workspaceSelectAllBtn: $('#workspaceSelectAllBtn'),
+  workspaceBatchMdBtn: $('#workspaceBatchMdBtn'),
+  workspaceClearBtn: $('#workspaceClearBtn'),
+  workspaceTimeline: $('#workspaceTimeline'),
+  workspaceSummary: $('#workspaceSummary'),
   replayModal: $('#replayModal'),
   replayTitle: $('#replayTitle'),
   replayMeta: $('#replayMeta'),
@@ -548,6 +563,9 @@ let builtinQuestionsFailed = false;
 let historyFilter = { subject: 'all', source: 'all', range: 'all' };
 let teacherFocus = { tag: 'all', band: 'all' };
 let teacherRecords = [];
+let workspaceRecords = [];
+let workspaceSelection = new Set();
+let workspaceCompare = { a: '', b: '' };
 const HISTORY_RANGE_DAYS = { all: 0, 30: 30, 7: 7 };
 let historySelectMode = false;
 let historySelection = new Set();
@@ -4960,6 +4978,251 @@ function renderTeacherView(records, summary) {
   refs.teacherInsight.append(deep);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Teacher workspace · full screen, local only                                */
+/* -------------------------------------------------------------------------- */
+
+function openTeacherWorkspace() {
+  workspaceRecords = loadHistory().slice();
+  const valid = new Set(workspaceRecords.map((record) => record.id));
+  workspaceSelection = new Set([...workspaceSelection].filter((id) => valid.has(id)));
+  if (!workspaceCompare.a || !valid.has(workspaceCompare.a)) {
+    workspaceCompare.a = workspaceRecords[0]?.id || '';
+  }
+  if (!workspaceCompare.b || !valid.has(workspaceCompare.b) || workspaceCompare.b === workspaceCompare.a) {
+    workspaceCompare.b = workspaceRecords[1]?.id || '';
+  }
+  renderTeacherWorkspace();
+  openModal('teacherWorkspaceModal');
+}
+
+function workspaceRecord(id) {
+  return workspaceRecords.find((record) => record.id === id) || null;
+}
+
+function fillWorkspaceSelect(select, selectedId) {
+  if (!select) return;
+  select.replaceChildren();
+  select.append(new Option('选择课时', ''));
+  for (const record of workspaceRecords) {
+    const score = Number(record.report?.overallScore);
+    const label = `${formatArchiveDate(record.endedAt)} · ${record.topic || '未命名课时'}${
+      Number.isFinite(score) ? ` · ${score}%` : ''
+    }`;
+    select.append(new Option(label, record.id));
+  }
+  select.value = selectedId || '';
+}
+
+function workspaceDiff(valueA, valueB, suffix = '') {
+  if (!Number.isFinite(valueA) || !Number.isFinite(valueB)) return '—';
+  const diff = Math.round(valueA - valueB);
+  return `${diff > 0 ? '+' : ''}${diff}${suffix}`;
+}
+
+function workspaceCompareColumn(record, side) {
+  const column = el('div', `workspace-compare-column is-${side}`);
+  if (!record) {
+    column.append(el('p', 'teacher-card-empty', '选择一节课开始对比。'));
+    return column;
+  }
+  const head = el('div', 'workspace-compare-head');
+  head.append(el('span', 'workspace-side-label', side === 'a' ? '课时 A' : '课时 B'));
+  head.append(el('strong', '', record.topic || '未命名课时'));
+  column.append(head);
+  column.append(
+    el('p', 'teacher-card-note', `${subjectInfo(record.subject)?.label || '未分科'} · ${formatArchiveDate(record.endedAt)}`)
+  );
+
+  const score = Number(record.report?.overallScore);
+  const scoreBox = el('div', 'workspace-score');
+  scoreBox.append(
+    el('strong', '', Number.isFinite(score) ? `${score}%` : '—'),
+    el('small', '', '综合评分')
+  );
+  column.append(scoreBox);
+
+  for (const metric of METRICS) {
+    const value = Number(record.report?.scores?.[metric.key]);
+    const row = el('div', 'dimension-row');
+    const track = el('div', 'dimension-track');
+    const fill = el('div', 'dimension-fill');
+    fill.style.setProperty('--value', `${Number.isFinite(value) ? value : 0}%`);
+    track.append(fill);
+    row.append(
+      el('span', 'dimension-name', metric.label),
+      track,
+      el('span', 'dimension-value', Number.isFinite(value) ? `${value}%` : '—')
+    );
+    column.append(row);
+  }
+
+  const facts = el('div', 'workspace-facts');
+  facts.append(
+    el('span', '', `讲课轮数 ${record.turns || 0}`),
+    el('span', '', `AI 提问 ${record.questions || 0}`),
+    el('span', '', `卡点 ${Array.isArray(record.stuckPoints) ? record.stuckPoints.length : 0} 个`)
+  );
+  column.append(facts);
+  const tags = normalizeTags(record.tags);
+  if (tags.length) column.append(el('p', 'workspace-tags', tags.join('、')));
+  const gaps = Array.isArray(record.report?.misconceptions) ? record.report.misconceptions : [];
+  if (gaps.length) {
+    column.append(el('p', 'teacher-item-quote', `理解缺口：${gaps[0].title || '未命名'}`));
+  }
+
+  const openBtn = el('button', 'btn btn-outline btn-sm', '查看完整报告');
+  openBtn.type = 'button';
+  openBtn.addEventListener('click', () => {
+    if (!record.report) return;
+    presentReport(record.report, {
+      topic: record.topic,
+      archived: true,
+      meta: formatRecordMeta(record),
+      record
+    });
+  });
+  column.append(openBtn);
+  return column;
+}
+
+function renderWorkspaceCompare() {
+  if (!refs.workspaceCompare) return;
+  refs.workspaceCompare.replaceChildren();
+  const a = workspaceRecord(workspaceCompare.a);
+  const b = workspaceRecord(workspaceCompare.b);
+  refs.workspaceCompare.append(workspaceCompareColumn(a, 'a'), workspaceCompareColumn(b, 'b'));
+  if (!a || !b) return;
+
+  const delta = el('div', 'workspace-compare-delta');
+  delta.append(
+    el(
+      'strong',
+      '',
+      `综合评分 A − B：${workspaceDiff(
+        Number(a.report?.overallScore),
+        Number(b.report?.overallScore),
+        ' 分'
+      )}`
+    )
+  );
+  for (const metric of METRICS) {
+    delta.append(
+      el(
+        'span',
+        '',
+        `${metric.label} ${workspaceDiff(
+          Number(a.report?.scores?.[metric.key]),
+          Number(b.report?.scores?.[metric.key])
+        )}`
+      )
+    );
+  }
+  refs.workspaceCompare.append(delta);
+}
+
+function renderWorkspaceBulkCount() {
+  if (refs.workspaceBulkCount) {
+    refs.workspaceBulkCount.textContent = `已选 ${workspaceSelection.size} 课`;
+  }
+  if (refs.workspaceBatchMdBtn) refs.workspaceBatchMdBtn.disabled = workspaceSelection.size === 0;
+}
+
+function renderWorkspaceTimeline() {
+  if (!refs.workspaceTimeline) return;
+  refs.workspaceTimeline.replaceChildren();
+  if (!workspaceRecords.length) {
+    refs.workspaceTimeline.append(el('p', 'teacher-card-empty', '暂无课时记录。'));
+    return;
+  }
+  for (const record of workspaceRecords) {
+    const row = el('div', 'workspace-timeline-row');
+    if (workspaceSelection.has(record.id)) row.classList.add('is-selected');
+
+    const check = el('input', 'workspace-check');
+    check.type = 'checkbox';
+    check.checked = workspaceSelection.has(record.id);
+    check.setAttribute('aria-label', `选择课时 ${record.topic || ''}`);
+    check.addEventListener('change', () => {
+      if (check.checked) workspaceSelection.add(record.id);
+      else workspaceSelection.delete(record.id);
+      row.classList.toggle('is-selected', check.checked);
+      renderWorkspaceBulkCount();
+    });
+
+    const main = el('button', 'workspace-timeline-main');
+    main.type = 'button';
+    const score = Number(record.report?.overallScore);
+    const head = el('span', 'workspace-timeline-head');
+    head.append(
+      el('strong', '', record.topic || '未命名课时'),
+      el('span', 'teacher-focus-score', Number.isFinite(score) ? `${score}%` : '暂无评分')
+    );
+    main.append(head);
+    const tags = normalizeTags(record.tags);
+    const meta = [formatArchiveDate(record.endedAt), subjectInfo(record.subject)?.short || '未分科'];
+    if (tags.length) meta.push(tags.join('、'));
+    if (Array.isArray(record.stuckPoints) && record.stuckPoints.length) {
+      meta.push(`卡点 ${record.stuckPoints.length} 个`);
+    }
+    main.append(el('span', 'teacher-focus-meta', meta.join(' · ')));
+    main.addEventListener('click', () => {
+      if (!workspaceCompare.a || (workspaceCompare.a && workspaceCompare.b)) {
+        workspaceCompare.a = record.id;
+        workspaceCompare.b = '';
+      } else {
+        workspaceCompare.b = record.id;
+      }
+      fillWorkspaceSelect(refs.workspaceCompareA, workspaceCompare.a);
+      fillWorkspaceSelect(refs.workspaceCompareB, workspaceCompare.b);
+      renderWorkspaceCompare();
+    });
+
+    row.append(check, main);
+    refs.workspaceTimeline.append(row);
+  }
+}
+
+function renderWorkspaceSummary() {
+  if (!refs.workspaceSummary) return;
+  refs.workspaceSummary.replaceChildren();
+  const view = summarizeTeacherView(workspaceRecords);
+  const headline = el('div', 'teacher-headline');
+  headline.append(el('p', 'teacher-headline-text', view.headline));
+  const metrics = el('div', 'teacher-metrics');
+  metrics.append(teacherMetric('最近 5 课', { current: view.summary.recent, delta: view.summary.delta }));
+  for (const metric of METRICS) metrics.append(teacherMetric(metric.label, view.metricTrends[metric.key]));
+  refs.workspaceSummary.append(headline, teacherWeek(view.week), metrics, teacherAdvice(view));
+}
+
+function renderTeacherWorkspace() {
+  const empty = workspaceRecords.length === 0;
+  if (refs.workspaceEmpty) refs.workspaceEmpty.hidden = !empty;
+  if (refs.workspaceContent) refs.workspaceContent.hidden = empty;
+  if (empty) return;
+  fillWorkspaceSelect(refs.workspaceCompareA, workspaceCompare.a);
+  fillWorkspaceSelect(refs.workspaceCompareB, workspaceCompare.b);
+  renderWorkspaceCompare();
+  renderWorkspaceTimeline();
+  renderWorkspaceBulkCount();
+  renderWorkspaceSummary();
+}
+
+function exportWorkspaceSelection() {
+  const selected = workspaceRecords.filter((record) => workspaceSelection.has(record.id));
+  if (!selected.length) {
+    toast('先勾选要导出的课时。', 'warm');
+    return;
+  }
+  const view = summarizeTeacherView(selected);
+  const text = `# 教师工作台 · 所选课时\n\n生成时间：${new Date().toLocaleDateString('zh-CN')}\n\n共 ${selected.length} 课\n\n${teacherViewToText(view)}`;
+  downloadBlob(
+    new Blob([text], { type: 'text/markdown;charset=utf-8' }),
+    `feynman-workspace-${teacherStamp()}.md`
+  );
+  toast('所选课时的学情摘要已导出。', 'success');
+}
+
 /** 只刷新重点课时列表，避免筛选时整块面板闪烁。 */
 function renderTeacherFocus(records) {
   const list = refs.teacherInsight?.querySelector('.teacher-focus-list');
@@ -6480,6 +6743,37 @@ function bindEvents() {
   refs.teacherMdBtn?.addEventListener('click', exportTeacherMarkdown);
   refs.teacherWeekMdBtn?.addEventListener('click', exportWeeklyMarkdown);
   refs.teacherImageBtn?.addEventListener('click', exportTeacherImage);
+  refs.teacherWorkspaceBtn?.addEventListener('click', openTeacherWorkspace);
+  refs.homeWorkspaceBtn?.addEventListener('click', openTeacherWorkspace);
+  refs.workspacePrintBtn?.addEventListener('click', () => window.print());
+  refs.workspaceCompareA?.addEventListener('change', () => {
+    workspaceCompare.a = refs.workspaceCompareA.value;
+    if (workspaceCompare.a && workspaceCompare.a === workspaceCompare.b) {
+      workspaceCompare.b = '';
+      if (refs.workspaceCompareB) refs.workspaceCompareB.value = '';
+    }
+    renderWorkspaceCompare();
+  });
+  refs.workspaceCompareB?.addEventListener('change', () => {
+    workspaceCompare.b = refs.workspaceCompareB.value;
+    if (workspaceCompare.b && workspaceCompare.b === workspaceCompare.a) {
+      workspaceCompare.a = '';
+      if (refs.workspaceCompareA) refs.workspaceCompareA.value = '';
+    }
+    renderWorkspaceCompare();
+  });
+  refs.workspaceSelectAllBtn?.addEventListener('click', () => {
+    if (workspaceSelection.size === workspaceRecords.length) workspaceSelection.clear();
+    else workspaceSelection = new Set(workspaceRecords.map((record) => record.id));
+    renderWorkspaceTimeline();
+    renderWorkspaceBulkCount();
+  });
+  refs.workspaceBatchMdBtn?.addEventListener('click', exportWorkspaceSelection);
+  refs.workspaceClearBtn?.addEventListener('click', () => {
+    workspaceSelection.clear();
+    renderWorkspaceTimeline();
+    renderWorkspaceBulkCount();
+  });
   refs.teacherInsight?.addEventListener('change', (event) => {
     if (!event.target.matches('.teacher-focus-select')) return;
     teacherFocus.tag = event.target.value;
