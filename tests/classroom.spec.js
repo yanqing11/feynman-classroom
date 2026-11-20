@@ -508,6 +508,34 @@ test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', as
   expect(weekly).toContain('# 本周学情周报');
   expect(weekly).toContain('近 7 天：2 课');
   expect(weekly).toContain('学生原话：「我把 3/4 米平均分成三份。」');
+
+  // 导出学情摘要 Markdown 文件
+  const mdPromise = page.waitForEvent('download');
+  await page.locator('#teacherMdBtn').click();
+  const md = await mdPromise;
+  expect(md.suggestedFilename()).toMatch(/^feynman-teacher-.*\.md$/);
+  const mdText = fs.readFileSync(await md.path(), 'utf8');
+  expect(mdText).toContain('# 学情摘要 · 教师视角');
+  expect(mdText).toContain('分数除法');
+
+  // 导出本周周报 Markdown 文件
+  const weeklyMdPromise = page.waitForEvent('download');
+  await page.locator('#teacherWeekMdBtn').click();
+  const weeklyMd = await weeklyMdPromise;
+  expect(weeklyMd.suggestedFilename()).toMatch(/^feynman-weekly-.*\.md$/);
+  const weeklyMdText = fs.readFileSync(await weeklyMd.path(), 'utf8');
+  expect(weeklyMdText).toContain('# 本周学情周报');
+  expect(weeklyMdText).toContain('学生原话：「我把 3/4 米平均分成三份。」');
+
+  // 导出学情长图 PNG
+  const imagePromise = page.waitForEvent('download');
+  await page.locator('#teacherImageBtn').click();
+  const image = await imagePromise;
+  expect(image.suggestedFilename()).toMatch(/^feynman-teacher-.*\.png$/);
+  const imagePng = fs.readFileSync(await image.path());
+  expect(imagePng.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(imagePng.readUInt32BE(16)).toBe(1080);
+  expect(imagePng.readUInt32BE(20)).toBeGreaterThan(1080);
 });
 
 test('档案导入与清空会同步写入本机数据库', async ({ page }) => {

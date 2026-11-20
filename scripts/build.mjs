@@ -27,7 +27,7 @@ async function main() {
   fs.mkdirSync(assetsDir, { recursive: true });
   // Remove every previously generated hashed file, including split chunks.
   for (const entry of fs.readdirSync(assetsDir)) {
-    if (/^(?:app|styles|report-image|chunk|speech|canvas)[.-][A-Za-z0-9]{8,10}\.(?:js|css)$/.test(entry)) {
+    if (/^(?:app|styles|report-image|teacher-image|chunk|speech|canvas)[.-][A-Za-z0-9]{8,10}\.(?:js|css)$/.test(entry)) {
       fs.rmSync(path.join(assetsDir, entry));
     }
   }

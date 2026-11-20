@@ -330,6 +330,9 @@ const refs = {
   teacherMeta: $('#teacherMeta'),
   teacherCopyBtn: $('#teacherCopyBtn'),
   teacherWeekBtn: $('#teacherWeekBtn'),
+  teacherMdBtn: $('#teacherMdBtn'),
+  teacherWeekMdBtn: $('#teacherWeekMdBtn'),
+  teacherImageBtn: $('#teacherImageBtn'),
   historySummary: $('#historySummary'),
   historySubjectFilter: $('#historySubjectFilter'),
   historyRangeFilter: $('#historyRangeFilter'),
@@ -3086,6 +3089,49 @@ async function exportReportImage() {
     toast('图片生成失败，请改用「复制 Markdown」。', 'error');
   } finally {
     refs.exportReportImageBtn.disabled = false;
+  }
+}
+
+/* --- 教师学情导出：Markdown 文件与长图（渲染器按需加载）-------------------- */
+
+function teacherStamp() {
+  return new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+}
+
+function teacherExportRecords() {
+  return filterHistoryRecords(loadHistory());
+}
+
+function exportTeacherMarkdown() {
+  const view = summarizeTeacherView(teacherExportRecords());
+  downloadBlob(
+    new Blob([teacherViewToText(view)], { type: 'text/markdown;charset=utf-8' }),
+    `feynman-teacher-${teacherStamp()}.md`
+  );
+  toast('学情摘要已保存为 Markdown 文件。', 'success');
+}
+
+function exportWeeklyMarkdown() {
+  const text = teacherWeeklyReport(teacherExportRecords());
+  downloadBlob(
+    new Blob([text], { type: 'text/markdown;charset=utf-8' }),
+    `feynman-weekly-${teacherStamp()}.md`
+  );
+  toast('本周周报已保存为 Markdown 文件。', 'success');
+}
+
+async function exportTeacherImage() {
+  if (!refs.teacherImageBtn) return;
+  refs.teacherImageBtn.disabled = true;
+  try {
+    const { renderTeacherImage } = await import('./js/teacher-image.js');
+    const blob = await renderTeacherImage(teacherExportRecords());
+    downloadBlob(blob, `feynman-teacher-${teacherStamp()}.png`);
+    toast('学情长图已保存，可以直接发给家长或老师。', 'success', 3200);
+  } catch {
+    toast('长图生成失败，请改用「导出摘要」。', 'error');
+  } finally {
+    refs.teacherImageBtn.disabled = false;
   }
 }
 
@@ -6207,6 +6253,9 @@ function bindEvents() {
     const ok = await copyText(teacherWeeklyReport(filterHistoryRecords(loadHistory())));
     toast(ok ? '本周学情报告已复制。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
   });
+  refs.teacherMdBtn?.addEventListener('click', exportTeacherMarkdown);
+  refs.teacherWeekMdBtn?.addEventListener('click', exportWeeklyMarkdown);
+  refs.teacherImageBtn?.addEventListener('click', exportTeacherImage);
   refs.teacherInsight?.addEventListener('change', (event) => {
     if (!event.target.matches('.teacher-focus-select')) return;
     teacherFocus.tag = event.target.value;
