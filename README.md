@@ -108,6 +108,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 | 理解缺口 | 每条包含证据、原因、怎么补；可一键针对缺口重新开课 |
 | 下一次这样讲 | 带示范话术的具体建议，可一键复制 Markdown 报告 |
 | 学习档案 | 首页入口；记录学科、主题、时间、三维分数，支持展开详情、课堂回放、单条删除与 Markdown 复制；卡点会单独汇总，可一键重讲 |
+| 教师视角学情面板 | 档案顶部的学情速览：一句话结论、近五次与三维趋势、课时质量分布、优先补的知识点、反复出现的理解缺口、下一次教学动作；一键复制学情摘要，点卡片直达对应诊断报告 |
 | 报告导出 | 报告可复制 Markdown，也可导出 1080px 宽、至少 1200px 高的 PNG 长图，渲染器按需加载；方便发给老师或存档 |
 | 备份与恢复 | 设置里可导出全部 JSON，也可导入备份：档案按记录 ID 合并，题库按题目 ID 合并；导入不会覆盖当前 API Key |
 | 自动保存与恢复 | 当前对话与 `hasTeacherSpeak` 同步写入 `localStorage` 与本机数据库，刷新后可直接接着讲；界面会显示最近一次自动保存时间；也可以「放弃本次课堂」，确认后清空且不归档 |
@@ -153,7 +154,7 @@ https://feynman-classroom-proxy.netlify.app/v1
 │   ├── api.js              # OpenRouter / OpenAI-compatible 客户端（流式 + JSON）
 │   ├── agents.js           # StudentAgent / TeacherAgent、学科上下文与报告归一化
 │   ├── store.js            # 状态机、会话与课堂参数持久化、设置
-│   ├── history.js          # 学习档案、分学科 / 来源 / 知识点统计
+│   ├── history.js          # 学习档案、分学科 / 来源 / 知识点统计、教师视角学情汇总
 │   ├── db.js               # 统一本机数据库（IndexedDB v2，五张表 + 一次性迁移）
 │   ├── bank.js             # 我的题库（统一 IndexedDB + localStorage 回退）
 │   ├── speech.js           # Web Speech API 封装（按需加载）

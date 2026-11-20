@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="费曼小课堂">
-  <link rel="stylesheet" href="./assets/styles.7S6YS4ZE.css">
+  <link rel="stylesheet" href="./assets/styles.FMTH37C3.css">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -953,7 +953,7 @@
         <div>
           <p class="eyebrow"><span class="eyebrow-line"></span>LEARNING ARCHIVE</p>
           <h2 id="historyTitle">学习档案</h2>
-          <p>每讲完一课，主题、轮数、当时的回答和诊断报告都会留在这里；上方的数据看板帮你看清长期变化。</p>
+          <p>每讲完一课，主题、轮数、当时的回答和诊断报告都会留在这里；上方的教师视角帮你快速判断该先补什么。</p>
         </div>
         <button class="icon-btn modal-close" data-close="historyModal" type="button" aria-label="关闭学习档案">×</button>
       </div>
@@ -989,6 +989,17 @@
             <button class="btn btn-ghost btn-sm" id="historyBulkCancelBtn" type="button">退出选择</button>
           </div>
         </div>
+
+        <section class="history-block teacher-block" id="teacherBlock">
+          <div class="history-section-head">
+            <h3>教师视角 · 学情速览</h3>
+            <div class="history-section-actions">
+              <span class="history-section-meta" id="teacherMeta"></span>
+              <button class="text-link" id="teacherCopyBtn" type="button">复制学情摘要</button>
+            </div>
+          </div>
+          <div class="teacher-insight" id="teacherInsight"></div>
+        </section>
 
         <section class="history-summary" id="historySummary"></section>
 
@@ -1231,6 +1242,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="./assets/app.YBW2FQKL.js"></script>
+  <script type="module" src="./assets/app.FKKAGLIR.js"></script>
 </body>
 </html>

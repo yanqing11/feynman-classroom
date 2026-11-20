@@ -3735,6 +3735,258 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.teacher-insight {
+  display: grid;
+  gap: 12px;
+}
+
+.teacher-headline {
+  padding: 14px 16px;
+  border: 1px solid rgba(31, 111, 92, 0.24);
+  border-left: 3px solid var(--green);
+  border-radius: 14px;
+  background: var(--green-pale);
+}
+
+.teacher-headline-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.teacher-stuck-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.teacher-stuck-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.teacher-stuck-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--green-deep);
+  font-size: 12px;
+}
+
+.teacher-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.teacher-metric {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.teacher-metric > strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.teacher-metric-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.teacher-metric-foot small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.teacher-delta {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-delta.is-up {
+  color: var(--green-deep);
+}
+
+.teacher-delta.is-down {
+  color: var(--coral);
+}
+
+.teacher-bands {
+  display: grid;
+  gap: 7px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.teacher-bands-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-band-track {
+  display: flex;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.teacher-band {
+  display: block;
+  height: 100%;
+}
+
+.teacher-band.is-retake {
+  background: var(--coral);
+}
+
+.teacher-band.is-reinforce {
+  background: var(--gold);
+}
+
+.teacher-band.is-mastered {
+  background: var(--green);
+}
+
+.teacher-band-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.teacher-band-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.teacher-band-label::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.teacher-band-label.is-retake::before {
+  background: var(--coral);
+}
+
+.teacher-band-label.is-reinforce::before {
+  background: var(--gold);
+}
+
+.teacher-band-label.is-mastered::before {
+  background: var(--green);
+}
+
+.teacher-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.teacher-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.teacher-card h4 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.teacher-card-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-card-list {
+  display: grid;
+  gap: 7px;
+}
+
+.teacher-card-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.teacher-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.teacher-item:hover {
+  border-color: var(--green);
+  background: var(--green-pale);
+}
+
+.teacher-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.teacher-item-head strong {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.teacher-item-meta {
+  flex: none;
+  color: var(--green-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teacher-item-detail,
+.teacher-item-foot {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-item-foot {
+  color: var(--faint);
+}
+
 .trend-chart {
   position: relative;
   min-height: 132px;
@@ -4665,6 +4917,14 @@ input[type="range"] {
 
   .history-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-cards {
+    grid-template-columns: 1fr;
   }
 
   .history-item-main {

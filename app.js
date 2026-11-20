@@ -50,7 +50,9 @@ import {
   summarizeBySubject,
   summarizeHistory,
   summarizeInteractions,
-  summarizeTags
+  summarizeTags,
+  summarizeTeacherView,
+  teacherViewToText
 } from './js/history.js';
 import {
   DB_NAME,
@@ -321,6 +323,10 @@ const refs = {
   historyModal: $('#historyModal'),
   historyEmpty: $('#historyEmpty'),
   historyContent: $('#historyContent'),
+  teacherBlock: $('#teacherBlock'),
+  teacherInsight: $('#teacherInsight'),
+  teacherMeta: $('#teacherMeta'),
+  teacherCopyBtn: $('#teacherCopyBtn'),
   historySummary: $('#historySummary'),
   historySubjectFilter: $('#historySubjectFilter'),
   historyRangeFilter: $('#historyRangeFilter'),
@@ -4045,6 +4051,7 @@ function renderHistory() {
 
   const visible = filterHistoryRecords(records);
   const summary = summarizeHistory(visible);
+  renderTeacherView(visible, summary);
   renderHistorySummary(summary);
   renderActivity(visible);
   renderSubjectOverview(visible);
@@ -4467,6 +4474,153 @@ function historyStat(value, unit, label, { accent = false, text = '' } = {}) {
   }
   card.append(strong, el('small', '', label));
   return card;
+}
+
+function teacherMetric(label, trend) {
+  const card = el('div', 'teacher-metric');
+  card.append(el('strong', '', Number.isFinite(trend?.current) ? `${trend.current}%` : '—'));
+  const foot = el('div', 'teacher-metric-foot');
+  foot.append(el('small', '', label));
+  if (trend?.delta != null) {
+    const sign = trend.delta > 0 ? '+' : '';
+    const level = trend.delta >= 0 ? 'is-up' : 'is-down';
+    foot.append(el('span', `teacher-delta ${level}`, `${sign}${trend.delta}`));
+  }
+  card.append(foot);
+  return card;
+}
+
+function teacherBands(bands, scored) {
+  const wrap = el('div', 'teacher-bands');
+  wrap.append(el('span', 'teacher-bands-label', '课时质量分布'));
+  const track = el('div', 'teacher-band-track');
+  const legend = el('div', 'teacher-band-legend');
+  const groups = [
+    ['retake', '需重讲'],
+    ['reinforce', '待巩固'],
+    ['mastered', '已掌握']
+  ];
+  for (const [key, label] of groups) {
+    const count = bands[key] || 0;
+    if (count) {
+      const segment = el('span', `teacher-band is-${key}`);
+      segment.style.width = `${(count / Math.max(1, scored)) * 100}%`;
+      segment.title = `${label} ${count} 课`;
+      track.append(segment);
+    }
+    legend.append(el('span', `teacher-band-label is-${key}`, `${label} ${count}`));
+  }
+  wrap.append(track, legend);
+  return wrap;
+}
+
+function teacherItem({ title, meta = '', detail = '', foot = '', onClick }) {
+  const button = el('button', 'teacher-item');
+  button.type = 'button';
+  const head = el('span', 'teacher-item-head');
+  head.append(el('strong', '', title));
+  if (meta) head.append(el('span', 'teacher-item-meta', meta));
+  button.append(head);
+  if (detail) button.append(el('span', 'teacher-item-detail', detail));
+  if (foot) button.append(el('span', 'teacher-item-foot', foot));
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function teacherCard(title, note, items) {
+  const card = el('article', 'teacher-card');
+  card.append(el('h4', '', title), el('p', 'teacher-card-note', note));
+  const list = el('div', 'teacher-card-list');
+  if (!items.length) {
+    list.append(el('p', 'teacher-card-empty', '暂无可分析的数据。'));
+  } else {
+    for (const item of items) list.append(item);
+  }
+  card.append(list);
+  return card;
+}
+
+/** 教师视角：把档案里分散的分数、缺口和建议，整理成可直接行动的三张卡片。 */
+function renderTeacherView(records, summary) {
+  if (!refs.teacherInsight) return;
+  refs.teacherInsight.replaceChildren();
+  const view = summarizeTeacherView(records);
+  const byId = (id) => records.find((record) => record.id === id);
+  const openRecord = (record) => {
+    if (!record?.report) return;
+    presentReport(record.report, {
+      topic: record.topic,
+      archived: true,
+      meta: formatRecordMeta(record),
+      record
+    });
+  };
+
+  if (refs.teacherMeta) {
+    refs.teacherMeta.textContent = view.scored
+      ? `${view.scored} 份诊断 · 基于当前筛选`
+      : '基于当前筛选的本机档案';
+  }
+
+  const headline = el('div', 'teacher-headline');
+  headline.append(el('p', 'teacher-headline-text', view.headline));
+  if (view.stuckSubjects.length) {
+    const chips = el('div', 'teacher-stuck-chips');
+    chips.append(el('span', 'teacher-stuck-label', '卡点分布'));
+    for (const item of view.stuckSubjects.slice(0, 4)) {
+      chips.append(el('span', 'teacher-stuck-chip', `${item.label} ${item.count}`));
+    }
+    headline.append(chips);
+  }
+  refs.teacherInsight.append(headline);
+
+  const metrics = el('div', 'teacher-metrics');
+  metrics.append(
+    teacherMetric('最近 5 课', {
+      current: summary.recent,
+      delta: summary.delta
+    })
+  );
+  for (const metric of METRICS) {
+    metrics.append(teacherMetric(metric.label, view.metricTrends[metric.key]));
+  }
+  refs.teacherInsight.append(metrics, teacherBands(view.bands, view.scored));
+
+  const weakItems = view.weakTags.map((tag) =>
+    teacherItem({
+      title: tag.tag,
+      meta: tag.average == null ? '—' : `${tag.average}%`,
+      detail: `${subjectInfo(tag.subject)?.short || '未分科'} · 练过 ${tag.sessions} 次`,
+      foot: '看最低分那节课',
+      onClick: () => openRecord(tag.record || byId(tag.recordId))
+    })
+  );
+  const misconceptionItems = view.misconceptions.map((item) =>
+    teacherItem({
+      title: item.title,
+      meta: `${item.count} 次`,
+      detail: item.evidence || item.why || '',
+      foot: item.fix ? `怎么补：${item.fix}` : '查看对应报告',
+      onClick: () => openRecord(byId(item.recordId))
+    })
+  );
+  const stepItems = view.prioritySteps.map((step) =>
+    teacherItem({
+      title: step.title,
+      meta: `那课 ${step.score}%`,
+      detail: step.action || step.example || '',
+      foot: step.recordTopic,
+      onClick: () => openRecord(step.record || byId(step.recordId))
+    })
+  );
+
+  const grid = el('div', 'teacher-cards');
+  grid.append(
+    teacherCard('优先补的知识点', '按平均分从低到高排列', weakItems),
+    teacherCard('反复出现的理解缺口', '同一问题出现多次时，优先在下一课处理', misconceptionItems),
+    teacherCard('下一次教学动作', '来自低分课的诊断建议，点开看完整报告', stepItems)
+  );
+  refs.teacherInsight.append(grid);
 }
 
 function renderHistorySummary(summary) {
@@ -5916,6 +6070,11 @@ function bindEvents() {
   refs.storageBannerExport?.addEventListener('click', handleExportData);
   refs.storageBannerManage?.addEventListener('click', openStorageSettings);
   refs.dbRefreshBtn?.addEventListener('click', () => void refreshDbStatus());
+  refs.teacherCopyBtn?.addEventListener('click', async () => {
+    const view = summarizeTeacherView(filterHistoryRecords(loadHistory()));
+    const ok = await copyText(teacherViewToText(view));
+    toast(ok ? '学情摘要已复制到剪贴板。' : '复制失败，请手动选择文字。', ok ? 'success' : 'error');
+  });
   refs.storageBannerClose?.addEventListener('click', dismissStorageBanner);
   window.addEventListener('feynman:storage-warning', handleStorageWarningEvent);
 

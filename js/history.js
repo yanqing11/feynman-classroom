@@ -537,6 +537,200 @@ export function summarizeTags(records) {
     });
 }
 
+function tidyText(value, max = 140) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function lowestScoredRecord(records, tag) {
+  const matches = records.filter(
+    (record) => Number.isFinite(record.report?.overallScore) && normalizeTags(record.tags).includes(tag)
+  );
+  return matches.sort((a, b) => a.report.overallScore - b.report.overallScore)[0] || null;
+}
+
+/**
+ * 教师视角学情：把已有档案整理成「先看什么、先补什么」。
+ * 所有结论都来自当前筛选范围内的记录，不新增任何网络请求。
+ */
+export function summarizeTeacherView(records) {
+  const list = Array.isArray(records) ? records : [];
+  const summary = summarizeHistory(list);
+  const scored = list.filter(
+    (record) => record.report && Number.isFinite(record.report.overallScore)
+  );
+  const recent = scored.slice(0, 5);
+  const previous = scored.slice(5, 10);
+
+  const metricTrends = {};
+  for (const metric of METRICS) {
+    const now = average(recent.map((record) => Number(record.report.scores?.[metric.key])));
+    const before = average(previous.map((record) => Number(record.report.scores?.[metric.key])));
+    metricTrends[metric.key] = {
+      label: metric.label,
+      current: now,
+      previous: before,
+      delta: Number.isFinite(now) && Number.isFinite(before) ? now - before : null
+    };
+  }
+
+  const weakTags = summarizeTags(list)
+    .filter((item) => Number.isFinite(item.average))
+    .slice(0, 3)
+    .map((item) => ({ ...item, record: lowestScoredRecord(list, item.tag) }));
+
+  const misconceptionMap = new Map();
+  for (const record of list) {
+    for (const item of Array.isArray(record.report?.misconceptions) ? record.report.misconceptions : []) {
+      const title = tidyText(item?.title || item?.type, 40) || '未命名理解缺口';
+      const key = title.toLocaleLowerCase();
+      if (!misconceptionMap.has(key)) {
+        misconceptionMap.set(key, {
+          title,
+          count: 0,
+          subjects: new Set(),
+          evidence: '',
+          why: '',
+          fix: '',
+          nextGoal: '',
+          record
+        });
+      }
+      const entry = misconceptionMap.get(key);
+      entry.count += 1;
+      if (record.subject) entry.subjects.add(record.subject);
+      if (!entry.evidence) entry.evidence = tidyText(item?.evidence, 160);
+      if (!entry.why) entry.why = tidyText(item?.why, 160);
+      if (!entry.fix) entry.fix = tidyText(item?.fix, 160);
+      if (!entry.nextGoal) entry.nextGoal = tidyText(item?.nextGoal, 160);
+    }
+  }
+  const misconceptions = [...misconceptionMap.values()]
+    .map((entry) => ({
+      ...entry,
+      subjects: [...entry.subjects],
+      recordId: entry.record.id,
+      recordTopic: entry.record.topic
+    }))
+    .sort((a, b) => b.count - a.count || String(b.record.endedAt || '').localeCompare(String(a.record.endedAt || '')))
+    .slice(0, 4);
+
+  const bands = { retake: 0, reinforce: 0, mastered: 0 };
+  for (const record of scored) {
+    if (record.report.overallScore < 60) bands.retake += 1;
+    else if (record.report.overallScore < 80) bands.reinforce += 1;
+    else bands.mastered += 1;
+  }
+
+  const stuckBySubject = new Map();
+  let stuckTotal = 0;
+  for (const record of list) {
+    const count = Array.isArray(record.stuckPoints) ? record.stuckPoints.length : 0;
+    if (!count) continue;
+    stuckTotal += count;
+    const key = record.subject || 'unsorted';
+    stuckBySubject.set(key, (stuckBySubject.get(key) || 0) + count);
+  }
+  const stuckSubjects = [...stuckBySubject.entries()]
+    .map(([subject, count]) => ({ subject, count, label: subjectInfo(subject)?.short || '未分科' }))
+    .sort((a, b) => b.count - a.count);
+
+  const steps = [];
+  for (const record of scored.slice(0, 8)) {
+    for (const item of (Array.isArray(record.report.nextSteps) ? record.report.nextSteps : []).slice(0, 2)) {
+      const title = tidyText(item?.title, 48);
+      const action = tidyText(item?.action, 160);
+      const example = tidyText(item?.example, 160);
+      if (!title && !action) continue;
+      steps.push({
+        title: title || action,
+        action,
+        example,
+        score: record.report.overallScore,
+        recordId: record.id,
+        recordTopic: record.topic,
+        record
+      });
+    }
+  }
+  const prioritySteps = steps
+    .sort((a, b) => a.score - b.score || String(b.record.endedAt || '').localeCompare(String(a.record.endedAt || '')))
+    .slice(0, 3);
+
+  const headlineParts = [];
+  if (Number.isFinite(summary.recent)) headlineParts.push(`最近 5 课平均 ${summary.recent}%`);
+  if (summary.delta !== null) {
+    headlineParts.push(
+      `比前 5 课${summary.delta >= 0 ? '提高' : '降低'} ${Math.abs(summary.delta)} 分`
+    );
+  }
+  if (weakTags.length && Number.isFinite(weakTags[0].average)) {
+    headlineParts.push(`最薄弱的知识点是「${weakTags[0].tag}」（平均 ${weakTags[0].average}%）`);
+  }
+  if (misconceptions.length && misconceptions[0].count > 1) {
+    headlineParts.push(`「${misconceptions[0].title}」反复出现 ${misconceptions[0].count} 次`);
+  }
+  if (bands.retake) headlineParts.push(`${bands.retake} 课需要重讲`);
+  const headline = headlineParts.length
+    ? `${headlineParts.join('，')}。`
+    : '诊断数据还不多。讲完一课并生成报告后，这里会给出学情结论。';
+
+  return {
+    sessions: list.length,
+    scored: summary.scored,
+    summary,
+    metricTrends,
+    weakTags,
+    misconceptions,
+    bands,
+    stuckTotal,
+    stuckSubjects,
+    prioritySteps,
+    headline
+  };
+}
+
+/** 教师学情摘要的可复制文本，供设置里的「复制学情摘要」使用。 */
+export function teacherViewToText(view) {
+  if (!view || !view.sessions) return '暂无学情数据。';
+  const lines = ['# 学情摘要 · 教师视角', '', view.headline, '', '## 三维表现'];
+  for (const metric of METRICS) {
+    const trend = view.metricTrends[metric.key];
+    const value = Number.isFinite(trend.current) ? `${trend.current}%` : '—';
+    const change =
+      trend.delta === null ? '' : `（较前 5 课 ${trend.delta >= 0 ? '+' : ''}${trend.delta}）`;
+    lines.push(`- ${metric.label}：${value}${change}`);
+  }
+  lines.push('', '## 优先补的知识点');
+  if (view.weakTags.length) {
+    for (const tag of view.weakTags) {
+      lines.push(`- ${tag.tag}：平均 ${tag.average ?? '—'}%，练过 ${tag.sessions} 次`);
+    }
+  } else {
+    lines.push('- 暂无带知识点的记录');
+  }
+  lines.push('', '## 反复出现的理解缺口');
+  if (view.misconceptions.length) {
+    for (const item of view.misconceptions) {
+      lines.push(`- ${item.title}（${item.count} 次）`);
+      if (item.evidence) lines.push(`  证据：${item.evidence}`);
+      if (item.fix) lines.push(`  怎么补：${item.fix}`);
+    }
+  } else {
+    lines.push('- 暂无记录到的理解缺口');
+  }
+  lines.push('', '## 下一次教学动作');
+  if (view.prioritySteps.length) {
+    for (const step of view.prioritySteps) {
+      lines.push(`- ${step.title}：${step.action || step.example || '查看对应报告'}`);
+    }
+  } else {
+    lines.push('- 暂无诊断建议');
+  }
+  lines.push('', `课时分布：需重讲 ${view.bands.retake} 课，待巩固 ${view.bands.reinforce} 课，已掌握 ${view.bands.mastered} 课。`);
+  return lines.join('\n');
+}
+
 /** 把报告转成 Markdown，历史详情和报告弹窗都复用它。 */
 export function reportToText(record) {
   if (!record?.report) return '';

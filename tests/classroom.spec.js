@@ -405,6 +405,85 @@ test('localStorage 中的课堂丢失时可从本机数据库恢复', async ({ p
   await expect(page.locator('#topbarTopic')).toContainText('数据库恢复测试');
 });
 
+test('教师视角学情面板汇总薄弱点、理解缺口与教学动作', async ({ page }) => {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const records = [
+    {
+      id: 'teacher-1',
+      topic: '分数除法',
+      subject: 'primary',
+      tags: ['分数除法'],
+      source: 'custom',
+      endedAt: new Date(now).toISOString(),
+      turns: 3,
+      questions: 5,
+      stuckPoints: [{ turn: 1, at: new Date(now).toISOString() }],
+      report: {
+        overallScore: 58,
+        scores: { conceptMastery: 52, logicIntegrity: 60, clarity: 62 },
+        dimensions: {},
+        misconceptions: [
+          {
+            title: '把除数的份数当成被除数',
+            evidence: '把 3 当成了平均分的份数。',
+            fix: '先画线段图表示 3/4 米。'
+          }
+        ],
+        nextSteps: [{ title: '用线段图再讲一次', action: '画出 3/4 米，标出平均分成三份。' }],
+        generatedAt: new Date(now).toISOString()
+      },
+      messages: [{ role: 'user', content: '我把 3/4 米平均分成三份。' }]
+    },
+    {
+      id: 'teacher-2',
+      topic: '分数加减',
+      subject: 'primary',
+      tags: ['分数加法'],
+      source: 'custom',
+      endedAt: new Date(now - day).toISOString(),
+      turns: 2,
+      questions: 2,
+      stuckPoints: [{ turn: 2, at: new Date(now - day).toISOString() }],
+      report: {
+        overallScore: 72,
+        scores: { conceptMastery: 70, logicIntegrity: 74, clarity: 72 },
+        dimensions: {},
+        misconceptions: [
+          {
+            title: '把除数的份数当成被除数',
+            evidence: '又数成了 3 份。',
+            fix: '用线段图对齐单位“1”。'
+          }
+        ],
+        nextSteps: [{ title: '先通分再相加', action: '用同样的分母对齐每一份。' }],
+        generatedAt: new Date(now - day).toISOString()
+      },
+      messages: [{ role: 'user', content: '分母不一样也能直接加吗？' }]
+    }
+  ];
+
+  await page.evaluate((items) => {
+    localStorage.setItem('feynman.history.v1', JSON.stringify(items));
+  }, records);
+  await page.reload();
+
+  await page.locator('#historyBtn').click();
+  await expect(page.locator('#teacherBlock')).toBeVisible();
+  await expect(page.locator('#teacherInsight')).toContainText('最近 5 课平均 65%');
+  await expect(page.locator('#teacherInsight')).toContainText('分数除法');
+  await expect(page.locator('#teacherInsight')).toContainText('把除数的份数当成被除数');
+  await expect(page.locator('#teacherInsight')).toContainText('用线段图再讲一次');
+  await expect(page.locator('#teacherInsight')).toContainText('卡点分布');
+
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#teacherCopyBtn').click();
+  await expect(page.getByText('学情摘要已复制到剪贴板。')).toBeVisible();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('# 学情摘要 · 教师视角');
+  expect(copied).toContain('把除数的份数当成被除数');
+});
+
 test('档案导入与清空会同步写入本机数据库', async ({ page }) => {
   const backup = {
     app: 'Feynman Classroom',
