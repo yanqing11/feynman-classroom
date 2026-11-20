@@ -26,7 +26,7 @@ const BUILD_ASSETS = [
   "./assets/chunk-DQDQMLF5.js",
   "./assets/speech-G4TOBX5V.js",
   "./assets/canvas-W2TVNO6K.js",
-  "./assets/styles.RMHQENMN.css"
+  "./assets/styles.K7LLI3A7.css"
 ];
 /* BUILD:END */
 
