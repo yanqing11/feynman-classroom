@@ -10,7 +10,7 @@ UPSTREAM_BASE = "https://openrouter.ai/api/v1"
 ALLOWED_ORIGINS = "https://yanqing11.github.io,http://127.0.0.1:8000,http://localhost:8000"
 # 只允许这些模型，留空表示不限制。用逗号分隔。
 ALLOWED_MODELS = "qwen/qwen3-vl-30b-a3b-instruct,qwen/qwen3-vl-8b-instruct,mistralai/mistral-small-3.2-24b-instruct,deepseek/deepseek-chat-v3-0324"
-SITE_URL = "https://yanqing11.github.io/feynman-classroom/"
+SITE_URL = "https://yanqing11.github.io/feynman-classroom-pro/"
 RATE_LIMIT_PER_MINUTE = "30"
 MAX_TOKENS = "2000"
 # 设为 0 关闭。开启需要 KV 绑定（见 README）。

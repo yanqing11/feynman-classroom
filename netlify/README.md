@@ -13,7 +13,7 @@ netlify/
     └── index.html     # 代理状态页，不是课堂页面
 ```
 
-课堂页面仍然在 GitHub Pages：<https://yanqing11.github.io/feynman-classroom/>
+课堂页面仍然在 GitHub Pages：<https://yanqing11.github.io/feynman-classroom-pro/>
 
 ## 环境变量
 

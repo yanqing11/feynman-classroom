@@ -12,7 +12,7 @@
    └──────────── 换一个主题，重新开始 ────────────┘
 ```
 
-**在线体验：<https://yanqing11.github.io/feynman-classroom/>**
+**在线体验：<https://yanqing11.github.io/feynman-classroom-pro/>**
 
 ## 这是什么
 
@@ -28,7 +28,7 @@
 
 ### 学生：直接打开链接
 
-<https://yanqing11.github.io/feynman-classroom/>
+<https://yanqing11.github.io/feynman-classroom-pro/>
 
 不用填 Key，直接写主题 / 传题目图片就能开课。
 

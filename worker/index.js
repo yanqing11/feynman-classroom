@@ -200,7 +200,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${env.UPSTREAM_KEY}`,
-          'HTTP-Referer': String(env.SITE_URL || 'https://yanqing11.github.io/feynman-classroom/'),
+          'HTTP-Referer': String(env.SITE_URL || 'https://yanqing11.github.io/feynman-classroom-pro/'),
           'X-Title': 'Feynman Classroom'
         },
         body: JSON.stringify(checked.payload)

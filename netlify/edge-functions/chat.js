@@ -189,7 +189,7 @@ export default async (request, context) => {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${upstreamKey}`,
-        'HTTP-Referer': readEnv('SITE_URL', 'https://yanqing11.github.io/feynman-classroom/'),
+        'HTTP-Referer': readEnv('SITE_URL', 'https://yanqing11.github.io/feynman-classroom-pro/'),
         'X-Title': 'Feynman Classroom'
       },
       body: JSON.stringify(checked.payload)

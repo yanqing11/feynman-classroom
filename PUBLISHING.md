@@ -217,8 +217,8 @@ git push
 
 | 项目 | URL |
 | --- | --- |
-| 仓库 | <https://github.com/yanqing11/feynman-classroom> |
-| GitHub Pages | <https://yanqing11.github.io/feynman-classroom/> |
+| 仓库 | <https://github.com/yanqing11/feynman-classroom-pro> |
+| GitHub Pages | <https://yanqing11.github.io/feynman-classroom-pro/> |
 | 课堂共享代理（默认） | <https://feynman-classroom-proxy.netlify.app/v1> |
 | 代理健康检查 | <https://feynman-classroom-proxy.netlify.app/v1/chat/completions> |
 | 备用代理（Worker） | <https://feynman-proxy.yangqingliu64.workers.dev> |
